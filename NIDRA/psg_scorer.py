@@ -23,12 +23,27 @@ class PSGScorer:
     """
     Scores sleep stages from PSG data.
     """
-    def __init__(self, input_file: str, output_dir: str, model_name: str = "u-sleep-nsrr-2024"):
-        self.input_file = Path(input_file)
+    def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None, ch_names: List[str] = None, sfreq: float = None, model_name: str = "u-sleep-nsrr-2024"):
+        if input_file is None and data is None:
+            raise ValueError("Either 'input_file' or 'data' must be provided.")
+        if data is not None and sfreq is None:
+            raise ValueError("'sfreq' must be provided when 'data' is given.")
+
         self.output_dir = Path(output_dir)
+        self.input_data = data
+        self.ch_names = ch_names
+        self.sfreq = sfreq
+        
+        if input_file:
+            self.input_file = Path(input_file)
+            self.base_filename = f"{self.input_file.parent.name}_{self.input_file.stem}"
+        else:
+            self.input_file = None
+            self.base_filename = "numpy_input"
+
         self.model_path = PSG_MODEL_PATH
         self.model_name = model_name
-        self.epoch_size = 30 
+        self.epoch_size = 30
         self.new_sample_rate = PSG_NEW_SAMPLE_RATE
         self.auto_channel_grouping = PSG_AUTO_CHANNEL_GROUPING
         self.onnx_model_path = None
@@ -57,7 +72,7 @@ class PSGScorer:
     def plot(self):
         """Generates and saves a dashboard plot."""
         if self.hypnogram is not None and self.probabilities is not None and self.raw is not None:
-            plot_filename = f"{self.input_file.parent.name}_{self.input_file.stem}_dashboard.png"
+            plot_filename = f"{self.base_filename}_dashboard.png"
             plot_hypnodensity(
                 hyp=self.hypnogram,
                 ypred=self.probabilities,
@@ -78,12 +93,25 @@ class PSGScorer:
         self.output_name = self.session.get_outputs()[0].name
 
     def _load_recording(self):
-        """Loads a PSG file without preloading data."""
+        """Loads a PSG file or creates a raw object from numpy data."""
         print("Loading sleep study...")
-        try:
-            self.raw = mne.io.read_raw_edf(self.input_file, preload=False, verbose=False, stim_channel=None)
-        except ValueError:
-            self.raw = mne.io.read_raw_bdf(self.input_file, preload=False, verbose=False, stim_channel=None)
+        if self.input_data is not None:
+            if self.input_data.ndim != 2:
+                raise ValueError("Input data must be a 2D array.")
+            
+            n_channels = self.input_data.shape[0]
+            if self.ch_names is None:
+                self.ch_names = [f"Ch{i+1:02d}" for i in range(n_channels)]
+            elif len(self.ch_names) != n_channels:
+                raise ValueError("Number of channel names does not match number of channels in data.")
+            
+            info = mne.create_info(ch_names=self.ch_names, sfreq=self.sfreq, ch_types='eeg', verbose=False)
+            self.raw = mne.io.RawArray(self.input_data, info, verbose=False)
+        else:
+            try:
+                self.raw = mne.io.read_raw_edf(self.input_file, preload=False, verbose=False, stim_channel=None)
+            except ValueError:
+                self.raw = mne.io.read_raw_bdf(self.input_file, preload=False, verbose=False, stim_channel=None)
 
 
     def _preprocess(self):
@@ -209,14 +237,14 @@ class PSGScorer:
         print(f"Saving results to {self.output_dir}...")
         
         # Save hypnogram to CSV
-        hypnogram_csv_file = self.output_dir / f"{self.input_file.stem}_hypnogram.csv"
+        hypnogram_csv_file = self.output_dir / f"{self.base_filename}_hypnogram.csv"
         with open(hypnogram_csv_file, 'w') as f:
             f.write("sleep_stage\n")
             for stage in self.hypnogram:
                 f.write(f"{int(stage)}\n")
 
         # Save probabilities to CSV
-        prob_csv_file = self.output_dir / f"{self.input_file.stem}_probabilities.csv"
+        prob_csv_file = self.output_dir / f"{self.base_filename}_probabilities.csv"
         with open(prob_csv_file, 'w') as f:
             header = "Epoch,Wake,N1,N2,N3,Unknown,REM\n"
             f.write(header)

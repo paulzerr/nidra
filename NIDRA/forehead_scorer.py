@@ -10,9 +10,19 @@ class ForeheadScorer:
     """
     Scores sleep stages from forehead EEG data.
     """
-    def __init__(self, input_file: str, output_dir: str, model_name: str = "u-sleep-forehead-2024"):
-        self.input_file = Path(input_file)
+    def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None, model_name: str = "u-sleep-forehead-2024"):
+        if input_file is None and data is None:
+            raise ValueError("Either 'input_file' or 'data' must be provided.")
+
         self.output_dir = Path(output_dir)
+        self.input_data = data
+        if input_file:
+            self.input_file = Path(input_file)
+            self.base_filename = f"{self.input_file.parent.name}_{self.input_file.stem}"
+        else:
+            self.input_file = None
+            self.base_filename = "numpy_input"
+
         self.model_path = FOREHEAD_MODEL_PATH
         self.model_name = model_name
         self.seq_length = FOREHEAD_SEQ_LENGTH
@@ -41,7 +51,7 @@ class ForeheadScorer:
         return self.hypnogram, self.probabilities
 
     def plot(self):
-        plot_filename = f"{self.input_file.parent.name}_{self.input_file.stem}_dashboard.png"
+        plot_filename = f"{self.base_filename}_dashboard.png"
         plot_hypnodensity(
             hyp=self.hypnogram,
             ypred=self.probabilities,
@@ -59,13 +69,20 @@ class ForeheadScorer:
         self.output_name = self.session.get_outputs()[0].name
 
     def _load_recording(self):
-        rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False).resample(self.fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
-        rawR_path = Path(re.sub(r'(?i)L\.edf$', 'R.edf', str(self.input_file)))
-        rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False).resample(self.fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
-        dataL = rawL.get_data().flatten()
-        dataR = rawR.get_data().flatten()
-        info = mne.create_info(['eegl', 'eegr'], sfreq=self.fs, ch_types=['eeg', 'eeg'], verbose=False)
-        self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
+        if self.input_data is not None:
+            if self.input_data.ndim != 2 or self.input_data.shape[0] != 2:
+                raise ValueError("Input data must be a 2D array with 2 channels.")
+            info = mne.create_info(['eegl', 'eegr'], sfreq=self.fs, ch_types=['eeg', 'eeg'], verbose=False)
+            self.raw = mne.io.RawArray(self.input_data, info, verbose=False)
+            self.raw.filter(l_freq=0.5, h_freq=None, verbose=False)
+        else:
+            rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False).resample(self.fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+            rawR_path = Path(re.sub(r'(?i)L\.edf$', 'R.edf', str(self.input_file)))
+            rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False).resample(self.fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+            dataL = rawL.get_data().flatten()
+            dataR = rawR.get_data().flatten()
+            info = mne.create_info(['eegl', 'eegr'], sfreq=self.fs, ch_types=['eeg', 'eeg'], verbose=False)
+            self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
 
     def _predict(self):
         last_seq = self.processed_data[-1]
@@ -81,8 +98,8 @@ class ForeheadScorer:
         self.raw_predictions = raw_predictions
 
     def _save_results(self):
-        hypnogram_path = self.output_dir / f"{self.input_file.parent.name}_{self.input_file.stem}_hypnogram.csv"
-        probabilities_path = self.output_dir / f"{self.input_file.parent.name}_{self.input_file.stem}_probabilities.csv"
+        hypnogram_path = self.output_dir / f"{self.base_filename}_hypnogram.csv"
+        probabilities_path = self.output_dir / f"{self.base_filename}_probabilities.csv"
 
         with open(hypnogram_path, 'w') as f:
             f.write("sleep_stage\n")
