@@ -22,7 +22,7 @@ class PSGScorer:
     """
     Scores sleep stages from PSG data.
     """
-    def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None, ch_names: List[str] = None, sfreq: float = None, model_name: str = "u-sleep-nsrr-2024"):
+    def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None, ch_names: List[str] = None, sfreq: float = None, model_name: str = "u-sleep-nsrr-2024_eeg"):
         if input_file is None and data is None:
             raise ValueError("Either 'input_file' or 'data' must be provided.")
         if data is not None and sfreq is None:

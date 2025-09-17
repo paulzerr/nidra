@@ -16,7 +16,7 @@ def run_cli():
     score_parser.add_argument("--input_path", required=True, help="Path to the input file (EDF) or directory.")
     score_parser.add_argument("--output_dir", required=True, help="Path to the output directory.")
     score_parser.add_argument("--scorer_type", required=True, choices=['psg', 'forehead'], help="Type of scorer.")
-    score_parser.add_argument("--model_name", help="ez6 or ez6moe for Zmax. U-Sleep 2.0 for PSG.", default=None)
+    score_parser.add_argument("--model_name", help="ez6 or ez6moe for Zmax. u-sleep-nsrr-2024 or u-sleep-nsrr-2024_eeg for PSG.", default=None)
     score_parser.add_argument("--no_plot", action="store_true", help="Do not generate a plot.")
 
     # If no command is given, show help. This is for when `nidra` is called alone.
