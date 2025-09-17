@@ -42,7 +42,7 @@ class PSGScorer:
 
         self.model_path = Path(__file__).parent / "models"
         self.model_name = model_name
-        self.epoch_sec = epoch_sec
+        self.epoch_sec = 30 #epoch_sec # we ignore this input for now and enforce 30s epochs
         self.new_sample_rate = 128
         self.auto_channel_grouping = ['EEG', 'EOG']
         self.onnx_model_path = None
