@@ -2,7 +2,7 @@ __pycache__/
 *.pyc
 
 .venv/
-
+.history/
 *.log
 
 build/

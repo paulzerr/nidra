@@ -16,7 +16,7 @@ def run_cli():
     score_parser.add_argument("--input_path", required=True, help="Path to the input file (EDF) or directory.")
     score_parser.add_argument("--output_dir", required=True, help="Path to the output directory.")
     score_parser.add_argument("--scorer_type", required=True, choices=['psg', 'forehead'], help="Type of scorer.")
-    score_parser.add_argument("--model_name", help="ez6 or ez6moe for Zmax. u-sleep-nsrr-2024 or u-sleep-nsrr-2024_eeg for PSG.", default=None)
+    score_parser.add_argument("--model_name", help="ez6 or ez6moe for Zmax. u-sleep-nsrr-2024 or u-sleep-nsrr-2024_eeg for PSG.", default='u-sleep-nsrr-2024_eeg')
     score_parser.add_argument("--no_plot", action="store_true", help="Do not generate a plot.")
 
     # If no command is given, show help. This is for when `nidra` is called alone.
@@ -47,6 +47,13 @@ def run_cli():
             print(f"Error: Input path {input_path} is not a valid file or directory.", file=sys.stderr)
             sys.exit(1)
 
+        model_name = args.model_name
+        if model_name is None:
+            if args.scorer_type == 'psg':
+                model_name = 'u-sleep-nsrr-2024'
+            elif args.scorer_type == 'forehead':
+                model_name = 'ez6'
+
         for file in files_to_process:
             print(f"Processing: {file}")
             try:
@@ -54,7 +61,8 @@ def run_cli():
                     scorer_type=args.scorer_type,
                     input_file=str(file),
                     output_dir=str(output_dir),
-                    model_name=args.model_name
+                    model_name=model_name,
+                    epoch_sec=30
                 )
                 scorer.score(plot=not args.no_plot)
                 print(f"Scoring for {file} complete. Results are in {output_dir}")

@@ -22,7 +22,7 @@ class PSGScorer:
     """
     Scores sleep stages from PSG data.
     """
-    def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None, ch_names: List[str] = None, sfreq: float = None, model_name: str = "u-sleep-nsrr-2024_eeg"):
+    def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None, ch_names: List[str] = None, sfreq: float = None, model_name: str = "u-sleep-nsrr-2024_eeg", epoch_sec: int = 30):
         if input_file is None and data is None:
             raise ValueError("Either 'input_file' or 'data' must be provided.")
         if data is not None and sfreq is None:
@@ -42,7 +42,7 @@ class PSGScorer:
 
         self.model_path = Path(__file__).parent / "models"
         self.model_name = model_name
-        self.epoch_size = 30
+        self.epoch_sec = epoch_sec
         self.new_sample_rate = 128
         self.auto_channel_grouping = ['EEG', 'EOG']
         self.onnx_model_path = None
@@ -126,7 +126,7 @@ class PSGScorer:
         original_sample_rate = self.raw.info['sfreq']
         psg_data = self.raw.get_data().T.astype(np.float64)
 
-        n_samples_in_epoch_original = int(self.epoch_size * original_sample_rate)
+        n_samples_in_epoch_original = int(self.epoch_sec * original_sample_rate)
         n_epochs = len(psg_data) // n_samples_in_epoch_original
         psg_data = psg_data[:n_epochs * n_samples_in_epoch_original]
 
@@ -144,7 +144,7 @@ class PSGScorer:
         for i in range(psg_data_resampled.shape[1]):
             psg_data_scaled[:, i] = self._robust_scale_channel(psg_data_resampled[:, i])
         
-        n_samples_in_epoch_final = self.epoch_size * self.new_sample_rate
+        n_samples_in_epoch_final = self.epoch_sec * self.new_sample_rate
         n_epochs_final = len(psg_data_scaled) // n_samples_in_epoch_final
         psg_data_scaled = psg_data_scaled[:n_epochs_final * n_samples_in_epoch_final]
         
