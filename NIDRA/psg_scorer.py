@@ -8,7 +8,6 @@ from pathlib import Path
 from collections import namedtuple, OrderedDict
 from itertools import product
 from typing import List, Tuple, Dict, Any
-from NIDRA.config import PSG_MODEL_PATH, PSG_NEW_SAMPLE_RATE, PSG_AUTO_CHANNEL_GROUPING
 from NIDRA.plotting import plot_hypnodensity
 
 
@@ -41,11 +40,11 @@ class PSGScorer:
             self.input_file = None
             self.base_filename = "numpy_input"
 
-        self.model_path = PSG_MODEL_PATH
+        self.model_path = Path(__file__).parent / "models"
         self.model_name = model_name
         self.epoch_size = 30
-        self.new_sample_rate = PSG_NEW_SAMPLE_RATE
-        self.auto_channel_grouping = PSG_AUTO_CHANNEL_GROUPING
+        self.new_sample_rate = 128
+        self.auto_channel_grouping = ['EEG', 'EOG']
         self.onnx_model_path = None
         self.preprocessed_psg = None
         self.channel_groups = None

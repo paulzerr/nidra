@@ -3,7 +3,6 @@ import mne
 import numpy as np
 from pathlib import Path
 import onnxruntime as ort
-from NIDRA.config import FOREHEAD_MODEL_PATH, FOREHEAD_SEQ_LENGTH, FOREHEAD_FS
 from NIDRA.plotting import plot_hypnodensity
 
 class ForeheadScorer:
@@ -23,10 +22,11 @@ class ForeheadScorer:
             self.input_file = None
             self.base_filename = "numpy_input"
 
-        self.model_path = FOREHEAD_MODEL_PATH
+        self.model_dir = Path(__file__).parent / "models"
         self.model_name = model_name
-        self.seq_length = FOREHEAD_SEQ_LENGTH
-        self.fs = FOREHEAD_FS
+        self.seq_length = 100
+        self.fs = 64
+        self.epoch_size = 30
         self.session = None
         self.input_name = None
         self.output_name = None
@@ -63,7 +63,7 @@ class ForeheadScorer:
         )
 
     def _load_model(self):
-        model_file = self.model_path.parent / f"{self.model_name}.onnx"
+        model_file = self.model_dir / f"{self.model_name}.onnx"
         self.session = ort.InferenceSession(str(model_file))
         self.input_name = self.session.get_inputs()[0].name
         self.output_name = self.session.get_outputs()[0].name
@@ -132,7 +132,7 @@ class ForeheadScorer:
         if data_as_array.shape[0] > data_as_array.shape[1]:
             data_as_array = data_as_array.T
 
-        num_channels, epoch_length = data_as_array.shape[0], 30 * self.fs
+        num_channels, epoch_length = data_as_array.shape[0], self.epoch_size * self.fs
         num_epochs = int(np.floor(data_as_array.shape[1] / epoch_length))
 
         epoched_data = np.full((num_channels, num_epochs, epoch_length), np.nan)
@@ -156,7 +156,7 @@ class ForeheadScorer:
 
     def _postprocess(self):
         # get number of complete 30-second epochs that exist in the raw EEG recording
-        num_epochs = int(np.floor(self.raw.get_data().shape[1] / (30 * self.fs)))
+        num_epochs = int(np.floor(self.raw.get_data().shape[1] / (self.epoch_size * self.fs)))
         # truncate predictions to match number of full epochs in recording
         ypred_raw = self.raw_predictions[:num_epochs, :]
         # reorder model output to fit standard sleep stage order
