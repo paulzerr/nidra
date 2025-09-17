@@ -24,9 +24,6 @@ class ForeheadScorer:
 
         self.model_dir = Path(__file__).parent / "models"
         self.model_name = model_name
-        self.seq_length = 100
-        self.fs = 64
-        self.epoch_size = 30
         self.session = None
         self.input_name = None
         self.output_name = None
@@ -69,25 +66,27 @@ class ForeheadScorer:
         self.output_name = self.session.get_outputs()[0].name
 
     def _load_recording(self):
+        fs = 64
         if self.input_data is not None:
             if self.input_data.ndim != 2 or self.input_data.shape[0] != 2:
                 raise ValueError("Input data must be a 2D array with 2 channels.")
-            info = mne.create_info(['eegl', 'eegr'], sfreq=self.fs, ch_types=['eeg', 'eeg'], verbose=False)
+            info = mne.create_info(['eegl', 'eegr'], sfreq=fs, ch_types=['eeg', 'eeg'], verbose=False)
             self.raw = mne.io.RawArray(self.input_data, info, verbose=False)
             self.raw.filter(l_freq=0.5, h_freq=None, verbose=False)
         else:
-            rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False).resample(self.fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+            rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False).resample(fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
             rawR_path = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', str(self.input_file)))
-            rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False).resample(self.fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+            rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False).resample(fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
             dataL = rawL.get_data().flatten()
             dataR = rawR.get_data().flatten()
-            info = mne.create_info(['eegl', 'eegr'], sfreq=self.fs, ch_types=['eeg', 'eeg'], verbose=False)
+            info = mne.create_info(['eegl', 'eegr'], sfreq=fs, ch_types=['eeg', 'eeg'], verbose=False)
             self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
 
     def _predict(self):
+        seq_length = 100
         last_seq = self.processed_data[-1]
         last_seq_valid_epochs = int(np.sum(~np.isnan(last_seq.sum(axis=(1, 2)))))
-        if last_seq_valid_epochs == self.seq_length:
+        if last_seq_valid_epochs == seq_length:
             raw_predictions = self.session.run(None, {self.input_name: self.processed_data.astype(np.float32)})[0].reshape(-1, 6)
         else:
             ypred_main = self.session.run(None, {self.input_name: self.processed_data[:self.num_full_seqs].astype(np.float32)})[0].reshape(-1, 6)
@@ -113,6 +112,9 @@ class ForeheadScorer:
         
 
     def _preprocess(self):
+        seq_length = 100
+        fs = 64
+        epoch_size = 30
         sdata = self.raw.get_data()
         for ch in range(sdata.shape[0]):
             sig = sdata[ch]
@@ -132,7 +134,7 @@ class ForeheadScorer:
         if data_as_array.shape[0] > data_as_array.shape[1]:
             data_as_array = data_as_array.T
 
-        num_channels, epoch_length = data_as_array.shape[0], self.epoch_size * self.fs
+        num_channels, epoch_length = data_as_array.shape[0], epoch_size * fs
         num_epochs = int(np.floor(data_as_array.shape[1] / epoch_length))
 
         epoched_data = np.full((num_channels, num_epochs, epoch_length), np.nan)
@@ -141,22 +143,24 @@ class ForeheadScorer:
             for e_idx, tidx in enumerate(tidxs):
                 epoched_data[ch_idx, e_idx, :] = data_as_array[ch_idx, tidx:tidx + epoch_length]
 
-        num_full_seqs, remainder_epochs = divmod(num_epochs, self.seq_length)
+        num_full_seqs, remainder_epochs = divmod(num_epochs, seq_length)
         num_seqs = num_full_seqs + (1 if remainder_epochs > 0 else 0)
 
-        seqdat = np.full((num_seqs, self.seq_length, epoched_data.shape[2], epoched_data.shape[0]), np.nan, dtype=np.float32)
+        seqdat = np.full((num_seqs, seq_length, epoched_data.shape[2], epoched_data.shape[0]), np.nan, dtype=np.float32)
         for ct in range(num_full_seqs):
-            idx_start, idx_end = ct * self.seq_length, (ct + 1) * self.seq_length
+            idx_start, idx_end = ct * seq_length, (ct + 1) * seq_length
             seqdat[ct, :, :, :] = np.transpose(epoched_data[:, idx_start:idx_end, :], (1, 2, 0))
         if remainder_epochs > 0:
-            idx_start = num_full_seqs * self.seq_length
+            idx_start = num_full_seqs * seq_length
             seqdat[num_full_seqs, :remainder_epochs, :, :] = np.transpose(epoched_data[:, idx_start:, :], (1, 2, 0))
 
         self.processed_data, self.num_full_seqs = seqdat, num_full_seqs
 
     def _postprocess(self):
+        fs = 64
+        epoch_size = 30
         # get number of complete 30-second epochs that exist in the raw EEG recording
-        num_epochs = int(np.floor(self.raw.get_data().shape[1] / (self.epoch_size * self.fs)))
+        num_epochs = int(np.floor(self.raw.get_data().shape[1] / (epoch_size * fs)))
         # truncate predictions to match number of full epochs in recording
         ypred_raw = self.raw_predictions[:num_epochs, :]
         # reorder model output to fit standard sleep stage order
