@@ -77,7 +77,7 @@ class ForeheadScorer:
             self.raw.filter(l_freq=0.5, h_freq=None, verbose=False)
         else:
             rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False).resample(self.fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
-            rawR_path = Path(re.sub(r'(?i)L\.edf$', 'R.edf', str(self.input_file)))
+            rawR_path = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', str(self.input_file)))
             rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False).resample(self.fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
             dataL = rawL.get_data().flatten()
             dataR = rawR.get_data().flatten()
