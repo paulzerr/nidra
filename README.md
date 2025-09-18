@@ -79,7 +79,7 @@ nidra-gui
 ```
 
 <br>
-<img src="docs/gui.png" alt="Screenshot of the NIDRA GUI" width="50%"/>
+<img src="docs/gui.png" alt="Screenshot of the NIDRA GUI" width="80%"/>
 <br>
 Fig.1 - Screenshot of the GUI
 <br>
