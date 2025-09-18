@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ texts["WINDOW_TITLE"] }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Left Panel: Controls -->
+        <div class="panel left-panel">
+            <div class="control-group">
+                <h2>{{ texts["INPUT_TITLE"] }}</h2>
+                <div class="file-input-group">
+                    <button id="browse-input-btn" class="browse-btn">{{ texts["BROWSE_BUTTON"] }}</button>
+                    <input type="text" id="input-dir" placeholder="Select input directory...">
+                </div>
+                <div class="radio-group">
+                    <label><input type="radio" name="scoring-mode" value="single" checked> {{ texts["OPTIONS_SCORE_SINGLE"] }}</label>
+                    <label><input type="radio" name="scoring-mode" value="subdirs"> {{ texts["OPTIONS_SCORE_SUBDIRS"] }}</label>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="control-group">
+                <h2>{{ texts["OUTPUT_TITLE"] }}</h2>
+                <div class="file-input-group">
+                    <button id="browse-output-btn" class="browse-btn">{{ texts["BROWSE_BUTTON"] }}</button>
+                    <input type="text" id="output-dir" placeholder="Select output directory...">
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="control-group horizontal-group">
+                <div class="sub-group">
+                    <label for="data-source">{{ texts["DATA_SOURCE_TITLE"] }}</label>
+                    <select id="data-source">
+                        <option value="{{ texts['DATA_SOURCE_FEE'] }}" selected>{{ texts["DATA_SOURCE_FEE"] }}</option>
+                        <option value="{{ texts['DATA_SOURCE_PSG'] }}">{{ texts["DATA_SOURCE_PSG"] }}</option>
+                    </select>
+                </div>
+                <div class="sub-group">
+                    <label for="model-name">{{ texts["MODEL_TITLE"] }}</label>
+                    <select id="model-name">
+                        <option value="ez6" selected>ez6</option>
+                        <option value="ez6moe">ez6moe</option>
+                    </select>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="control-group">
+                <h2>{{ texts["OPTIONS_TITLE"] }}</h2>
+                <div class="checkbox-group">
+                    <label><input type="checkbox" id="gen-plot" checked> {{ texts["OPTIONS_PLOT"] }}</label>
+                    <label><input type="checkbox" id="gen-stats" checked> {{ texts["OPTIONS_STATS"] }}</label>
+                </div>
+                <button id="help-btn" class="help-btn">{{ texts["HELP_TITLE"] }}</button>
+            </div>
+
+            <button id="run-btn" class="run-btn">{{ texts["RUN_BUTTON"] }}</button>
+        </div>
+
+        <!-- Right Panel: Console -->
+        <div class="panel right-panel">
+            <div id="console" class="console-output">
+                <pre>Welcome to NIDRA Web UI. Press 'Run Scoring' to begin.</pre>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const runBtn = document.getElementById('run-btn');
+    const consoleOutput = document.getElementById('console');
+    const dataSourceSelect = document.getElementById('data-source');
+    const modelNameSelect = document.getElementById('model-name');
+    const browseInputDirBtn = document.getElementById('browse-input-btn');
+    const browseOutputDirBtn = document.getElementById('browse-output-btn');
+
+    let logInterval;
+    let statusInterval;
+
+    // --- Event Listeners ---
+
+    // Handle Data Source change to update model list
+    dataSourceSelect.addEventListener('change', () => {
+        const selectedSource = dataSourceSelect.value;
+        // Assuming config.TEXTS is available globally via the template
+        if (selectedSource.includes('PSG')) { // A bit brittle, but works with current text
+            modelNameSelect.innerHTML = '<option value="u-sleep-nsrr-2024" selected>u-sleep-nsrr-2024</option>';
+        } else {
+            modelNameSelect.innerHTML = `
+                <option value="ez6" selected>ez6</option>
+                <option value="ez6moe">ez6moe</option>
+            `;
+        }
+    });
+
+    // Handle Run Button click
+    runBtn.addEventListener('click', async () => {
+        const payload = {
+            input_dir: document.getElementById('input-dir').value,
+            output_dir: document.getElementById('output-dir').value,
+            data_source: dataSourceSelect.value,
+            model_name: modelNameSelect.value,
+            plot: document.getElementById('gen-plot').checked,
+            gen_stats: document.getElementById('gen-stats').checked,
+            score_subdirs: document.querySelector('input[name="scoring-mode"]:checked').value === 'subdirs'
+        };
+
+        if (!payload.input_dir || !payload.output_dir) {
+            alert('Please provide both an Input and an Output directory path.');
+            return;
+        }
+
+        setRunningState(true);
+
+        try {
+            const response = await fetch('/start-scoring', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                console.log('Scoring started:', result.message);
+                startPolling();
+            } else {
+                alert(`Error: ${result.message}`);
+                setRunningState(false);
+            }
+        } catch (error) {
+            console.error('Failed to start scoring process:', error);
+            alert('An error occurred while trying to start the scoring process.');
+            setRunningState(false);
+        }
+    });
+
+    // "Browse" button functionality
+    const handleBrowseClick = async (targetInputId) => {
+        try {
+            const response = await fetch('/select-directory');
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                document.getElementById(targetInputId).value = result.path;
+                // Automatically set default output path when input is selected
+                if (targetInputId === 'input-dir') {
+                    const outputDirInput = document.getElementById('output-dir');
+                    if (!outputDirInput.value) { // Only set if output is empty
+                        outputDirInput.value = result.path + '/autoscorer_output';
+                    }
+                }
+            } else if (result.status === 'cancelled') {
+                console.log('Directory selection was cancelled.');
+            } else {
+                alert(`Error selecting directory: ${result.message}`);
+            }
+        } catch (error) {
+            console.error('Failed to open directory dialog:', error);
+            alert('An error occurred while trying to open the directory dialog.');
+        }
+    };
+
+    browseInputDirBtn.addEventListener('click', () => handleBrowseClick('input-dir'));
+    browseOutputDirBtn.addEventListener('click', () => handleBrowseClick('output-dir'));
+
+
+    // --- UI and Polling Functions ---
+
+    function setRunningState(isRunning) {
+        runBtn.disabled = isRunning;
+        runBtn.textContent = isRunning ? 'Running...' : 'Run Scoring';
+    }
+
+    function startPolling() {
+        // Clear any existing intervals
+        if (logInterval) clearInterval(logInterval);
+        if (statusInterval) clearInterval(statusInterval);
+
+        // Start new polling
+        logInterval = setInterval(fetchLogs, 1000); // Poll logs every second
+        statusInterval = setInterval(checkStatus, 2000); // Check status every 2 seconds
+    }
+
+    function stopPolling() {
+        clearInterval(logInterval);
+        clearInterval(statusInterval);
+    }
+
+    async function fetchLogs() {
+        try {
+            const response = await fetch('/log');
+            const logText = await response.text();
+            const consolePre = consoleOutput.querySelector('pre');
+            if (consolePre.textContent !== logText) {
+                consolePre.textContent = logText;
+                // Auto-scroll to the bottom
+                consoleOutput.scrollTop = consoleOutput.scrollHeight;
+            }
+        } catch (error) {
+            console.error('Error fetching logs:', error);
+        }
+    }
+
+    async function checkStatus() {
+        try {
+            const response = await fetch('/status');
+            const data = await response.json();
+            if (!data.is_running) {
+                setRunningState(false);
+                stopPolling();
+                // Final log fetch to ensure we have the latest output
+                setTimeout(fetchLogs, 500);
+            }
+        } catch (error) {
+            console.error('Error checking status:', error);
+            // If status check fails, stop polling to avoid flooding with errors
+            setRunningState(false);
+            stopPolling();
+        }
+    }
+
+    // Initial status check in case the server was already running a task
+    // The initial status check is not required and can clear the welcome message.
+    // Polling will now begin only after the user starts a scoring task.
+});

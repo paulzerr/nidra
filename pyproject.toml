@@ -11,7 +11,7 @@ authors = [
 description = "A tool for scoring sleep data from PSG and forehead EEG recordings."
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT License"}
+license = "MIT"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -23,8 +23,15 @@ dependencies = [
     "seaborn",
     "pandas",
     "onnxruntime",
-    "dearpygui",
     "matplotlib",
+    "Flask",
+    "filelock>=3.9.0",
+    "pyyaml",
+    "absl-py",
+    "h5py",
+    "psutil",
+    "pyinstaller",
+    "pywebview"
 ]
 
 [project.urls]
