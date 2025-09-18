@@ -1,61 +1,74 @@
-# NIDRA
+# NIDRA 
+### Neural Inferencer for Deep Rest Analysis
+<br>
 
-NIDRA is a simple-to-use tool for scoring sleep recordings. Data from Polysomnography (PSG), as well as sleep EEG wearables (such as ZMax) can be scored. It provides a graphical user interface, a command-line interface, and a Python API.
+Advanced neural networks can perform highly accurate sleep scoring, but these technologies are often difficult to implement. 
 
-The idea behind NIDRA is to enable anyone, including researchers without programming knowledge, to use cutting-edge sleep scoring models.
+NIDRA is a fool-proof, simple-to-use tool for scoring sleep recordings using the best currently available autoscoring machine learning algorithms. No programming required, but a CLI and python endpoints are available. 
 
-NIDRA also presents the first interface for reliable sleep scoring of ZMax data, using the ez6 and ez6moe sleep scoring models. For a validation of these models see https://www.biorxiv.org/content/10.1101/2025.06.02.657451v1
+NIDRA can be downloaded as a standalone executable file, without installing anything (useful in restricted environments), but is also pip installable, or by downloading this repository.
+
+NIDRA can autoscore data from polysomnography (PSG) recordings, as well as from sleep EEG wearables (such as ZMax). 
+
+NIDRA enables anyone, including researchers without any programming experience, to use cutting-edge sleep scoring models.
+
+NIDRA by default uses the highly accurate U-Sleep 2.0 model for PSG, and the recently validated high-accuracy ez6 and ez6moe sleep scoring models for ZMax data and simliar sleep EEG wearables. For a validation of the ez models see https://www.biorxiv.org/content/10.1101/2025.06.02.657451v1
 
 
-## Usage
+<br>
+
+# Usage:
 
 NIDRA can be used without installation using portable, ready-to-go executables:
 
 Linux: LINK
+
 MacOS: LINK
+
 Windows: LINK
 
 
 ## Installation
 
-Alternatively, NIDRA can be installed via pip:
-
-pip install NIDRA
-
-
-Or, by cloning this github repository:
-
-It is recommended to install it in a virtual environment.
+Alternatively, NIDRA can be installed by cloning this github repository:
 
 1.  **Clone the repository:**
+
     ```bash
-    git clone https://github.com/p-zerr/NIDRA.git
+    git clone https://codeberg.org/pzerr/NIDRA.git
     cd NIDRA
     ```
 
 2.  **Create and activate a virtual environment:**
-    *   On macOS and Linux:
-        ```bash
-        python3 -m venv .venv
-        source .venv/bin/activate
-        ```
-    *   On Windows:
-        ```bash
-        python -m venv .venv
-        .venv\Scripts\activate
-        ```
+
+    On macOS and Linux:
+    ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate
+    ```
+    
+    On Windows:
+    ```bash
+    python -m venv .venv
+    .venv\Scripts\activate
+    ```
 
 3.  **Install the package:**
-    Install the package
+    
     ```bash
     pip install .
     ```
 
-## Usage
 
-NIDRA can be used in three ways: through the graphical user interface (GUI), the command-line interface (CLI), or as a Python package.
+Or, (in the near future), from PyPI:
 
-### Graphical User Interface (GUI)
+```bash
+pip install NIDRA
+```
+
+
+
+# Graphical User Interface:
 
 The GUI provides an intuitive way to score sleep recordings. To launch the GUI, run the portable executable (see above),
 
@@ -65,12 +78,45 @@ or run the following command in your terminal after installation:
 nidra-gui
 ```
 
-![Screenshot of the NIDRA GUI](placeholder.png)
+<br>
+<img src="docs/gui.png" alt="Screenshot of the NIDRA GUI" width="50%"/>
+<br>
+Fig.1 - Screenshot of the GUI
+<br>
+<br>
 
-**Manual:**
+
+
+# Model Validation:
+
+### ez6 and ez6moe
+
+ez6 is the first accurate autoscoring model for 2-channel forehead sleep EEG devices, such as the ZMax.
+
+ez6moe is multiple-expert model and a variant of ez6. It is accurate on the level of the interrater agreement between human scorers. 
+
+<br>
+<img src="docs/matrix.png" alt="Screenshot of the NIDRA GUI" width="50%"/>
+<br>
+Fig.2 - Confusion matrix (vs. manually scored PSG) of the artefact-aware ez6moe model 
+<br>
+<br>
+
+### U-Sleep
+
+For U-Sleep models see https://www.nature.com/articles/s41746-021-00440-5
+
+
+<br>
+<br>
+
+
+
+
+# **Manual:**
 
 1.  **Input Directory**: Select the directory containing the sleep recording data.
-2.  **Output Directory**: Select the directory where the results will be saved.
+2.  **Output Directory**: Select the directory where the results will be saved. This defaults to a new folder in the Input Directory.
 3.  **Scoring Mode**:
     *   **Score single recording**: Scores a single recording in the selected input directory.
     *   **Score all subdirectories**: Scores all recordings in the subdirectories of the selected input directory.
@@ -80,12 +126,9 @@ nidra-gui
 5.  **Model**: Select the model to use for scoring. The available models depend on the selected data source.
 6.  **Options**:
     *   **Generate Plots**: Generate plots of the sleep stages.
-    *   **Generate Statistics**: Generate statistics of the sleep stages.
+    *   **Generate Statistics**: Generate statistics of the sleep stages, such as WASO, sleep efficiency, etc.
 7.  **Run**: Start the scoring process.
 
-### Python API
-
-NIDRA can be used as a Python package to integrate sleep scoring into your own scripts.
 
 **Example:**
 
@@ -93,12 +136,10 @@ NIDRA can be used as a Python package to integrate sleep scoring into your own s
 import NIDRA
 from pathlib import Path
 
-# --- Forehead Scorer Example ---
-print("Running Forehead Scorer Example...")
+# --- EEG wearable example ---
 forehead_input_file = Path('test_data_zmax/EEG_L.edf')
-forehead_output_dir = Path('output/forehead')
+forehead_output_dir = Path('test_data_zmax/autoscoring_output')
 
-# Create scorer instance using the factory
 forehead_scorer = NIDRA.scorer(
     scorer_type='forehead',
     input_file=str(forehead_input_file),
@@ -106,16 +147,14 @@ forehead_scorer = NIDRA.scorer(
     model_name='ez6'
 )
 
-# Run scoring and generate plot
 forehead_hypnogram, forehead_probabilities = forehead_scorer.score(plot=True)
-print(f"Forehead scoring complete. Results are in {forehead_output_dir}")
 
-# --- PSG Scorer Example ---
-print("Running PSG Scorer Example...")
+
+
+# --- PSG example ---
 psg_input_file = Path('test_data_psg/sleeprecording.edf')
-psg_output_dir = Path('output/psg')
+psg_output_dir = Path('test_data_psg/autoscoring_output')
 
-# Create scorer instance using the factory
 psg_scorer = NIDRA.scorer(
     scorer_type='psg',
     input_file=str(psg_input_file),
@@ -123,9 +162,9 @@ psg_scorer = NIDRA.scorer(
     model_name='u-sleep-nsrr-2024'
 )
 
-# Run scoring and generate plot
 psg_hypnogram, psg_probabilities = psg_scorer.score(plot=True)
-print(f"PSG scoring complete. Results are in {psg_output_dir}")
+
+
 ```
 
 
@@ -149,7 +188,7 @@ nidra score [OPTIONS]
 **Example:**
 
 ```bash
-nidra score --input_path test_data_zmax/ --output_dir output/ --scorer_type forehead --model_name ez6
+nidra score --input_path test_data_zmax/ --output_dir test_data_zmax/autoscoringoutput/ --scorer_type forehead --model_name ez6
 ```
 
 
@@ -161,6 +200,9 @@ If you use NIDRA, please cite the following publication:
 
 Coon WG, Zerr P, Milsap G, Sikder N, Smith M, Dresler M, Reid M. "ezscore-f: A Set of Freely Available, Validated Sleep Stage Classifiers for Forehead EEG." bioRxiv, 2025, doi: 10.1101/2025.06.02.657451.
 https://www.biorxiv.org/content/10.1101/2025.06.02.657451v1
+
+
+## Attribution
 
 ez6 and ez6moe models were developed by Coon et al., see:
 Coon WG, Zerr P, Milsap G, Sikder N, Smith M, Dresler M, Reid M.
