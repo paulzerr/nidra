@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIDRA User Manual</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h1>NIDRA</h1>
+            <span>User Manual</span>
+        </div>
+        <ul>
+            <li><a href="#introduction">Introduction</a></li>
+            <li><a href="#installation">Installation</a></li>
+            <li><a href="#gui-guide">GUI Guide</a></li>
+            <li><a href="#cli-guide">CLI Guide</a></li>
+            <li><a href="#python-package">Python Package</a></li>
+            <li><a href="#models">Models</a></li>
+            <li><a href="#utilities">Utilities</a></li>
+        </ul>
+    </nav>
+    <main class="content">
+        <section id="introduction">
+            <h2>Introduction</h2>
+            <p>NIDRA is an automated sleep scoring tool designed for both forehead EEG and full polysomnography (PSG) recordings. It provides a user-friendly graphical interface and a powerful command-line tool for processing sleep data, generating hypnograms, sleep statistics, and visualizations.</p>
+        </section>
+
+        <section id="installation">
+            <h2>Installation</h2>
+            <p>NIDRA is available on the Python Package Index (PyPI) and can be installed using pip. It is recommended to install it in a virtual environment to avoid conflicts with other packages.</p>
+            <pre><code>pip install nidra</code></pre>
+            <p>Once installed, you can launch the graphical interface by running <code>nidra-gui</code> in your terminal, or use it as a command-line tool or Python package.</p>
+        </section>
+
+        <section id="gui-guide">
+            <h2>GUI Guide</h2>
+            <p>The NIDRA graphical user interface (GUI) provides an intuitive way to perform sleep scoring without needing to use the command line. To launch the GUI, run the application from its executable or by calling the main module.</p>
+
+            <img src="gui_screenshot.png" alt="NIDRA GUI Screenshot" style="width: 100%; max-width: 800px; display: block; margin: 20px auto;">
+
+            <p>The interface is organized into several key areas:</p>
+            <ol>
+                <li><strong>Input/Output Selection:</strong> Choose your input data directory and specify where to save the results.</li>
+                <li><strong>Scoring Mode:</strong> Select whether you are scoring a single recording or batch-processing multiple recordings in subfolders.</li>
+                <li><strong>Data Source and Model:</strong> Specify the type of recording (forehead EEG or full PSG) and select the appropriate scoring model.</li>
+                <li><strong>Options:</strong> Customize your output by choosing whether to generate plots and sleep statistics.</li>
+                <li><strong>Run Control:</strong> Start the scoring process with the "Run" button.</li>
+                <li><strong>Console Log:</strong> Monitor the real-time progress and see any important messages or errors.</li>
+            </ol>
+
+            <h3>1. Input and Output</h3>
+            <p>The main interface is divided into panels for selecting input data, configuring options, and viewing output logs.</p>
+            <ul>
+                <li><strong>Input Directory:</strong> Use the "Browse files..." button to select the directory that contains your sleep recording(s). The path to the selected directory will appear in the text field.</li>
+                <li><strong>Output Directory:</strong> Specify the directory where NIDRA will save the scoring results. By default, it creates a folder named <code>autoscorer_output</code> inside your selected input directory.</li>
+            </ul>
+
+            <h3>2. Scoring Mode</h3>
+            <p>NIDRA offers two modes for processing your data:</p>
+            <ul>
+                <li><strong>Score single recording:</strong> Select this if your input directory contains the files for only one sleep session (e.g., <code>*L.edf</code> and <code>*R.edf</code> for forehead EEG, or a single <code>.edf</code> for PSG).</li>
+                <li><strong>Score all recordings (in subfolders):</strong> Choose this for batch processing. Your input directory should contain multiple subdirectories, where each subdirectory holds the files for a single recording. NIDRA will process each subfolder sequentially.</li>
+            </ul>
+
+            <h3>3. Data Source and Model Selection</h3>
+            <p>You must specify the type of data you are providing and choose an appropriate scoring model.</p>
+            <ul>
+                <li><strong>Data Source:</strong>
+                    <ul>
+                        <li><code>EEG wearable (e.g. ZMax)</code>: For recordings from forehead EEG devices.</li>
+                        <li><code>full PSG (EEG, optional: EOG, EMG)</code>: For standard polysomnography recordings.</li>
+                    </ul>
+                </li>
+                <li><strong>Model:</strong> The available models depend on the selected data source.
+                    <ul>
+                        <li>For forehead EEG, you can choose between <strong>ez6</strong> and <strong>ez6moe</strong>.</li>
+                        <li>For full PSG, the <strong>u-sleep-nsrr-2024</strong> model is used.</li>
+                    </ul>
+                </li>
+            </ul>
+
+            <h3>4. Options</h3>
+            <p>Customize the output generated by NIDRA:</p>
+            <ul>
+                <li><strong>Generate graph:</strong> When checked, NIDRA will create a plot of the resulting hypnogram and save it as an image file.</li>
+                <li><strong>Generate sleep statistics:</strong> If enabled, a CSV file containing detailed sleep statistics (e.g., time in each stage, sleep efficiency) will be generated.</li>
+                <li><strong>Help & Info:</strong> Opens a detailed help page in your web browser.</li>
+            </ul>
+
+            <h3>5. Running and Monitoring</h3>
+            <ul>
+                <li><strong>Run NIDRA autoscoring:</strong> Click this button to start the scoring process. The button will become disabled and change its label to "Running..." while processing is active.</li>
+                <li><strong>Console Panel:</strong> The right-hand panel displays real-time logs. It shows the progress of the scoring, which files are being processed, and any warnings or errors that occur. This is useful for monitoring the status of your analysis.</li>
+            </ul>
+        </section>
+
+        <section id="cli-guide">
+            <h2>CLI Guide</h2>
+            <p>For users who prefer working in the terminal, NIDRA provides a command-line interface (CLI) to automate the scoring process. The main command is <code>score</code>, which takes several arguments to specify the input, output, and scoring parameters.</p>
+
+            <h3>Usage</h3>
+            <pre><code>nidra score --input_path <PATH> --output_dir <PATH> --scorer_type <TYPE> [OPTIONS]</code></pre>
+
+            <h3>Required Arguments</h3>
+            <ul>
+                <li><code>--input_path <PATH></code>: The path to the input data. This can be a single <code>.edf</code> file or a directory containing one or more <code>.edf</code> files for batch processing.</li>
+                <li><code>--output_dir <PATH></code>: The path to the directory where the output files (hypnogram, plot, statistics) will be saved.</li>
+                <li><code>--scorer_type <TYPE></code>: Specifies the type of recording. Must be either <code>psg</code> for polysomnography data or <code>forehead</code> for forehead EEG data.</li>
+            </ul>
+
+            <h3>Optional Arguments</h3>
+            <ul>
+                <li><code>--model_name <NAME></code>: The name of the model to use for scoring.
+                    <ul>
+                        <li>For <code>forehead</code>, choices are <code>ez6</code> (default) and <code>ez6moe</code>.</li>
+                        <li>For <code>psg</code>, choices are <code>u-sleep-nsrr-2024</code> (default) and <code>u-sleep-nsrr-2024_eeg</code>.</li>
+                    </ul>
+                </li>
+                <li><code>--no_plot</code>: A flag that, when included, prevents the generation of the hypnogram plot.</li>
+            </ul>
+
+            <h3>Examples</h3>
+            <p><strong>1. Scoring a single forehead EEG recording:</strong></p>
+            <pre><code>nidra score --input_path /path/to/recording.edf --output_dir /path/to/output --scorer_type forehead --model_name ez6moe</code></pre>
+
+            <p><strong>2. Scoring a directory of PSG recordings without generating plots:</strong></p>
+            <pre><code>nidra score --input_path /path/to/psg_data/ --output_dir /path/to/output --scorer_type psg --no_plot</code></pre>
+        </section>
+
+        <section id="python-package">
+            <h2>Usage as a Python Package</h2>
+            <p>NIDRA can be used directly in your Python scripts to programmatically score sleep recordings. The primary way to interact with it is through the <code>ForeheadScorer</code> and <code>PSGScorer</code> classes.</p>
+
+            <h3>Example 1: Scoring a Forehead EEG Recording</h3>
+            <p>This example shows how to score a two-channel forehead EEG recording (e.g., from a ZMax device). You only need to provide the path to one of the files (e.g., the left channel), and NIDRA will automatically find the other.</p>
+            <pre><code>from nidra.forehead_scorer import ForeheadScorer
+
+# Initialize the scorer
+scorer = ForeheadScorer(
+    output_dir='./scoring_output',
+    input_file='./sample_data/subject_01_L.edf',
+    model_name='ez6moe'  # Optional: 'ez6' is the default
+)
+
+# Run the scoring process and get the hypnogram
+# Set plot=True to also generate a hypnogram visualization
+hypnogram, probabilities = scorer.score(plot=True)
+
+print("Scoring complete.")
+print(f"Hypnogram: {hypnogram}")
+            </code></pre>
+
+            <h3>Example 2: Scoring a Full PSG Recording</h3>
+            <p>This example demonstrates how to score a standard polysomnography (PSG) file. NIDRA will automatically identify the required EEG and EOG channels from the file.</p>
+            <pre><code>from nidra.psg_scorer import PSGScorer
+
+# Initialize the scorer
+scorer = PSGScorer(
+    output_dir='./scoring_output',
+    input_file='./sample_data/subject_02.edf',
+    model_name='u-sleep-nsrr-2024'  # Optional
+)
+
+# Run the scoring process
+hypnogram, probabilities = scorer.score(plot=True)
+
+print("Scoring complete.")
+print(f"Hypnogram: {hypnogram}")
+            </code></pre>
+        </section>
+
+        <section id="models">
+            <h2>Models</h2>
+            <p>NIDRA includes several pre-trained models, each optimized for a specific type of EEG data.</p>
+            
+            <h3>Forehead EEG Models</h3>
+            <ul>
+                <li><code>ez6.onnx</code>: A robust model for scoring two-channel forehead EEG recordings. This is the default model for forehead data.</li>
+                <li><code>ez6moe.onnx</code>: An alternative model for forehead EEG, potentially offering different performance characteristics.</li>
+            </ul>
+
+            <h3>Polysomnography (PSG) Models</h3>
+            <ul>
+                <li><code>u-sleep-nsrr-2024.onnx</code>: A model designed for full PSG recordings that include both EEG and EOG channels.</li>
+                <li><code>u-sleep-nsrr-2024_eeg.onnx</code>: A specialized version of the U-Sleep model that works with only the EEG channels from a PSG recording. This is used as a fallback if EOG channels are not detected.</li>
+            </ul>
+        </section>
+
+        <section id="utilities">
+            <h2>Utilities</h2>
+            <p>The <code>NIDRA.utils</code> module contains helper functions used throughout the application. The most relevant for end-users is the sleep statistics calculation.</p>
+
+            <h3><code>compute_sleep_stats(hypnogram)</code></h3>
+            <p>This function takes a hypnogram and calculates a comprehensive set of sleep statistics.</p>
+            <h4>Parameters:</h4>
+            <ul>
+                <li><code>hypnogram (list)</code>: A list of integers representing the sleep stage for each epoch (e.g., <code>[0, 0, 1, 2, 2, 3, 2, 5, 5, 0]</code>). The standard stage mapping is used: 0=Wake, 1=N1, 2=N2, 3=N3, 5=REM.</li>
+            </ul>
+            <h4>Returns:</h4>
+            <p>A dictionary containing key sleep metrics, including:</p>
+            <ul>
+                <li>Time in Bed (minutes)</li>
+                <li>Total Sleep Time (minutes)</li>
+                <li>Sleep Efficiency (%)</li>
+                <li>Sleep Latency (minutes)</li>
+                <li>Wake After Sleep Onset (WASO) (minutes)</li>
+                <li>Time and percentage spent in each sleep stage (N1, N2, N3, REM).</li>
+            </ul>
+        </section>
+    </main>
+</body>
+</html>
