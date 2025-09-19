@@ -1,17 +1,15 @@
-__pycache__/
+*.log
+*.tmp
 *.pyc
 
-NIDRA.egg-info/
-*.log
+__pycache__/
 
-.venv/
+
 .history/
-*.log
 
 build/
 dist/
-
 examples/
 release/
 tests/
-
+executables/
