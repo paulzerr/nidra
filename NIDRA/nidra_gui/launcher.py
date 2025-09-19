@@ -44,11 +44,11 @@ def main():
     # The CWD needs to be the directory of the binary for Neutralino to find its resources
     app_dir = os.path.dirname(binary_path)
 
-    config_source_path = get_resource_path('neutralino.config.json')
-    config_dest_path = os.path.join(app_dir, 'neutralino.config.json')
+    #config_source_path = get_resource_path('neutralino.config.json')
+    #config_dest_path = os.path.join(app_dir, 'neutralino.config.json')
 
     try:
-        shutil.copy(config_source_path, config_dest_path)
+        #shutil.copy(config_source_path, config_dest_path)
         # Redirect stdout and stderr to DEVNULL to prevent the console from appearing
         with open(os.devnull, 'w') as devnull:
             subprocess.run(
