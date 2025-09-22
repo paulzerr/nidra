@@ -5,16 +5,23 @@ import os
 import shutil
 from pathlib import Path
 from NIDRA.nidra_gui.app import app
+import importlib.resources
 
 def get_resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
-    try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
+    """ Get absolute path to resource, works for dev, PyInstaller, and installed packages. """
+    # PyInstaller creates a temp folder and stores path in _MEIPASS
+    if hasattr(sys, '_MEIPASS'):
         base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(Path(__file__).parent)
+        return os.path.join(base_path, relative_path)
 
-    return os.path.join(base_path, relative_path)
+    # For installed packages, use importlib.resources
+    try:
+        package_resources = importlib.resources.files('NIDRA.nidra_gui')
+        return str(package_resources.joinpath(relative_path))
+    except (ModuleNotFoundError, AttributeError):
+        # Fallback for development mode
+        base_path = os.path.abspath(Path(__file__).parent)
+        return os.path.join(base_path, relative_path)
 
 def run_flask():
     """Runs the Flask app."""

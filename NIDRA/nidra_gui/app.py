@@ -31,16 +31,21 @@ TEXTS = {
     "CONSOLE_INIT_MESSAGE": "Start by selecting a directory containing a sleep recording, or subfolders with one sleep recording each (Input Directory).",
 }
 
-# Determine the base path for resources, accommodating PyInstaller
+# Determine the base path for resources, accommodating PyInstaller and standard installs
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    base_path = sys._MEIPASS
+    # Running as a PyInstaller bundle
+    base_path = Path(sys._MEIPASS)
+    template_folder = str(base_path / 'resources' / 'templates')
+    static_folder = str(base_path / 'resources' / 'static')
+    app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 else:
-    base_path = os.path.dirname(os.path.abspath(__file__))
-
-template_folder = os.path.join(base_path, 'resources', 'templates')
-static_folder = os.path.join(base_path, 'resources', 'static')
-
-app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
+    # Running as a standard Python package
+    # The __name__ is 'NIDRA.nidra_gui.app', so we use the parent package 'NIDRA.nidra_gui'
+    app = Flask(__name__, instance_relative_config=True)
+    # This assumes the resources folder is at the same level as app.py
+    # When installed, the paths are relative to the package root.
+    app.template_folder = str(Path(__file__).parent / 'resources' / 'templates')
+    app.static_folder = str(Path(__file__).parent / 'resources' / 'static')
 
 # Suppress noisy HTTP request logging
 log = logging.getLogger('werkzeug')
