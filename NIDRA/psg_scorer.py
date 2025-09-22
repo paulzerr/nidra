@@ -1,4 +1,3 @@
-import os
 import re
 import mne
 import numpy as np
@@ -9,6 +8,7 @@ from collections import namedtuple, OrderedDict
 from itertools import product
 from typing import List, Tuple, Dict, Any
 from NIDRA.plotting import plot_hypnodensity
+import importlib.resources
 
 
 # --- Channel Definitions ---
@@ -40,7 +40,6 @@ class PSGScorer:
             self.input_file = None
             self.base_filename = "numpy_input"
 
-        self.model_path = Path(__file__).parent / "models"
         self.model_name = model_name
         self.epoch_sec = 30 #epoch_sec # we ignore this input for now and enforce 30s epochs
         self.new_sample_rate = 128
@@ -86,10 +85,16 @@ class PSGScorer:
             print("Scoring must be run before plotting.")
 
     def _load_model(self):
-        print(f"Loading model from {self.model_path}")
-        self.session = ort.InferenceSession(str(self.model_path))
-        self.input_name = self.session.get_inputs()[0].name
-        self.output_name = self.session.get_outputs()[0].name
+        model_filename = f"{self.model_name}.onnx"
+        print(f"Loading model {model_filename}...")
+        try:
+            with importlib.resources.path('NIDRA.models', model_filename) as model_file:
+                self.session = ort.InferenceSession(str(model_file))
+            self.input_name = self.session.get_inputs()[0].name
+            self.output_name = self.session.get_outputs()[0].name
+        except FileNotFoundError:
+            print(f"Error: Model file not found at NIDRA/models/{model_filename}")
+            raise
 
     def _load_recording(self):
         """Loads a PSG file or creates a raw object from numpy data."""
@@ -157,15 +162,15 @@ class PSGScorer:
         model_name = self.model_name
         if not self.has_eog:
             print("No EOG channels detected. Attempting to use EEG-only model.")
-            eeg_model_path = os.path.join(self.model_path, model_name + "_eeg.onnx")
-            if os.path.exists(eeg_model_path):
-                model_name += "_eeg"
-                print(f"Using EEG-only model: {model_name}")
-            else:
-                print(f"Warning: EEG-only model not found at {eeg_model_path}. Using standard model.")
+            # Check if the EEG-only model exists using importlib.resources
+            try:
+                with importlib.resources.path('NIDRA.models', model_name + "_eeg.onnx"):
+                    model_name += "_eeg"
+                    print(f"Using EEG-only model: {model_name}")
+            except FileNotFoundError:
+                print(f"Warning: EEG-only model not found. Using standard model.")
         
-        self.onnx_model_path = os.path.join(self.model_path, model_name + ".onnx")
-        self.model_path = Path(self.onnx_model_path)
+        self.model_name = model_name
         self._load_model()
 
     def _predict(self):
