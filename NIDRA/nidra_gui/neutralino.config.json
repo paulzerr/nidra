@@ -5,7 +5,7 @@
   "defaultMode": "window",
   "port": 0,
   "documentRoot": "/resources/",
-  "url": "http://127.0.0.1:5001",
+  "url": "/",
   "enableServer": true,
   "enableNativeAPI": true,
   "tokenSecurity": "one-time",

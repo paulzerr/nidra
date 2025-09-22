@@ -2,6 +2,7 @@ import subprocess
 import threading
 import sys
 import os
+import socket
 from pathlib import Path
 from NIDRA.nidra_gui.app import app
 import importlib.resources
@@ -21,17 +22,39 @@ def get_resource_path(relative_path):
         base_path = os.path.abspath(Path(__file__).parent)
         return os.path.join(base_path, relative_path)
 
-def run_flask():
-    """Runs the Flask app."""
+def find_free_port(preferred_ports=[5001, 5002, 5003, 62345, 62346, 62347, 62348, 62349]):
+    """
+    Finds a free port on the host machine.
+    It first tries a list of preferred ports and then falls back to a random port.
+    """
+    for port in preferred_ports:
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('', port))
+                return port
+        except OSError:
+            continue  # Port is already in use
+
+    # If no preferred ports are available, ask the OS for a random one
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('', 0))
+            return s.getsockname()[1]
+    except Exception as e:
+        raise RuntimeError("Could not find any free port.") from e
+
+def run_flask(port):
+    """Runs the Flask app on a given port."""
     cli = sys.modules['flask.cli']
     cli.show_server_banner = lambda *x: None # We don't want to show the Flask startup message
-    app.run(port=5001)
+    app.run(port=port)
 
 def main():
     """
     Starts the Flask server in a background thread and then launches the Neutralino application.
     """
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    port = find_free_port()
+    flask_thread = threading.Thread(target=run_flask, args=(port,), daemon=True)
     flask_thread.start()
 
     # Determine the correct binary name based on the OS
@@ -49,8 +72,11 @@ def main():
 
     try:
         with open(os.devnull, 'w') as devnull:
+            # Construct the URL with the dynamic port
+            url = f"http://127.0.0.1:{port}"
+
             subprocess.run(
-                [binary_path, '--load-dir-res'],
+                [binary_path, '--load-dir-res', f'--url={url}'],
                 cwd=app_dir,
                 check=True,
                 stdout=devnull,
