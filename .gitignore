@@ -15,3 +15,5 @@ executables/
 
 build/
 dist/
+!NIDRA/nidra_gui/dist/
+!NIDRA/nidra_gui/dist/**
