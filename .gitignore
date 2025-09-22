@@ -12,3 +12,6 @@ examples/
 release/
 tests/
 executables/
+
+build/
+dist/
