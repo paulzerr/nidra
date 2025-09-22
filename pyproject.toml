@@ -38,8 +38,9 @@ dependencies = [
 "Homepage" = "https://github.com/p-zerr/NIDRA"
 
 [project.scripts]
-nidra-gui = "NIDRA.gui:launch_gui"
-nidra = "NIDRA.cli:run_cli"
+nid = "NIDRA.cli:run_cli"
+nidra = "NIDRA.nidra_gui.launcher:main"
 
 [tool.setuptools]
-packages = ["NIDRA"]
+include-package-data = true
+packages = {find = {}}

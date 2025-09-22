@@ -19,7 +19,7 @@ def run_cli():
     score_parser.add_argument("--model_name", help="ez6 or ez6moe for Zmax. u-sleep-nsrr-2024 or u-sleep-nsrr-2024_eeg for PSG.", default='u-sleep-nsrr-2024_eeg')
     score_parser.add_argument("--no_plot", action="store_true", help="Do not generate a plot.")
 
-    # If no command is given, show help. This is for when `nidra` is called alone.
+    # If no command is given, show help. This is for when `nid` is called alone.
     if len(sys.argv) <= 1:
         parser.print_help(sys.stderr)
         sys.exit(1)

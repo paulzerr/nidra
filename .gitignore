@@ -5,10 +5,9 @@
 __pycache__/
 
 
-.history/
-
-build/
-dist/
+.*/
+.tmp/
+NIDRA.egg-info/
 examples/
 release/
 tests/
