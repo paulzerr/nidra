@@ -7,9 +7,6 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog
 
-# --- Path Setup ---
-# --- Direct Import from Original, Working Code ---
-# This is the most reliable way to ensure the scoring process works exactly as intended.
 import time
 from NIDRA import scorer as scorer_factory
 from NIDRA.utils import setup_logging, compute_sleep_stats
@@ -40,10 +37,7 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 else:
     # Running as a standard Python package
-    # The __name__ is 'NIDRA.nidra_gui.app', so we use the parent package 'NIDRA.nidra_gui'
     app = Flask(__name__, instance_relative_config=True)
-    # This assumes the resources folder is at the same level as app.py
-    # When installed, the paths are relative to the package root.
     app.template_folder = str(Path(__file__).parent / 'resources' / 'templates')
     app.static_folder = str(Path(__file__).parent / 'resources' / 'static')
 
@@ -56,7 +50,6 @@ is_scoring_running = False
 worker_thread = None
 
 # --- Flask Routes ---
-
 @app.route('/')
 def index():
     """Serves the main HTML page."""
@@ -95,7 +88,6 @@ def start_scoring():
     logger.info("\n" + "="*80 + "\nStarting new scoring process via Web UI...\n" + "="*80)
 
     # --- Direct Call to the Original Worker Function ---
-    # We pass the parameters exactly as the original GUI would.
     worker_thread = threading.Thread(
         target=scoring_thread_wrapper,
         args=(
@@ -115,7 +107,6 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
     """A wrapper to manage the global running state around the original function."""
     global is_scoring_running
     try:
-        # The `cancel_event` is not used in the original GUI's threaded call, so we pass None.
         _run_scoring_worker(input_dir, output_dir, score_subdirs, None, data_source, model_name, plot, gen_stats)
     except Exception as e:
         logger.error(f"A critical error occurred in the scoring thread: {e}", exc_info=True)
@@ -252,7 +243,6 @@ def _run_scoring_worker(input_dir, output_dir, score_subdirs, cancel_event, data
                 logger.info("-" * 80)
                 _run_scoring(files_to_score[0], output_dir, data_source, model_name, gen_stats, plot)
     except (FileNotFoundError, ValueError) as e:
-        # Catch specific, user-facing errors and log them cleanly without a traceback.
         logger.error(str(e))
     except Exception as e:
         logger.error(f"An unexpected error occurred during scoring: {e}", exc_info=True)
@@ -290,7 +280,6 @@ def shutdown():
 
     if is_scoring_running:
         logger.warning("Shutdown requested, but scoring is in progress. Waiting for it to complete.")
-        # Optionally, you could implement a timeout here
         if worker_thread:
             worker_thread.join()  # Wait for the scoring thread to finish
 

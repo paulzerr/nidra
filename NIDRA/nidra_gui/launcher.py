@@ -2,6 +2,7 @@ import subprocess
 import threading
 import sys
 import os
+import platform
 import socket
 import requests
 from pathlib import Path
@@ -62,7 +63,15 @@ def main():
     if sys.platform == "win32":
         binary_name = "nidra_gui-win_x64.exe"
     elif sys.platform == "darwin":
-        binary_name = "nidra_gui-mac_x64"
+        mac_version_str = platform.mac_ver()[0]
+        major_version = int(mac_version_str.split('.')[0])
+        
+        if major_version == 10:
+            binary_name = "nidra_gui-mac_10"
+        elif major_version == 11:
+            binary_name = "nidra_gui-mac_11"
+        else:  # For macOS 12 (Monterey) and newer
+            binary_name = "nidra_gui-mac_12_and_up"
     else:
         binary_name = "nidra_gui-linux_x64"
 
