@@ -273,3 +273,27 @@ def log_stream():
             return f.read()
     except Exception as e:
         return f"Error reading log file: {e}"
+
+
+def shutdown_server():
+    """Function to shut down the server."""
+    func = request.environ.get('werkzeug.server.shutdown')
+    if func is None:
+        logger.warning('Not running with the Werkzeug Server')
+        return
+    func()
+
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    """Shuts down the Flask server."""
+    global is_scoring_running, worker_thread
+
+    if is_scoring_running:
+        logger.warning("Shutdown requested, but scoring is in progress. Waiting for it to complete.")
+        # Optionally, you could implement a timeout here
+        if worker_thread:
+            worker_thread.join()  # Wait for the scoring thread to finish
+
+    logger.info("Server is shutting down...")
+    shutdown_server()
+    return 'Server shutting down...'

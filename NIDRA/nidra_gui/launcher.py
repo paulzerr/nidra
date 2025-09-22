@@ -3,6 +3,7 @@ import threading
 import sys
 import os
 import socket
+import requests
 from pathlib import Path
 from NIDRA.nidra_gui.app import app
 import importlib.resources
@@ -89,6 +90,20 @@ def main():
         print(f"Error running Neutralino application: {e}")
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
+    finally:
+        # --- Guaranteed Shutdown ---
+        # When the Neutralino process exits, this block is executed.
+        # We attempt a graceful shutdown, but because the Flask thread is a
+        # daemon, the program will exit regardless of the outcome.
+        try:
+            print("Neutralino window closed. Attempting to shut down Flask server...")
+            # Send a shutdown request with a short timeout.
+            requests.post(f"http://127.0.0.1:{port}/shutdown", timeout=2)
+            print("Shutdown signal sent.")
+        except requests.exceptions.RequestException as e:
+            print(f"Could not send shutdown signal (server might be already down): {e}")
+        
+        print("Launcher is exiting.")
 
 if __name__ == '__main__':
     main()

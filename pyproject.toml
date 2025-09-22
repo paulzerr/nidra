@@ -25,13 +25,7 @@ dependencies = [
     "onnxruntime",
     "matplotlib",
     "Flask",
-    "filelock>=3.9.0",
-    "pyyaml",
-    "absl-py",
-    "h5py",
-    "psutil",
-    "pyinstaller",
-    "pywebview"
+    "pyinstaller"
 ]
 
 [project.urls]
