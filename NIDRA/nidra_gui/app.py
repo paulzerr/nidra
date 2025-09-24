@@ -4,8 +4,7 @@ from flask import Flask, render_template, request, jsonify
 import threading
 import logging
 from pathlib import Path
-import tkinter as tk
-from tkinter import filedialog
+import multiprocessing
 
 import time
 from NIDRA import scorer as scorer_factory
@@ -55,20 +54,51 @@ def index():
     """Serves the main HTML page."""
     return render_template('index.html', texts=TEXTS)
 
-@app.route('/select-directory')
-def select_directory():
-    """Opens a native directory selection dialog on the server."""
+def _open_dialog_in_process(queue):
+    """
+    Worker function to run the Tkinter dialog in a separate process.
+    This is necessary to prevent threading issues with Tkinter on macOS.
+    """
+    import tkinter as tk
+    from tkinter import filedialog
     try:
         root = tk.Tk()
         root.withdraw()
         root.attributes('-topmost', True)
-        directory_path = filedialog.askdirectory(parent=root, title="Select Directory")
+        directory_path = filedialog.askdirectory(title="Select Directory")
         root.destroy()
-        if directory_path:
-            return jsonify({'status': 'success', 'path': directory_path})
-        return jsonify({'status': 'cancelled'})
+        queue.put(directory_path or '') # Put empty string if cancelled
     except Exception as e:
-        logger.error(f"Error in directory dialog: {e}", exc_info=True)
+        # If there's an error, put the exception message in the queue
+        queue.put(f"ERROR:{e}")
+
+@app.route('/select-directory')
+def select_directory():
+    """
+    Opens a native directory selection dialog on the server using a separate
+    process to ensure it runs on a main thread.
+    """
+    try:
+        # Use a multiprocessing queue to get the result back from the process
+        q = multiprocessing.Queue()
+        # Create and start the process
+        p = multiprocessing.Process(target=_open_dialog_in_process, args=(q,))
+        p.start()
+        # Wait for the process to finish
+        p.join()
+        # Get the result from the queue
+        result = q.get()
+
+        if result.startswith("ERROR:"):
+            raise RuntimeError(result.replace("ERROR:", "", 1))
+
+        if result:
+            return jsonify({'status': 'success', 'path': result})
+        else:
+            return jsonify({'status': 'cancelled'})
+
+    except Exception as e:
+        logger.error(f"Error in directory dialog process: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/start-scoring', methods=['POST'])
