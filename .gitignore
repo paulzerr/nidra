@@ -9,6 +9,7 @@ __pycache__/
 .tmp/
 NIDRA.egg-info/
 examples/
+!examples/test_data_zmax/
 release/
 tests/
 executables/
