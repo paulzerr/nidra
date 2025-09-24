@@ -6,6 +6,8 @@ import platform
 import socket
 import requests
 from pathlib import Path
+import webbrowser
+import time
 from NIDRA.nidra_gui.app import app
 import importlib.resources
 
@@ -80,11 +82,9 @@ def main():
     # The CWD needs to be the directory of the binary for Neutralino to find its resources
     app_dir = os.path.dirname(binary_path)
 
+    url = f"http://127.0.0.1:{port}"
     try:
         with open(os.devnull, 'w') as devnull:
-            # Construct the URL with the dynamic port
-            url = f"http://127.0.0.1:{port}"
-
             subprocess.run(
                 [binary_path, '--load-dir-res', f'--url={url}'],
                 cwd=app_dir,
@@ -92,13 +92,23 @@ def main():
                 stdout=devnull,
                 stderr=devnull
             )
-    except FileNotFoundError:
-        print(f"Error: Neutralino binary not found at {binary_path}")
-        print("Please ensure the application is installed correctly.")
-    except subprocess.CalledProcessError as e:
-        print(f"Error running Neutralino application: {e}")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"Could not launch Neutralino app: {e}")
+        print("Falling back to opening in the default web browser.")
+        
+        # Add a small delay to ensure the server is ready
+        time.sleep(1)
+        
+        webbrowser.open(url)
+        
+        print("\n" + "="*50)
+        print("The NIDRA GUI is now running in your web browser.")
+        print(f"If it didn't open automatically, please navigate to: {url}")
+        print("Press Enter in this terminal to shut down the server.")
+        print("="*50 + "\n")
+        
+        # Keep the script alive until the user presses Enter
+        input()
     finally:
         # --- Guaranteed Shutdown ---
         # When the Neutralino process exits, this block is executed.
