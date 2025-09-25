@@ -1,4 +1,43 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // --- Dynamic UI Scaling ---
+
+    // Adjust these constants to fine-tune the UI's appearance.
+    const BASE_UI_SCALE = 1.0; // Overall size of UI elements (padding, margins, etc.)
+    const BASE_FONT_SCALE = 1.5; // Overall font size
+
+    const apect_ratio = 16 / 9;
+    const apect_ratio_threshold = 0.1;
+
+    function scaleUi() {
+        const { clientWidth, clientHeight } = document.documentElement;
+        const current_ap = clientWidth / clientHeight;
+        const root = document.documentElement;
+
+        let scale;
+        // If the aspect ratio is within a certain threshold of the target,
+        // use a simpler scaling method to avoid distortion.
+        if (Math.abs(current_ap - apect_ratio) < apect_ratio_threshold) {
+            // Scale based on width when close to the target aspect ratio
+            scale = clientWidth / 100;
+        } else {
+            // More robust scaling for other aspect ratios
+            scale = Math.min(clientWidth / (100 * 1.6), clientHeight / (100 * 0.9));
+        }
+
+        // Set the CSS variables for independent scaling
+        root.style.setProperty('--ui-scale', `${scale * BASE_UI_SCALE}px`);
+        root.style.setProperty('--font-scale', `${scale * BASE_FONT_SCALE}px`);
+    }
+
+
+    // Initial scaling
+    scaleUi();
+
+    // --- Event Listeners ---
+
+    // Rescale UI on window resize
+    window.addEventListener('resize', scaleUi);
+
     const runBtn = document.getElementById('run-btn');
     const consoleOutput = document.getElementById('console');
     const dataSourceSelect = document.getElementById('data-source');
