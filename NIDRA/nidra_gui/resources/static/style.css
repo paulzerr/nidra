@@ -1,17 +1,32 @@
-/* --- Reset and Body --- */
+/* --- CSS Variables and Reset --- */
+:root {
+    --base-font-size: 16px;
+    --spacing-unit: 1rem;
+    --border-radius: 0.375rem;
+    --text-color: #333;
+    --primary-color: #007aff;
+    --light-gray: #f0f2f5;
+    --border-color: #d9d9d9;
+}
+
 * {
     box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-size: var(--base-font-size);
 }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    margin: 0;
-    background-color: #f0f2f5;
+    background-color: var(--light-gray);
+    height: 100vh;
+    overflow: hidden;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
-    overflow: hidden; /* Prevents resizing from showing scrollbars on the body */
 }
 
 /* --- Main Layout --- */
@@ -20,86 +35,85 @@ body {
     width: 100%;
     height: 100%;
     background-color: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
     overflow: hidden;
-    border: 1px solid #d9d9d9;
+    border: 1px solid var(--border-color);
 }
 
 .panel {
     display: flex;
     flex-direction: column;
-    padding: 20px;
+    padding: clamp(1rem, 2.5vw, 1.5rem);
+    overflow-y: auto;
 }
 
 .left-panel {
-    width: 50%;
-    border-right: 1px solid #d9d9d9;
+    flex: 1 1 50%;
+    min-width: 320px;
+    border-right: 1px solid var(--border-color);
     background-color: #fafafa;
-    padding-right: 30px;
 }
 
 .right-panel {
-    width: 50%;
+    flex: 1 1 50%;
+    min-width: 320px;
     background-color: #2b2b2b;
     color: #f0f0f0;
-    padding: 15px;
 }
 
 /* --- Controls & Typography --- */
 .control-group {
-    margin-bottom: 15px;
+    margin-bottom: var(--spacing-unit);
 }
 
 .control-group h2 {
-    font-size: 16px;
+    font-size: clamp(1rem, 2vw, 1.125rem);
     font-weight: 600;
-    margin-top: 0;
-    margin-bottom: 12px;
+    margin-bottom: 0.75rem;
     color: #1a1a1a;
 }
 
 hr {
     border: none;
     border-top: 1px solid #e0e0e0;
-    margin: 20px 0;
+    margin: var(--spacing-unit) 0;
 }
 
 label {
-    font-size: 14px;
+    font-size: clamp(0.875rem, 1.5vw, 1rem);
     font-weight: 500;
-    color: #333;
+    color: var(--text-color);
 }
 
 /* --- Input Elements --- */
 .file-input-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 0.5rem;
 }
 
 input[type="text"], select {
     width: 100%;
-    padding: 8px 12px;
+    padding: 0.5rem 0.75rem;
     border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 14px;
+    border-radius: var(--border-radius);
+    font-size: clamp(0.875rem, 1.5vw, 1rem);
     background-color: #fff;
-    height: 36px;
+    height: 2.25rem;
 }
 
 .browse-btn, .help-btn {
-    flex-shrink: 0; /* Prevent button from shrinking */
-    padding: 0 18px;
+    flex-shrink: 0;
+    padding: 0 1.125rem;
     border: 1px solid #ccc;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     cursor: pointer;
-    font-size: 14px;
+    font-size: clamp(0.875rem, 1.5vw, 1rem);
     font-weight: 500;
     transition: background-color 0.2s ease;
     background-color: #f5f5f5;
-    color: #333;
-    height: 36px;
+    color: var(--text-color);
+    height: 2.25rem;
 }
 
 .browse-btn:hover, .help-btn:hover {
@@ -107,10 +121,10 @@ input[type="text"], select {
 }
 
 .radio-group {
-    margin-top: 15px;
+    margin-top: 0.75rem;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 0.5rem;
 }
 
 .radio-group label {
@@ -120,48 +134,51 @@ input[type="text"], select {
 }
 
 input[type="radio"], input[type="checkbox"] {
-    margin-right: 8px;
-    width: 16px;
-    height: 16px;
+    margin-right: 0.5rem;
+    width: 1rem;
+    height: 1rem;
 }
 
 .horizontal-group {
     display: flex;
-    gap: 25px;
+    flex-wrap: wrap;
+    gap: 1.5rem;
     align-items: flex-end;
 }
 
 .sub-group {
     flex: 1;
+    min-width: 150px;
 }
 
 .sub-group label {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 0.5rem;
 }
 
 .checkbox-group {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    margin-bottom: 15px;
+    gap: 0.5rem;
+    margin-bottom: var(--spacing-unit);
 }
 
 .help-btn {
-    width: 180px;
+    width: 100%;
+    max-width: 180px;
 }
 
 /* --- Run Button --- */
 .run-btn {
-    margin-top: auto; /* Pushes the button to the bottom */
+    margin-top: auto;
     width: 100%;
-    height: 44px;
-    padding: 0 15px;
-    font-size: 16px;
+    height: 2.75rem;
+    padding: 0 1rem;
+    font-size: clamp(1rem, 2vw, 1.125rem);
     font-weight: 600;
     border: none;
-    border-radius: 6px;
-    background-color: #007aff;
+    border-radius: var(--border-radius);
+    background-color: var(--primary-color);
     color: white;
     cursor: pointer;
     transition: background-color 0.2s ease;
@@ -181,17 +198,15 @@ input[type="radio"], input[type="checkbox"] {
     flex-grow: 1;
     background-color: #2b2b2b;
     color: #dcdcdc;
-    border-radius: 4px;
+    border-radius: 0.25rem;
     overflow-y: auto;
-    overflow-x: hidden; /* Prevent horizontal scrollbar */
     font-family: 'Menlo', 'Consolas', 'Monaco', monospace;
-    font-size: 13px;
+    font-size: clamp(0.8125rem, 1.5vw, 0.875rem);
     height: 100%;
 }
 
 .console-output pre {
-    margin: 0;
-    padding: 10px;
-    white-space: pre-wrap; /* Wrap text */
-    word-wrap: break-word; /* Break long words */
+    padding: 0.75rem;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }

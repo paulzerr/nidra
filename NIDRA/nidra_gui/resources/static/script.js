@@ -155,4 +155,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial status check in case the server was already running a task
     // The initial status check is not required and can clear the welcome message.
     // Polling will now begin only after the user starts a scoring task.
+
+    // --- Dynamic Font Sizing ---
+    function adjustFontSize() {
+        const baseWidth = 1200; // The window width at which the base font size is optimal
+        const minWidth = 800;   // The minimum window width to consider for scaling
+        const baseFontSize = 16; // Corresponds to :root --base-font-size in CSS
+        const minFontSize = 12;  // Minimum font size to prevent text from becoming too small
+
+        let windowWidth = window.innerWidth;
+        let newSize;
+
+        if (windowWidth > baseWidth) {
+            newSize = baseFontSize;
+        } else if (windowWidth < minWidth) {
+            newSize = minFontSize;
+        } else {
+            // Linearly scale font size between minWidth and baseWidth
+            const widthRatio = (windowWidth - minWidth) / (baseWidth - minWidth);
+            newSize = minFontSize + (baseFontSize - minFontSize) * widthRatio;
+        }
+
+        document.documentElement.style.fontSize = `${newSize}px`;
+    }
+
+    // Adjust font size on initial load and on window resize
+    window.addEventListener('resize', adjustFontSize);
+    adjustFontSize(); // Initial call
 });

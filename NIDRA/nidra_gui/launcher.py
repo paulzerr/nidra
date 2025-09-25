@@ -75,9 +75,13 @@ def main():
         else:  # For macOS 12 (Monterey) and newer
             binary_name = "nidra_gui-mac_12_and_up"
     else:
-        binary_name = "nidra_gui-linux_x64"
+        binary_name = "nidra_gui-linux_x64XXX"
 
     binary_path = get_resource_path(f"dist/nidra_gui/{binary_name}")
+    print("binary path:")
+    print(binary_path)
+    print("end binary path")
+
 
     # The CWD needs to be the directory of the binary for Neutralino to find its resources
     app_dir = os.path.dirname(binary_path)
