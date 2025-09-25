@@ -33,16 +33,16 @@ rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
 # 3. Build Neutralino Frontend
-info "Building Neutralino frontend..."
-cd "$NEUTRALINO_APP_DIR"
-neu update
-neu build --release
+#info "Building Neutralino frontend..."
+#cd "$NEUTRALINO_APP_DIR"
+#neu update
+#neu build --release
 
 # Ensure config is present in dist for the Neutralino binary
-cp neutralino.config.json dist/nidra_gui/neutralino.config.json
+#cp neutralino.config.json dist/nidra_gui/neutralino.config.json
 
 # 4. Build PyInstaller Backend
-cd ../../setup # Return to the setup directory
+#cd ../../setup # Return to the setup directory
 info "Building PyInstaller backend..."
 pyinstaller --distpath "$BUILD_DIR/dist" --workpath "$BUILD_DIR/pyinstaller_build" "$PYINSTALLER_SPEC_FILE"
 
@@ -59,14 +59,14 @@ rm -rf "$BUILD_DIR"
 # Clean up Neutralino build artifacts
 # Enable extended globbing to exclude files from deletion
 shopt -s extglob
-cd "$NEUTRALINO_APP_DIR/dist"
+#cd "$NEUTRALINO_APP_DIR/dist"
 # Remove everything except the 'nidra_gui' directory which contains executables
-rm -rf !(nidra_gui)
-cd nidra_gui
+#rm -rf !(nidra_gui)
+#cd nidra_gui
 # Remove everything except the final executables and the config file
-rm -rf !(nidra_gui-linux_x64|nidra_gui-mac_x64|nidra_gui-win_x64.exe|neutralino.config.json|resources.neu)
+#rm -rf !(nidra_gui-linux_x64|nidra_gui-mac_x64|nidra_gui-win_x64.exe|neutralino.config.json|resources.neu)
 
 # Remove Neutralino binaries
-rm -rf "$NEUTRALINO_APP_DIR/bin"
+#rm -rf "$NEUTRALINO_APP_DIR/bin"
 
 info "Build complete! The final executable 'NIDRA' is located in the project root directory."

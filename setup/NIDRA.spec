@@ -6,10 +6,8 @@ a = Analysis(
     pathex=['..', '../NIDRA/nidra_gui', '../NIDRA'],
     binaries=[],
     datas=[
-        ('../NIDRA/models', 'NIDRA/models'),
-        ('../NIDRA/nidra_gui/dist', 'dist'),
-        ('../NIDRA/nidra_gui/resources', 'resources'),
-        ('../NIDRA/nidra_gui/neutralino.config.json', '.')
+        ('../NIDRA/models', 'models'),
+        ('../NIDRA/nidra_gui/neutralino', 'neutralino')
     ],
     hiddenimports=['decorator', 'scipy', 'scipy.io', 'webview', 'mne'],
     hookspath=['hooks'],
