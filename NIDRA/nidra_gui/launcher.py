@@ -79,7 +79,7 @@ def main():
     if sys.platform == "win32":
         binary_name = "neutralino-win_x64.exe"
     elif sys.platform == "darwin":
-        binary_name = "neutralino-mac_10"
+        binary_name = "neutralino-mac_10x"
     else:
         binary_name = "neutralino-linux_x64"
 
