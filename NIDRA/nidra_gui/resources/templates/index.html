@@ -55,11 +55,13 @@
 
             <div class="control-group">
                 <h2>{{ texts["OPTIONS_TITLE"] }}</h2>
-                <div class="checkbox-group">
-                    <label><input type="checkbox" id="gen-plot" checked> {{ texts["OPTIONS_PLOT"] }}</label>
-                    <label><input type="checkbox" id="gen-stats" checked> {{ texts["OPTIONS_STATS"] }}</label>
+                <div class="options-group">
+                    <div class="checkbox-group">
+                        <label><input type="checkbox" id="gen-plot" checked> {{ texts["OPTIONS_PLOT"] }}</label>
+                        <label><input type="checkbox" id="gen-stats" checked> {{ texts["OPTIONS_STATS"] }}</label>
+                    </div>
+                    <button id="help-btn" class="help-btn">{{ texts["HELP_TITLE"] }}</button>
                 </div>
-                <button id="help-btn" class="help-btn">{{ texts["HELP_TITLE"] }}</button>
             </div>
 
             <button id="run-btn" class="run-btn">{{ texts["RUN_BUTTON"] }}</button>
