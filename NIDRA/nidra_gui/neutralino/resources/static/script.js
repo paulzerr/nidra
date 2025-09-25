@@ -24,9 +24,17 @@ document.addEventListener('DOMContentLoaded', () => {
             scale = Math.min(clientWidth / (100 * 1.6), clientHeight / (100 * 0.9));
         }
 
+        // --- Cross-platform DPI Scaling ---
+        // Adjust scaling based on the device's pixel ratio. This is crucial for
+        // ensuring the UI looks consistent on high-DPI displays (like Apple's
+        // Retina screens), especially on macOS where this can be an issue.
+        const dpi = window.devicePixelRatio || 1;
+        const effective_scale = scale / dpi;
+
+
         // Set the CSS variables for independent scaling
-        root.style.setProperty('--ui-scale', `${scale * BASE_UI_SCALE}px`);
-        root.style.setProperty('--font-scale', `${scale * BASE_FONT_SCALE}px`);
+        root.style.setProperty('--ui-scale', `${effective_scale * BASE_UI_SCALE}px`);
+        root.style.setProperty('--font-scale', `${effective_scale * BASE_FONT_SCALE}px`);
     }
 
 

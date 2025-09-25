@@ -44,7 +44,7 @@ TEXTS = {
     "DATA_SOURCE_FEE": "EEG wearable (e.g. ZMax)   ", "DATA_SOURCE_PSG": "full PSG (EEG, optional: EOG, EMG)   ",
     "OUTPUT_TITLE": "Output Directory", "RUN_BUTTON": "Run NIDRA autoscoring", "BROWSE_BUTTON": "Browse files...",
     "HELP_TITLE": "Help & Info (opens in browser)",
-    "CONSOLE_INIT_MESSAGE": "Start by selecting a directory containing a sleep recording, or subfolders with one sleep recording each (Input Directory).",
+    "CONSOLE_INIT_MESSAGE": "Welcome to NIDRA Web UI. Press 'Run Scoring' to begin.",
 }
 
 # Determine the base path for resources, accommodating PyInstaller and standard installs
@@ -145,6 +145,7 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
         logger.error(f"A critical error occurred in the scoring thread: {e}", exc_info=True)
     finally:
         is_scoring_running = False
+        logger.info("Autoscoring completed")
         logger.info("\n" + "="*80 + "\nScoring process finished.\n" + "="*80)
 
 
@@ -192,7 +193,7 @@ def _find_files_to_score(input_dir, data_source, score_subdirs):
     if score_subdirs and files_to_process:
         logger.info("The following recordings will be processed:")
         for file in files_to_process:
-            logger.info(f"  - {file.parent.name}")
+            logger.info(f"  - {file}")
     return files_to_process
 
 
@@ -229,11 +230,11 @@ def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plo
                 logger.error(f"Could not generate sleep statistics for {input_file.name}: {e}", exc_info=True)
 
         execution_time = time.time() - start_time
-        logger.info(f">> SUCCESS: Finished processing {input_file.name} in {execution_time:.2f} seconds.")
+        logger.info(f">> SUCCESS: Finished processing {input_file} in {execution_time:.2f} seconds.")
         logger.info(f"  Results saved to: {output_dir}")
         return True
     except Exception as e:
-        logger.error(f">> FAILED to process {input_file.name}: {e}", exc_info=True)
+        logger.error(f">> FAILED to process {input_file}: {e}", exc_info=True)
         return False
 
 
@@ -251,7 +252,7 @@ def _run_batch_scoring(files_to_score, output_dir, data_source, model_name, gen_
     processed_count = 0
     for i, file in enumerate(files_to_score):
         logger.info("\n" + "-" * 80)
-        logger.info(f"[{i+1}/{len(files_to_score)}] Processing: {file.parent.name}")
+        logger.info(f"[{i+1}/{len(files_to_score)}] Processing: {file}")
         logger.info("-" * 80)
         if _run_scoring(file, str(batch_output_dir), data_source, model_name, gen_stats, plot):
             processed_count += 1
@@ -272,7 +273,7 @@ def _run_scoring_worker(input_dir, output_dir, score_subdirs, cancel_event, data
         else:
             if files_to_score:
                 logger.info("\n" + "-" * 80)
-                logger.info(f"Processing: {files_to_score[0].name}")
+                logger.info(f"Processing: {files_to_score[0]}")
                 logger.info("-" * 80)
                 _run_scoring(files_to_score[0], output_dir, data_source, model_name, gen_stats, plot)
     except (FileNotFoundError, ValueError) as e:
@@ -290,8 +291,8 @@ def status():
 def log_stream():
     """Streams the content of the log file."""
     try:
-        if not LOG_FILE.exists():
-            return ""
+        if not LOG_FILE.exists() or LOG_FILE.stat().st_size == 0:
+            return TEXTS["CONSOLE_INIT_MESSAGE"]
         with open(LOG_FILE, 'r', encoding='utf-8', errors='ignore') as f:
             return f.read()
     except Exception as e:
