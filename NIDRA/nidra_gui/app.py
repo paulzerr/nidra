@@ -31,14 +31,14 @@ TEXTS = {
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     # Running as a PyInstaller bundle
     base_path = Path(sys._MEIPASS)
-    template_folder = str(base_path / 'resources' / 'templates')
-    static_folder = str(base_path / 'resources' / 'static')
+    template_folder = str(base_path / 'neutralino' / 'resources' / 'templates')
+    static_folder = str(base_path / 'neutralino' / 'resources' / 'static')
     app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 else:
     # Running as a standard Python package
     app = Flask(__name__, instance_relative_config=True)
-    app.template_folder = str(Path(__file__).parent / 'resources' / 'templates')
-    app.static_folder = str(Path(__file__).parent / 'resources' / 'static')
+    app.template_folder = str(Path(__file__).parent / 'neutralino' / 'resources' / 'templates')
+    app.static_folder = str(Path(__file__).parent / 'neutralino' / 'resources' / 'static')
 
 # Suppress noisy HTTP request logging
 log = logging.getLogger('werkzeug')

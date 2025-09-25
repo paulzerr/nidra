@@ -8,6 +8,7 @@ import requests
 from pathlib import Path
 import webbrowser
 import time
+from NIDRA.nidra_gui.app import app
 try:
     from NIDRA.nidra_gui.app import app
 except ModuleNotFoundError:
@@ -70,21 +71,13 @@ def main():
 
     # Determine the correct binary name based on the OS
     if sys.platform == "win32":
-        binary_name = "nidra_gui-win_x64.exe"
+        binary_name = "neutralino-win_x64.exe"
     elif sys.platform == "darwin":
-        mac_version_str = platform.mac_ver()[0]
-        major_version = int(mac_version_str.split('.')[0])
-        
-        if major_version == 10:
-            binary_name = "nidra_gui-mac_10"
-        elif major_version == 11:
-            binary_name = "nidra_gui-mac_11"
-        else:  # For macOS 12 (Monterey) and newer
-            binary_name = "nidra_gui-mac_12_and_up"
+        binary_name = "neutralino-mac_10"
     else:
-        binary_name = "nidra_gui-linux_x64XXX"
+        binary_name = "neutralino-linux_x64"
 
-    binary_path = get_resource_path(f"dist/nidra_gui/{binary_name}")
+    binary_path = get_resource_path(f"neutralino/{binary_name}")
     print("binary path:")
     print(binary_path)
     print("end binary path")
@@ -107,33 +100,21 @@ def main():
         print(f"Could not launch Neutralino app: {e}")
         print("Falling back to opening in the default web browser.")
         
-        # Add a small delay to ensure the server is ready
         time.sleep(1)
-        
         webbrowser.open(url)
         
         print("\n" + "="*50)
         print("The NIDRA GUI is now running in your web browser.")
         print(f"If it didn't open automatically, please navigate to: {url}")
-        print("Press Enter in this terminal to shut down the server.")
+        print("\n" + "="*50)
+        print("Press Enter in this terminal or close the terminal window to shut down the server.")
         print("="*50 + "\n")
         
-        # Keep the script alive until the user presses Enter
         input()
     finally:
-        # --- Guaranteed Shutdown ---
-        # When the Neutralino process exits, this block is executed.
-        # We attempt a graceful shutdown, but because the Flask thread is a
-        # daemon, the program will exit regardless of the outcome.
-        try:
-            print("Neutralino window closed. Attempting to shut down Flask server...")
-            # Send a shutdown request with a short timeout.
-            requests.post(f"http://127.0.0.1:{port}/shutdown", timeout=2)
-            print("Shutdown signal sent.")
-        except requests.exceptions.RequestException as e:
-            print(f"Could not send shutdown signal (server might be already down): {e}")
-        
-        print("Launcher is exiting.")
+        print("Neutralino window closed. Attempting to shut down Flask server...")
+        requests.post(f"http://127.0.0.1:{port}/shutdown", timeout=2)
+
 
 if __name__ == '__main__':
     main()
