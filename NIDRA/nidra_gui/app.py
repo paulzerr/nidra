@@ -15,6 +15,26 @@ from NIDRA.utils import setup_logging, compute_sleep_stats
 LOG_FILE = setup_logging()
 logger = logging.getLogger(__name__)
 
+
+def _open_dialog_in_process(queue):
+    """
+    Worker function to run the Tkinter dialog in a separate process.
+    This is necessary to prevent threading issues with Tkinter on macOS.
+    """
+    import tkinter as tk
+    from tkinter import filedialog
+    try:
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes('-topmost', True)
+        directory_path = filedialog.askdirectory(title="Select Directory")
+        root.destroy()
+        queue.put(directory_path or '') # Put empty string if cancelled
+    except Exception as e:
+        # If there's an error, put the exception message in the queue
+        queue.put(f"ERROR:{e}")
+
+
 # --- UI Text ---
 TEXTS = {
     "WINDOW_TITLE": "NIDRA Sleep Autoscorer", "INPUT_TITLE": "Input Directory", "MODEL_TITLE": "Model",
@@ -54,23 +74,6 @@ def index():
     """Serves the main HTML page."""
     return render_template('index.html', texts=TEXTS)
 
-def _open_dialog_in_process(queue):
-    """
-    Worker function to run the Tkinter dialog in a separate process.
-    This is necessary to prevent threading issues with Tkinter on macOS.
-    """
-    import tkinter as tk
-    from tkinter import filedialog
-    try:
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        directory_path = filedialog.askdirectory(title="Select Directory")
-        root.destroy()
-        queue.put(directory_path or '') # Put empty string if cancelled
-    except Exception as e:
-        # If there's an error, put the exception message in the queue
-        queue.put(f"ERROR:{e}")
 
 @app.route('/select-directory')
 def select_directory():

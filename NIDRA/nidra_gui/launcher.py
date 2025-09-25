@@ -8,6 +8,7 @@ import requests
 from pathlib import Path
 import webbrowser
 import time
+import multiprocessing
 from NIDRA.nidra_gui.app import app
 try:
     from NIDRA.nidra_gui.app import app
@@ -65,6 +66,11 @@ def main():
     """
     Starts the Flask server in a background thread and then launches the Neutralino application.
     """
+    # Set the multiprocessing start method to 'spawn' for consistency across platforms
+    # This is crucial on macOS and can prevent issues on Linux when using GUI toolkits
+    # in subprocesses (like tkinter for the file dialog).
+    multiprocessing.set_start_method('spawn', force=True)
+
     port = find_free_port()
     flask_thread = threading.Thread(target=run_flask, args=(port,), daemon=True)
     flask_thread.start()
