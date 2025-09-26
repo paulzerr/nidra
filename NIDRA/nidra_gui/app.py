@@ -5,6 +5,7 @@ import threading
 import logging
 from pathlib import Path
 import multiprocessing
+import importlib.resources
 
 import time
 from NIDRA import scorer as scorer_factory
@@ -56,7 +57,6 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 else:
     # Running as a standard Python package
-    base_path = Path(__file__).parent.parent.parent # Project root
     app = Flask(__name__, instance_relative_config=True)
     app.template_folder = str(Path(__file__).parent / 'neutralino' / 'resources' / 'templates')
     app.static_folder = str(Path(__file__).parent / 'neutralino' / 'resources' / 'static')
@@ -78,8 +78,14 @@ def index():
 @app.route('/docs/<path:filename>')
 def serve_docs(filename):
     """Serves files from the docs directory."""
-    # The `base_path` is already correctly set up to handle both development and bundled modes.
-    docs_path = base_path / 'docs'
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        # Running as a PyInstaller bundle
+        docs_path = Path(sys._MEIPASS) / 'docs'
+    else:
+        # For a standard package, 'docs' is a resource within the 'docs' package
+        # Note: This requires Python 3.9+ for `files()`
+        docs_path = importlib.resources.files('docs')
+
     return send_from_directory(docs_path, filename)
 
 @app.route('/select-directory')

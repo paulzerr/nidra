@@ -5,6 +5,7 @@ from pathlib import Path
 import onnxruntime as ort
 from NIDRA.plotting import plot_hypnodensity
 import importlib.resources
+from NIDRA.utils import get_model_path, is_running_in_pyinstaller_bundle, download_models
 
 class ForeheadScorer:
     """
@@ -36,6 +37,8 @@ class ForeheadScorer:
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
+        download_models()
+
     def score(self, plot: bool = False):
         self._load_model()
         self._load_recording()
@@ -61,15 +64,21 @@ class ForeheadScorer:
 
     def _load_model(self):
         model_filename = f"{self.model_name}.onnx"
-        # Use importlib.resources to access model files within the package
-        try:
-            with importlib.resources.path('NIDRA.models', model_filename) as model_file:
-                self.session = ort.InferenceSession(str(model_file))
+        if is_running_in_pyinstaller_bundle():
+            # Use importlib.resources to access model files within the package
+            try:
+                with importlib.resources.path('NIDRA.models', model_filename) as model_file:
+                    self.session = ort.InferenceSession(str(model_file))
+                self.input_name = self.session.get_inputs()[0].name
+                self.output_name = self.session.get_outputs()[0].name
+            except FileNotFoundError:
+                print(f"Error: Model file not found at NIDRA/models/{model_filename}")
+                raise
+        else:
+            model_path = get_model_path(model_filename)
+            self.session = ort.InferenceSession(model_path)
             self.input_name = self.session.get_inputs()[0].name
             self.output_name = self.session.get_outputs()[0].name
-        except FileNotFoundError:
-            print(f"Error: Model file not found at NIDRA/models/{model_filename}")
-            raise
 
     def _load_recording(self):
         fs = 64

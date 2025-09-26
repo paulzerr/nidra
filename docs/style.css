@@ -49,7 +49,7 @@ body {
 }
 .sidebar ul li a {
     display: block;
-    padding: 0.5rem 0;
+    padding: 0.2rem 0;
     color: #495057;
     text-decoration: none;
     transition: color 0.2s ease-in-out;

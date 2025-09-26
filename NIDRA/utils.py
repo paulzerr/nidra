@@ -1,3 +1,4 @@
+import sys
 """
 Utility functions for NIDRA sleep scoring.
 """
@@ -288,6 +289,17 @@ def setup_logging():
     return log_file
 
 
+def get_model_path(model_filename):
+    """
+    Constructs the path to a model file in the user's data directory.
+    This function assumes that download_models() has already been run.
+    """
+    app_name = "NIDRA"
+    app_author = "pzerr"
+    data_dir = user_data_dir(app_name, app_author)
+    models_dir = os.path.join(data_dir, "models")
+    return os.path.join(models_dir, model_filename)
+
 def download_models(tk_root=None, status_label=None, completion_label=None):
     """
     Checks for models and downloads them if they are missing.
@@ -369,3 +381,9 @@ def download_models(tk_root=None, status_label=None, completion_label=None):
         print("--- Model download complete ---")
     
     return True
+
+def is_running_in_pyinstaller_bundle():
+    """
+    Check if the script is running in a PyInstaller bundle.
+    """
+    return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
