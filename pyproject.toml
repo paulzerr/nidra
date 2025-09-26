@@ -25,7 +25,10 @@ dependencies = [
     "onnxruntime",
     "matplotlib",
     "Flask",
-    "pyinstaller"
+    "pyinstaller",
+    "huggingface_hub",
+    "appdirs",
+    "requests"
 ]
 
 [project.urls]

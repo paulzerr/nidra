@@ -2,12 +2,15 @@ import argparse
 import sys
 from pathlib import Path
 import NIDRA
+from NIDRA.utils import download_models
 
 
 def run_cli():
     """
     Run the scorer from the command line.
     """
+    # Download models on first run
+    download_models()
     parser = argparse.ArgumentParser(description="NIDRA")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 

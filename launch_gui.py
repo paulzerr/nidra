@@ -11,14 +11,6 @@ import time
 import multiprocessing
 from NIDRA.nidra_gui.app import app
 from NIDRA.utils import download_models
-try:
-    from NIDRA.nidra_gui.app import app
-except ModuleNotFoundError:
-    # If running script directly, add project root to Python path
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-    from NIDRA.nidra_gui.app import app
 import importlib.resources
 
 def get_resource_path(relative_path):
@@ -33,7 +25,7 @@ def get_resource_path(relative_path):
         return str(package_resources.joinpath(relative_path))
     except (ModuleNotFoundError, AttributeError):
         # Fallback for development mode
-        base_path = os.path.abspath(Path(__file__).parent)
+        base_path = os.path.abspath(os.path.join(Path(__file__).parent, 'NIDRA', 'nidra_gui'))
         return os.path.join(base_path, relative_path)
 
 def find_free_port(preferred_ports=[5001, 5002, 5003, 62345, 62346, 62347, 62348, 62349]):

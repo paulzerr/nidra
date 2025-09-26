@@ -2,12 +2,17 @@
 Utility functions for NIDRA sleep scoring.
 """
 import re
+import os
+import sys
 import numpy as np
 from typing import List
 import logging
 import tempfile
 from pathlib import Path
 from datetime import datetime
+from huggingface_hub import hf_hub_download, hf_hub_url
+from appdirs import user_data_dir
+import requests
 
 def calculate_font_size(screen_height, percentage, min_size, max_size):
     """Calculates font size as a percentage of screen height with min/max caps."""
@@ -281,3 +286,86 @@ def setup_logging():
         ]
     )
     return log_file
+
+
+def download_models(tk_root=None, status_label=None, completion_label=None):
+    """
+    Checks for models and downloads them if they are missing.
+    Provides GUI feedback if tk_root and status_label are provided.
+    Returns True if a download was needed, False otherwise.
+    """
+    if hasattr(sys, '_MEIPASS'):
+        return False
+
+    repo_id = "pzerr/NIDRA_models"
+    models = ["u-sleep-nsrr-2024.onnx", "u-sleep-nsrr-2024_eeg.onnx", "ez6.onnx", "ez6moe.onnx"]
+
+    app_name = "NIDRA"
+    app_author = "pzerr"
+    data_dir = user_data_dir(app_name, app_author)
+    models_dir = os.path.join(data_dir, "models")
+    os.makedirs(models_dir, exist_ok=True)
+
+    models_to_download = [m for m in models if not os.path.exists(os.path.join(models_dir, m))]
+
+    if not models_to_download:
+        found_message = f"All models found at: {models_dir}"
+        if tk_root and status_label:
+            tk_root.after(0, lambda: status_label.config(text=found_message))
+        else:
+            print(found_message)
+        return False
+
+    # --- Download is needed ---
+    
+    # Calculate total size
+    total_size = 0
+    for model_name in models_to_download:
+        try:
+            url = hf_hub_url(repo_id, model_name)
+            response = requests.head(url, timeout=15)
+            response.raise_for_status()
+            file_size = int(response.headers.get('content-length', 0))
+            total_size += file_size
+        except Exception:
+            # Could not get size for this model, continue to next
+            continue
+    
+    total_size_mb = total_size / (1024 * 1024)
+    if total_size_mb < 0.1:
+        total_size_mb = 152.0
+    size_info = f"({total_size_mb:.2f} MB)" if total_size_mb > 0 else ""
+    download_message = f"Downloading sleep scoring models to {models_dir}, please wait... {size_info}"
+
+    if tk_root and status_label:
+        tk_root.after(0, lambda: status_label.config(text=download_message))
+    else:
+        print("--- NIDRA Model Download ---")
+        print(download_message)
+
+    # Download models
+    for model_name in models_to_download:
+        try:
+            if not (tk_root and status_label):
+                 print(f"Downloading {model_name}...")
+
+            hf_hub_download(repo_id=repo_id, filename=model_name, local_dir=models_dir)
+            
+            if not (tk_root and status_label):
+                print(f"Successfully downloaded {model_name}.")
+
+        except Exception as e:
+            error_message = f"Error downloading {model_name}: {e}"
+            if tk_root and status_label:
+                tk_root.after(0, lambda: status_label.config(text=error_message))
+            else:
+                print(error_message)
+            return True # Still, a download was attempted.
+    
+    completion_message = "Model download complete. You can now use NIDRA."
+    if tk_root and completion_label:
+        tk_root.after(0, lambda: completion_label.config(text=completion_message))
+    else:
+        print("--- Model download complete ---")
+    
+    return True

@@ -1,6 +1,6 @@
 import sys
 import os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 import threading
 import logging
 from pathlib import Path
@@ -56,6 +56,7 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 else:
     # Running as a standard Python package
+    base_path = Path(__file__).parent.parent.parent # Project root
     app = Flask(__name__, instance_relative_config=True)
     app.template_folder = str(Path(__file__).parent / 'neutralino' / 'resources' / 'templates')
     app.static_folder = str(Path(__file__).parent / 'neutralino' / 'resources' / 'static')
@@ -74,6 +75,12 @@ def index():
     """Serves the main HTML page."""
     return render_template('index.html', texts=TEXTS)
 
+@app.route('/docs/<path:filename>')
+def serve_docs(filename):
+    """Serves files from the docs directory."""
+    # The `base_path` is already correctly set up to handle both development and bundled modes.
+    docs_path = base_path / 'docs'
+    return send_from_directory(docs_path, filename)
 
 @app.route('/select-directory')
 def select_directory():
@@ -212,6 +219,8 @@ def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plo
         )
         
         hypnogram, probabilities = scorer.score(plot=plot)
+
+        logger.info("Autoscoring complete.")
 
         if gen_stats:
             logger.info("Calculating sleep statistics...")

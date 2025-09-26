@@ -2,8 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Dynamic UI Scaling ---
 
     // Adjust these constants to fine-tune the UI's appearance.
-    const BASE_UI_SCALE = 1.0; // Overall size of UI elements (padding, margins, etc.)
-    const BASE_FONT_SCALE = 1.5; // Overall font size
+    const BASE_UI_SCALE = 1.1; // Overall size of UI elements (padding, margins, etc.)
+    const BASE_FONT_SCALE = 2.6; // Overall font size
 
     const apect_ratio = 16 / 9;
     const apect_ratio_threshold = 0.1;
@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modelNameSelect = document.getElementById('model-name');
     const browseInputDirBtn = document.getElementById('browse-input-btn');
     const browseOutputDirBtn = document.getElementById('browse-output-btn');
+    const helpBtn = document.getElementById('help-btn');
 
     let logInterval;
     let statusInterval;
@@ -141,6 +142,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     browseInputDirBtn.addEventListener('click', () => handleBrowseClick('input-dir'));
+    helpBtn.addEventListener('click', () => {
+        window.open('/docs/manual.html', '_blank');
+    });
     browseOutputDirBtn.addEventListener('click', () => handleBrowseClick('output-dir'));
 
 
