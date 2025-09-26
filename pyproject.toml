@@ -42,6 +42,5 @@ nidra = "NIDRA.nidra_gui.launcher:main"
 packages = {find = {}}
 
 [tool.setuptools.package-data]
-"NIDRA" = ["models/*.onnx"]
 "NIDRA.nidra_gui" = ["neutralino/**"]
 "docs" = ["**"]
