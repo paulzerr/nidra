@@ -68,7 +68,7 @@ def index():
     # so we no longer need to construct a special initial message here.
     logger.info("-------------------------- System Information --------------------------")
     logger.info(f"OS: {platform.platform()}")
-    logger.info(f"Python Version: {sys.version.replace('\n', ' ')}")
+    logger.info(f"Python Version: {' '.join(sys.version.splitlines())}")
     logger.info(f"Python Environment: {sys.prefix}")
     logger.info(f"Running Directory: {Path.cwd()}")
     logger.info(f"Log File: {LOG_FILE}")
@@ -233,7 +233,8 @@ def _find_files_to_score(input_dir, data_source, score_subdirs):
         # Check if we are in single-file mode but subdirectories exist.
         if not score_subdirs and any(item.is_dir() for item in input_path.iterdir()):
             raise ValueError(
-                f"No recordings found in '{input_dir}', but subdirectories were detected.\n\n"
+                f"No recordings found in '{input_dir}', but subdirectories were detected."
+                "\n\n"
                 "If your recordings are in separate subfolders, please select the 'Score all recordings (in subfolders)' option."
             )
         raise FileNotFoundError(f"Could not find any suitable recordings in '{input_dir}'. Please check the input directory and data source settings.")

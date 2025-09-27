@@ -8,7 +8,7 @@ from pathlib import Path
 import webbrowser
 import time
 import multiprocessing
-from .app import app, check_ping
+from NIDRA.nidra_gui.app import app, check_ping
 import time
 import importlib.resources
 import atexit

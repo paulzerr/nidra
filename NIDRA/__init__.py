@@ -10,12 +10,12 @@ def scorer(scorer_type: str, **kwargs):
         An instance of the specified scorer class.
     """
     if scorer_type == 'forehead':
-        from .forehead_scorer import ForeheadScorer
+        from NIDRA.forehead_scorer import ForeheadScorer
         return ForeheadScorer(**kwargs)
     elif scorer_type == 'psg':
-        from .psg_scorer import PSGScorer
+        from NIDRA.psg_scorer import PSGScorer
         return PSGScorer(**kwargs)
     else:
         raise ValueError(f"Unknown scorer type: {scorer_type}")
 
-from .utils import batch_scorer
+from NIDRA.utils import batch_scorer

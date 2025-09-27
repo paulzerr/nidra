@@ -495,10 +495,10 @@ def download_models(logger):
             repo_url = "https://huggingface.co/pzerr/NIDRA_models"
             download_dir = get_model_path(model_name)
             error_message = (
-                f"\n--- MODEL DOWNLOAD FAILED ---\n"
+                "\n--- MODEL DOWNLOAD FAILED ---\n"
                 f"Automatic download of the required model '{model_name}' failed.\n"
-                f"Please try one of the following solutions:\n"
-                f"1. Use the single-file executable version of NIDRA, which includes all models.\n"
+                "Please try one of the following solutions:\n"
+                "1. Use the single-file executable version of NIDRA, which includes all models.\n"
                 f"2. Manually download the model from: {repo_url}\n"
                 f"   And place it in the following directory: {os.path.dirname(download_dir)}\n"
             )
@@ -544,7 +544,7 @@ def download_example_data(logger):
     if not files_to_download:
         return str(example_data_dir)
 
-    logger.info(f"\n\nDownloading example data to {example_data_dir}, please wait...")
+    logger.info("\n\n" + f"Downloading example data to {example_data_dir}, please wait...")
 
     for filename in files_to_download:
         try:
@@ -556,7 +556,7 @@ def download_example_data(logger):
             repo_url = "https://huggingface.co/pzerr/NIDRA_models"
             download_dir = example_data_dir / filename
             error_message = (
-                f"\n--- EXAMPLE DATA DOWNLOAD FAILED ---\n"
+                "\n--- EXAMPLE DATA DOWNLOAD FAILED ---\n"
                 f"Automatic download of the example data file '{filename}' failed.\n"
                 f"Please try manually downloading the file from: {repo_url}\n"
                 f"And place it in the following directory: {example_data_dir}\n"

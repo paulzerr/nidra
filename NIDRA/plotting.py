@@ -219,7 +219,7 @@ def plot_hypnodensity(hyp, ypred, raw, nclasses=6, figoutdir='./', filename='das
                 vmin, vmax = np.percentile(Sxx, [5, 95])
                 norm = Normalize(vmin=vmin, vmax=vmax)
                 axs[ax_key].pcolormesh(tt, f, Sxx, norm=norm, cmap='Spectral_r', shading="auto")
-                axs[ax_key].set_ylabel(f"{ch_name}\nFrequency [Hz]")
+                axs[ax_key].set_ylabel(f"{ch_name}" + "\nFrequency [Hz]")
                 
                 axs[ax_key].set_xlim(tt.min(), tt.max())
                 axs[ax_key].grid(True, which='major', axis='x', color='#EEEEEE', lw=0.8)
@@ -234,7 +234,7 @@ def plot_hypnodensity(hyp, ypred, raw, nclasses=6, figoutdir='./', filename='das
                 vmin, vmax = np.percentile(Sxx, [5, 95])
                 norm = Normalize(vmin=vmin, vmax=vmax)
                 axs[ax_key].pcolormesh(tt, f, Sxx, norm=norm, cmap='Spectral_r', shading="auto")
-                axs[ax_key].set_ylabel(f"{ch_name}\nFrequency [Hz]")
+                axs[ax_key].set_ylabel(f"{ch_name}" + "\nFrequency [Hz]")
                 
                 axs[ax_key].set_xlim(tt.min(), tt.max())
                 axs[ax_key].grid(True, which='major', axis='x', color='#EEEEEE', lw=0.8)
