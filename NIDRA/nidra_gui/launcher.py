@@ -9,16 +9,8 @@ from pathlib import Path
 import webbrowser
 import time
 import multiprocessing
-from NIDRA.nidra_gui.app import app
-from NIDRA.utils import download_models
-try:
-    from NIDRA.nidra_gui.app import app
-except ModuleNotFoundError:
-    # If running script directly, add project root to Python path
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
-    from NIDRA.nidra_gui.app import app
+from .app import app
+from ..utils import download_models
 import importlib.resources
 
 def get_resource_path(relative_path):
@@ -61,7 +53,7 @@ def run_flask(port):
     """Runs the Flask app on a given port."""
     cli = sys.modules['flask.cli']
     cli.show_server_banner = lambda *x: None # We don't want to show the Flask startup message
-    app.run(port=port, debug=True)
+    app.run(port=port)
 
 
 def fallback_gui(url):
@@ -78,11 +70,11 @@ def fallback_gui(url):
 
     # Create a more visually appealing font
     default_font = tkFont.nametofont("TkDefaultFont")
-    default_font.configure(size=16)
-    url_font = tkFont.Font(family=default_font.cget("family"), size=16, underline=True)
+    default_font.configure(size=18)
+    url_font = tkFont.Font(family=default_font.cget("family"), size=18, underline=True)
 
     # Set up the window layout
-    root.geometry("800x600") # Adjusted for potential download messages
+    root.geometry("800x400") # Adjusted for potential download messages
     root.resizable(False, False)
     container = tk.Frame(root, padx=15, pady=15)
     container.pack(expand=True, fill="both")
@@ -96,14 +88,14 @@ def fallback_gui(url):
     root.geometry(f'+{x}+{y}')
 
     # Add informational labels
-    tk.Label(container, text="\n\nNIDRA GUI is now running in your web browser").pack(pady=(0, 5))
+    tk.Label(container, text="\n\nThe NIDRA GUI is now running in your web browser:").pack(pady=(0, 5))
     
     # Add a clickable URL label
     url_label = tk.Label(container, text=url, fg="blue", cursor="hand2", font=url_font)
     url_label.pack()
     url_label.bind("<Button-1>", lambda e: webbrowser.open(url))
     
-    tk.Label(container, text="\n\nKEEP THIS WINDOW OPEN! \nClose this window to shut down NIDRA.\n\n").pack(pady=(5, 0))
+    tk.Label(container, text="\n\nClosing this window will shut down NIDRA.\n\n").pack(pady=(5, 0))
 
     # --- Download Section ---
     status_label = tk.Label(container, text="")
@@ -115,7 +107,7 @@ def fallback_gui(url):
         download_needed = download_models(tk_root=root, status_label=status_label, completion_label=completion_label)
         if not download_needed:
             # If no download was needed, we can shrink the window.
-            root.after(0, lambda: root.geometry("800x600"))
+            root.after(0, lambda: root.geometry("800x300"))
 
     download_thread = threading.Thread(target=download_in_thread, daemon=True)
     download_thread.start()
