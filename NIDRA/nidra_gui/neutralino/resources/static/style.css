@@ -52,14 +52,15 @@ body {
     flex: 1 1 50%;
     border-right: calc(0.1 * var(--ui-scale)) solid var(--border-color);
     background-color: #fafafa;
-    padding-right: calc(2.5 * var(--ui-scale));
+    padding-right: calc(3 * var(--ui-scale));
 }
 
 .right-panel {
     flex: 1 1 50%;
     background-color: #2b2b2b;
     color: #f0f0f0;
-    padding: calc(1.5 * var(--ui-scale));
+    padding: calc(2 * var(--ui-scale));
+    padding-left: calc(3 * var(--ui-scale));
 }
 
 /* --- Controls & Typography --- */
@@ -177,6 +178,15 @@ input[type="radio"], input[type="checkbox"] {
 
 .help-btn {
     flex-shrink: 0;
+    width: 100%; /* Make buttons fill the container */
+}
+
+.help-button-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-scale);
+    flex-shrink: 0; /* Prevent the stack from shrinking */
+    width: 35%; /* Adjust width as needed */
 }
 
 /* --- Run Button --- */
@@ -197,7 +207,7 @@ input[type="radio"], input[type="checkbox"] {
 }
 
 .run-btn:hover {
-    background-color: #072d3b;
+    background-color: #0979a1;
 }
 
 .run-btn:disabled {

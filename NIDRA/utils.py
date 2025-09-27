@@ -381,3 +381,49 @@ def is_running_in_pyinstaller_bundle():
     Check if the script is running in a PyInstaller bundle.
     """
     return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+
+
+def download_example_data(logger):
+    """
+    Checks for example data in the user's data directory and downloads it if missing.
+    Logs progress to the provided logger instance.
+    Returns the path to the example data directory.
+    """
+    if is_running_in_pyinstaller_bundle():
+        logger.info("Running in a PyInstaller bundle, example data should be included. Skipping download check.")
+        # In a bundle, data would be next to the executable.
+        base_path = Path(sys.executable).parent
+        example_data_dir = base_path / "example_zmax_data"
+        if example_data_dir.exists():
+            return str(example_data_dir)
+        else:
+            # Fallback for development mode within a bundled app structure
+            return str(Path(sys._MEIPASS) / "example_zmax_data")
+
+    repo_id = "pzerr/NIDRA_models"
+    example_files = ["EEG_L.edf", "EEG_R.edf"]
+
+    # Place example data next to the models directory
+    models_dir = Path(os.path.dirname(get_model_path("dummy.onnx")))
+    example_data_dir = models_dir.parent / "example_zmax_data"
+    os.makedirs(example_data_dir, exist_ok=True)
+
+    files_to_download = [f for f in example_files if not (example_data_dir / f).exists()]
+
+    if not files_to_download:
+        return str(example_data_dir)
+
+    logger.info(f"\n\nDownloading example data to {example_data_dir}, please wait...")
+
+    for filename in files_to_download:
+        try:
+            logger.info(f"Downloading {filename}...")
+            hf_hub_download(repo_id=repo_id, filename=filename, local_dir=str(example_data_dir))
+            logger.info(f"Successfully downloaded {filename}.")
+        except Exception as e:
+            logger.error(f"Error downloading {filename}: {e}", exc_info=True)
+            # If a download fails, return None to indicate an error
+            return None
+
+    logger.info("--- Example data download complete ---")
+    return str(example_data_dir)

@@ -10,7 +10,7 @@ import psutil
 
 import time
 from NIDRA import scorer as scorer_factory
-from NIDRA.utils import setup_logging, compute_sleep_stats, download_models
+from NIDRA.utils import setup_logging, compute_sleep_stats, download_models, download_example_data
 
 
 # --- Setup ---
@@ -155,6 +155,23 @@ def start_scoring():
     worker_thread.start()
     return jsonify({'status': 'success', 'message': 'Scoring process initiated.'})
 
+
+@app.route('/show-example', methods=['POST'])
+def show_example():
+    """Downloads example data and returns the path."""
+    try:
+        logger.info("\n--- Preparing scoring of example data ---")
+        example_data_path = download_example_data(logger=logger)
+        if example_data_path:
+            logger.info(f"Example data is ready at: {example_data_path}")
+            return jsonify({'status': 'success', 'path': example_data_path})
+        else:
+            logger.error("Failed to download or locate the example data.")
+            return jsonify({'status': 'error', 'message': 'Could not download example data.'}), 500
+    except Exception as e:
+        logger.error(f"An error occurred while preparing the example: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, model_name, plot, gen_stats):
     """A wrapper to manage the global running state around the original function."""
     global is_scoring_running
@@ -169,12 +186,10 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
     finally:
         is_scoring_running = False
         if total_count > 0:
-            if success_count == total_count:
-                logger.info("Autoscoring completed.")
-            elif success_count > 0:
+            if 0 < success_count < total_count:
                 logger.info(f"Autoscoring completed with {total_count - success_count} failure(s): "
                             f"Successfully processed {success_count} of {total_count} recordings.")
-            else:
+            elif success_count == 0 and total_count > 0:
                 logger.info("Autoscoring failed for all recordings.")
         elif total_count == 0:
             logger.info("Autoscoring failed.")
@@ -247,7 +262,7 @@ def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plo
         
         hypnogram, probabilities = scorer.score(plot=plot)
 
-        logger.info("Autoscoring complete.")
+        logger.info("Autoscoring completed.")
 
         if gen_stats:
             logger.info("Calculating sleep statistics...")

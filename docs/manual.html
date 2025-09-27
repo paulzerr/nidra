@@ -44,14 +44,15 @@
         </section>
 
         <section id="installation">
-            <h2>Installation & Usage</h2>
+            <h2>Installation</h2>
             <p>There are two main ways to use NIDRA:</p>
-            <h4>1. Standalone Executable (Recommended)</h4>
+            <h4>1. Standalone Executable (Recommended for non-technical users)</h4>
             <p>The easiest way to use NIDRA is via the portable, ready-to-go executables which require no installation. Simply download the correct version for your operating system and run it.</p>
             <ul>
-                <li><strong><a href="LINK">Download for Linux</a></strong></li>
-                <li><strong><a href="LINK">Download for MacOS</a></strong></li>
-                <li><strong><a href="LINK">Download for Windows</a></strong></li>
+                <h3><strong><a href="LINK">Download for Linux</a></strong></h3>
+                <h3><strong><a href="LINK">Download for MacOS</a></strong></h3>
+                <h3><strong><a href="LINK">Download for Windows</a></strong></h3>
+                <br>
             </ul>
             <h4>2. Install from PyPI</h4>
             <p>Alternatively, NIDRA can be installed as a Python package using pip. This requires Python 3.10 or later.</p>
@@ -59,6 +60,7 @@
             <p>Once installed, you can launch the graphical interface by running the <code>nidra</code> command in your terminal.</p>
             <p>For advanced users who wish to install the package directly from the source code, please see the <a href="#install-from-source">Install from Source</a> section.</p>
         </section>
+            <p><strong>Note on Model Downloads:</strong> If you installed NIDRA via pip, the first time you run a scoring process, the necessary model files will be automatically downloaded from the Hugging Face repository (<a href="https://huggingface.co/pzerr/NIDRA_models/">https://huggingface.co/pzerr/NIDRA_models/</a>). This is a one-time setup step that requires an internet connection. The standalone executables do not require this step, as the models are already bundled.</p>
 
         <section id="gui-guide">
             <h2>Graphical User Interface (GUI)</h2>
@@ -84,7 +86,7 @@
             <h3>General Requirements</h3>
             <ul>
                 <li><strong>File Format:</strong> NIDRA exclusively works with European Data Format (.edf) files.</li>
-                <li><strong>Channel Labels:</strong> Ensure your EDF files have standard channel labels (e.g., 'EEG Fpz-Cz', 'EOG left') for PSG data, as NIDRA uses these to identify the correct signals.</li>
+                <li><strong>Channel Labels:</strong> Ensure your EDF files have standard channel labels (e.g., 'EEG Fpz-Cz', 'EOG left', 'Fp1', 'O2-M1') for PSG data, as NIDRA uses these to identify channel types.</li>
             </ul>
             <h3>Data Structure Guide</h3>
             <p>Whether you are scoring a single file or batch processing, NIDRA expects each recording session to be in its own folder. When using the "Score all subdirectories" mode, NIDRA will treat every subfolder in your input directory as a separate recording.</p>
@@ -92,9 +94,12 @@
             <p>For two-channel forehead EEG data, the left and right channel files must be in the same directory. For ZMax data, these are typically named <code>EEG_L.edf</code> and <code>EEG_R.edf</code>.</p>
             <pre>
 forehead_study/
-└── subject_01/
-    ├── EEG_L.edf
-    └── EEG_R.edf
+├── subject_01/
+|   ├── EEG_L.edf
+|   └── EEG_R.edf
+├── subject_02/
+|   ├── night01_L.edf
+|   └── night01_R.edf
 </pre>
             <p><strong>Structure for PSG:</strong></p>
             <p>For PSG data, each EDF file should be in its own directory. NIDRA can process multiple recordings in subdirectories, as shown in this example with three recordings:</p>
@@ -154,10 +159,10 @@ psg_study/
             <h3>The Output Files</h3>
             <p>For each recording, NIDRA generates up to four files:</p>
             <ul>
-                <li><strong>Hypnogram File (<code>hypnogram.txt</code>):</strong> This is the main output. It's a text file with a single column of numbers, where each number is the sleep stage for one 30-second epoch.</li>
-                <li><strong>Probabilities File (<code>probabilities.txt</code>):</strong> This file contains the raw probabilities for each sleep stage for every epoch. Each row corresponds to an epoch, and each column corresponds to a sleep stage (Wake, N1, N2, N3, Artifact, REM). This is useful for advanced analysis of model confidence.</li>
-                <li><strong>Hypnogram Plot (<code>hypnogram.png</code>):</strong> An image that visualizes the hypnogram, showing the progression of sleep stages over the night.</li>
-                <li><strong>Sleep Statistics (<code>sleep_statistics.csv</code>):</strong> A CSV file with a detailed summary of sleep metrics like Total Sleep Time, Sleep Efficiency, and time spent in each stage.</li>
+                <li><strong>Hypnogram File (<code>..._hypnogram.csv</code>):</strong> This is the main output. It's a CSV file with a single column of numbers, where each number is the sleep stage for one 30-second epoch.</li>
+                <li><strong>Probabilities File (<code>..._probabilities.csv</code>):</strong> This file contains the raw probabilities for each sleep stage for every epoch. Each row corresponds to an epoch, and each column corresponds to a sleep stage (Wake, N1, N2, N3, REM, Artifact). This is useful for advanced analysis of model confidence.</li>
+                <li><strong>Dashboard Plot (<code>..._dashboard.png</code>):</strong> An image that visualizes the hypnogram and underlying data, showing the progression of sleep stages over the night.</li>
+                <li><strong>Sleep Statistics (<code>..._sleep_statistics.csv</code>):</strong> A CSV file with a detailed summary of sleep metrics like Total Sleep Time, Sleep Efficiency, and time spent in each stage.</li>
             </ul>
             
             <h3>Sleep Stage Key</h3>
@@ -187,28 +192,81 @@ psg_study/
         <section id="python-package">
             <h2>Python Package: Advanced Integration</h2>
             <p>Using NIDRA as a Python package provides the ultimate flexibility, allowing you to integrate automated scoring directly into your data analysis pipelines.</p>
-            <h3>Core Concept: The Scorer Object</h3>
-            <p>The main entry point is the <code>NIDRA.scorer</code> class. You first create an instance of this class, providing it with the configuration for your scoring task. Then, you call the <code>.score()</code> method on the instance to run the analysis.</p>
+            <h3>Core Concept: The Scorer Factory</h3>
+            <p>The main entry point is the <code>NIDRA.scorer()</code> factory function. You call this function to create a scorer instance, providing it with the configuration for your scoring task. Then, you call the <code>.score()</code> method on the returned object to run the analysis.</p>
+            
             <h4><code>NIDRA.scorer(...)</code> Parameters</h4>
-            <p>When initializing a scorer, you must provide the following arguments:</p>
+            <p>When creating a scorer, you must provide the following arguments:</p>
             <ul>
                 <li><code>scorer_type</code> (str): The type of data. Must be either <code>'forehead'</code> or <code>'psg'</code>.</li>
-                <li><code>input_file</code> (str): The full path to the input EDF file. For forehead EEG, this should be the path to the left channel file (e.g., ending in <code>_L.edf</code> or named <code>EEG_L.edf</code>).</li>
                 <li><code>output_dir</code> (str): The path to the directory where results will be saved.</li>
-                <li><code>model_name</code> (str, optional): The name of the model to use. If not provided, a default model will be selected based on the <code>scorer_type</code>.</li>
+                <li><code>input_file</code> (str, optional): The full path to the input EDF file. Required if not providing data as a NumPy array.</li>
+                <li><code>data</code> (np.ndarray, optional): An in-memory NumPy array of the EEG/PSG data. If you use this, <code>input_file</code> should be <code>None</code>.</li>
+                <li><code>model_name</code> (str, optional): The name of the model to use. If not provided, a default model will be selected.</li>
+                <li><strong>For PSG data from NumPy array:</strong>
+                    <ul>
+                        <li><code>sfreq</code> (float): The sampling frequency of the data.</li>
+                        <li><code>ch_names</code> (list of str): A list of channel names.</li>
+                    </ul>
+                </li>
             </ul>
+
             <h4><code>scorer.score(...)</code> Method</h4>
             <p>This method runs the scoring process. It takes one optional argument:</p>
             <ul>
-                <li><code>plot</code> (bool, optional): If <code>True</code>, a hypnogram plot will be generated. Defaults to <code>True</code>.</li>
+                <li><code>plot</code> (bool, optional): If <code>True</code>, a dashboard plot will be generated. Defaults to <code>False</code>.</li>
             </ul>
             <p><strong>Returns:</strong></p>
-            <p>The method returns a tuple containing two elements:</p>
+            <p>The method returns a tuple containing two NumPy arrays:</p>
             <ol>
                 <li><strong>hypnogram</strong> (<code>numpy.ndarray</code>): A 1D array of integers representing the sleep stage for each 30-second epoch. See the <a href="#understanding-results">Sleep Stage Key</a> for the meaning of each integer.</li>
-                <li><strong>probabilities</strong> (<code>numpy.ndarray</code>): A 2D array of shape (n_epochs, n_classes). Each row corresponds to an epoch, and each column contains the model's predicted probability for a specific sleep stage. The order of classes is Wake, N1, N2, N3, REM, Artifact.</li>
+                <li><strong>probabilities</strong> (<code>numpy.ndarray</code>): A 2D array of shape (n_epochs, n_classes). Each row corresponds to an epoch, and each column contains the model's predicted probability for a specific sleep stage.</li>
             </ol>
-            <h3>Example: Batch Processing and Analyzing Statistics with Pandas</h3>
+
+            <h3>Example 1: Scoring a PSG File</h3>
+            <p>This example shows how to score a single PSG recording from an EDF file.</p>
+            <pre>
+import NIDRA
+
+# Initialize the scorer
+scorer = NIDRA.scorer(
+    scorer_type='psg',
+    input_file='/path/to/your/data/sleep_recording.edf',
+    output_dir='/path/to/your/output',
+    model_name='u-sleep-nsrr-2024'
+)
+
+# Run scoring
+hypnogram, probabilities = scorer.score(plot=True)
+
+print("Scoring complete.")
+print("Hypnogram shape:", hypnogram.shape)
+print("Probabilities shape:", probabilities.shape)
+</pre>
+
+            <h3>Example 2: Scoring In-Memory NumPy Data</h3>
+            <p>You can also score data that you already have in memory as a NumPy array, bypassing the need for file I/O. This is useful for real-time applications or custom data loading pipelines. When scoring PSG data from an array, you must provide the sampling frequency (<code>sfreq</code>). Providing channel names is recommended but optional; if not provided, they will be auto-generated.</p>
+            <pre>
+import NIDRA
+import numpy as np
+
+# --- Create some dummy PSG data ---
+sfreq = 256
+ch_names = ['F3-A2', 'C4-A1', 'O2-A1', 'EOG-L']
+n_samples = sfreq * 60 * 60  # 1 hour of data
+dummy_data = np.random.randn(len(ch_names), n_samples)
+
+# --- Initialize and run the scorer ---
+scorer = NIDRA.scorer(
+    scorer_type='psg',
+    output_dir='/path/to/numpy_psg_output',
+    data=dummy_data,
+    sfreq=sfreq,
+    ch_names=ch_names  # This parameter is optional
+)
+hypnogram, probabilities = scorer.score()
+</pre>
+            <h3>Example 3: Batch Processing a Study</h3>
             <p>This example demonstrates a more realistic workflow: looping through a directory of subjects, scoring each one, and aggregating the sleep statistics into a single pandas DataFrame.</p>
             <pre>
 import NIDRA
@@ -217,6 +275,7 @@ import pandas as pd
 
 # --- Setup ---
 base_dir = Path('my_study_data/')
+# Assumes your data is structured like: my_study_data/subject_01/EEG_L.edf
 subjects = [p for p in base_dir.iterdir() if p.is_dir()]
 all_stats = []
 
@@ -224,34 +283,43 @@ all_stats = []
 for subject_dir in subjects:
     print(f"Processing {subject_dir.name}...")
     
-    # Assume forehead EEG data with an _L.edf file
-    input_file = next(subject_dir.glob('*_L.edf'))
-    output_dir = subject_dir / 'py_output'
-    
-    # Initialize and run the scorer
-    scorer = NIDRA.scorer(
-        scorer_type='forehead',
-        input_file=str(input_file),
-        output_dir=str(output_dir),
-        model_name='ez6moe'
-    )
-    hypnogram, probabilities = scorer.score(plot=True)
-    
-    # The scorer automatically saves the stats, we just need to load it
-    stats_file = output_dir / 'sleep_statistics.csv'
-    if stats_file.exists():
-        stats = pd.read_csv(stats_file)
-        stats['subject_id'] = subject_dir.name
-        all_stats.append(stats)
+    try:
+        # Find the correct input file for forehead EEG
+        input_file = next(subject_dir.glob('*_L.edf'))
+        
+        # Define a unique output directory for this subject's results
+        output_dir = subject_dir / 'nidra_output'
+        output_dir.mkdir(exist_ok=True)
+        
+        # Initialize and run the scorer
+        scorer = NIDRA.scorer(
+            scorer_type='forehead',
+            input_file=str(input_file),
+            output_dir=str(output_dir),
+            model_name='ez6moe'
+        )
+        hypnogram, probabilities = scorer.score(plot=True)
+        
+        # The scorer automatically saves stats, so we just load the CSV
+        stats_file = output_dir / f"{input_file.stem}_sleep_statistics.csv"
+        if stats_file.exists():
+            stats = pd.read_csv(stats_file)
+            stats['subject_id'] = subject_dir.name
+            all_stats.append(stats)
+        else:
+            print(f"Warning: Could not find stats file for {subject_dir.name}")
+
+    except StopIteration:
+        print(f"Warning: No '*_L.edf' file found in {subject_dir}. Skipping.")
+    except Exception as e:
+        print(f"An error occurred while processing {subject_dir.name}: {e}")
 
 # --- Aggregate results ---
 if all_stats:
     final_dataframe = pd.concat(all_stats, ignore_index=True)
-    final_dataframe.to_csv(base_dir / 'study_summary_statistics.csv')
+    final_dataframe.to_csv(base_dir / 'study_summary_statistics.csv', index=False)
     print("Processing complete. Summary statistics saved.")
 </pre>
-            <h3>Accessing Raw Probabilities</h3>
-            <p>The <code>.score()</code> method also returns a <code>probabilities</code> object. This is a NumPy array of shape (n_epochs, n_classes), containing the raw probability for each sleep stage for every epoch. This is useful for advanced analyses, such as assessing model confidence or performing your own classification based on a different probability threshold.</p>
         </section>
 
         <section id="install-from-source">

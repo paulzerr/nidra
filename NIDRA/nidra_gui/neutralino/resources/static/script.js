@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const browseInputDirBtn = document.getElementById('browse-input-btn');
     const browseOutputDirBtn = document.getElementById('browse-output-btn');
     const helpBtn = document.getElementById('help-btn');
+    const showExampleBtn = document.getElementById('show-example-btn');
 
     let logInterval;
     let statusInterval;
@@ -146,6 +147,36 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open('/docs/manual.html', '_blank');
     });
     browseOutputDirBtn.addEventListener('click', () => handleBrowseClick('output-dir'));
+
+    showExampleBtn.addEventListener('click', async () => {
+        // Immediately start polling for logs to show download progress
+        startPolling();
+        // We don't set running state here, as the main scoring hasn't started yet.
+        // The backend will log progress which will appear in the console.
+
+        try {
+            // This fetch will wait until the download on the backend is complete
+            const response = await fetch('/show-example', { method: 'POST' });
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                // Once download is complete, fill paths and click run
+                document.getElementById('input-dir').value = result.path;
+                document.getElementById('output-dir').value = result.path + '/autoscorer_output';
+                document.querySelector('input[name="scoring-mode"][value="single"]').checked = true;
+                
+                // Now, click the run button to start the actual scoring process
+                runBtn.click();
+            } else {
+                alert(`Error showing example: ${result.message}`);
+                stopPolling(); // Stop polling on error
+            }
+        } catch (error) {
+            console.error('Failed to run example:', error);
+            alert('An error occurred while trying to run the example.');
+            stopPolling(); // Stop polling on error
+        }
+    });
 
 
     // --- UI and Polling Functions ---
