@@ -30,7 +30,8 @@ dependencies = [
     "hf_xet",
     "appdirs",
     "requests",
-    "pywebview"
+    "pywebview",
+    "psutil"
 ]
 
 [project.urls]

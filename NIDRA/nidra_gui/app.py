@@ -1,20 +1,20 @@
 import sys
-import os
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import threading
 import logging
 from pathlib import Path
-import multiprocessing
 import importlib.resources
+import platform
+import os
+import psutil
 
 import time
 from NIDRA import scorer as scorer_factory
-from NIDRA.utils import setup_logging, compute_sleep_stats
+from NIDRA.utils import setup_logging, compute_sleep_stats, download_models
 
 
 # --- Setup ---
-LOG_FILE = setup_logging()
-logger = logging.getLogger(__name__)
+LOG_FILE, logger = setup_logging()
 
 
 
@@ -28,7 +28,7 @@ TEXTS = {
     "DATA_SOURCE_FEE": "EEG wearable (e.g. ZMax)   ", "DATA_SOURCE_PSG": "PSG (EEG/EOG)   ",
     "OUTPUT_TITLE": "Output Folder", "RUN_BUTTON": "Run autoscoring", "BROWSE_BUTTON": "Browse files...",
     "HELP_TITLE": "Help & Info (opens in browser)",
-    "CONSOLE_INIT_MESSAGE": "Welcome to NIDRA. Enter input folder (location of your sleep recordings) to begin.",
+    "CONSOLE_INIT_MESSAGE": "\n\nWelcome to NIDRA, the easy to use sleep autoscorer.\n\nSpecify input folder (location of your sleep recordings) to begin.\n\nTo shutdown NIDRA, simply close this window or tab.",
 }
 
 # Determine the base path for resources, accommodating PyInstaller and standard installs
@@ -51,11 +51,40 @@ log.setLevel(logging.ERROR)
 # --- Global State ---
 is_scoring_running = False
 worker_thread = None
+_startup_check_done = False
+last_ping = None
+ping_thread = None
+ping_interval = 2  # seconds
+ping_timeout = 5  # seconds
+
 
 # --- Flask Routes ---
 @app.route('/')
 def index():
     """Serves the main HTML page."""
+    global _startup_check_done
+
+    # The JavaScript will now fetch the log content on page load,
+    # so we no longer need to construct a special initial message here.
+    logger.info("-------------------------- System Information --------------------------")
+    logger.info(f"OS: {platform.platform()}")
+    logger.info(f"Python Version: {sys.version.replace('\n', ' ')}")
+    logger.info(f"Python Environment: {sys.prefix}")
+    logger.info(f"Running Directory: {Path.cwd()}")
+    logger.info(f"Log File: {LOG_FILE}")
+    logger.info(f"User Agent: {request.headers.get('User-Agent', 'N/A')}")
+    logger.info("--------------------------------------------------------------------------\n")
+
+    if not _startup_check_done:
+        def startup_task():
+            """A wrapper to run startup tasks in the correct order."""
+            logger.info("Checking if autoscoring model files are available...")
+            download_models(logger=logger)
+            logger.info(TEXTS.get("CONSOLE_INIT_MESSAGE", "Welcome to NIDRA."))
+
+        threading.Thread(target=startup_task, daemon=True).start()
+        _startup_check_done = True
+
     return render_template('index.html', texts=TEXTS)
 
 @app.route('/docs/<path:filename>')
@@ -129,13 +158,28 @@ def start_scoring():
 def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, model_name, plot, gen_stats):
     """A wrapper to manage the global running state around the original function."""
     global is_scoring_running
+    success_count, total_count = -1, -1
     try:
-        _run_scoring_worker(input_dir, output_dir, score_subdirs, None, data_source, model_name, plot, gen_stats)
+        success_count, total_count = _run_scoring_worker(
+            input_dir, output_dir, score_subdirs, None, data_source, model_name, plot, gen_stats
+        )
     except Exception as e:
         logger.error(f"A critical error occurred in the scoring thread: {e}", exc_info=True)
+        success_count, total_count = 0, 0  # Assume failure
     finally:
         is_scoring_running = False
-        logger.info("Autoscoring completed")
+        if total_count > 0:
+            if success_count == total_count:
+                logger.info("Autoscoring completed.")
+            elif success_count > 0:
+                logger.info(f"Autoscoring completed with {total_count - success_count} failure(s): "
+                            f"Successfully processed {success_count} of {total_count} recordings.")
+            else:
+                logger.info("Autoscoring failed for all recordings.")
+        elif total_count == 0:
+            logger.info("Autoscoring failed.")
+        # A total_count of -1 indicates an unexpected error before the worker could return.
+
         logger.info("\n" + "="*80 + "\nScoring process finished.\n" + "="*80)
 
 
@@ -256,22 +300,32 @@ def _run_batch_scoring(files_to_score, output_dir, data_source, model_name, gen_
     logger.info(f"Total execution time: {total_execution_time:.2f} seconds.")
     logger.info(f"All results saved in: {batch_output_dir}")
     logger.info("-" * 80)
+    return processed_count, len(files_to_score)
 
 def _run_scoring_worker(input_dir, output_dir, score_subdirs, cancel_event, data_source, model_name, plot, gen_stats):
+    """
+    Main worker function to find and score files.
+    Returns a tuple of (number_of_files_successfully_processed, total_files_found).
+    """
     try:
         files_to_score = _find_files_to_score(input_dir, data_source, score_subdirs)
         if score_subdirs:
-            _run_batch_scoring(files_to_score, output_dir, data_source, model_name, gen_stats, plot)
+            return _run_batch_scoring(files_to_score, output_dir, data_source, model_name, gen_stats, plot)
         else:
             if files_to_score:
                 logger.info("\n" + "-" * 80)
                 logger.info(f"Processing: {files_to_score[0]}")
                 logger.info("-" * 80)
-                _run_scoring(files_to_score[0], output_dir, data_source, model_name, gen_stats, plot)
+                success = _run_scoring(files_to_score[0], output_dir, data_source, model_name, gen_stats, plot)
+                return (1, 1) if success else (0, 1)
+            else:
+                return 0, 0
     except (FileNotFoundError, ValueError) as e:
         logger.error(str(e))
+        return 0, 0
     except Exception as e:
         logger.error(f"An unexpected error occurred during scoring: {e}", exc_info=True)
+        return 0, 0
 
 
 @app.route('/status')
@@ -291,13 +345,38 @@ def log_stream():
         return f"Error reading log file: {e}"
 
 
+@app.route('/ping', methods=['POST'])
+def ping():
+    """Resets the ping timer."""
+    global last_ping
+    last_ping = time.time()
+    return jsonify({'status': 'ok'})
+
+
+def check_ping(port):
+    """Periodically checks if the frontend is still alive."""
+    global last_ping
+    while True:
+        time.sleep(ping_interval)
+        if last_ping and time.time() - last_ping > ping_timeout:
+            logger.info("Frontend timeout. Shutting down server...")
+            import requests
+            try:
+                requests.post(f"http://127.0.0.1:{port}/shutdown")
+            except requests.exceptions.RequestException:
+                pass # Server might already be down
+            break
+
+
 def shutdown_server():
     """Function to shut down the server."""
-    func = request.environ.get('werkzeug.server.shutdown')
-    if func is None:
-        logger.warning('Not running with the Werkzeug Server')
-        return
-    func()
+    try:
+        parent = psutil.Process(os.getpid())
+        for child in parent.children(recursive=True):
+            child.terminate()
+        parent.terminate()
+    except psutil.NoSuchProcess:
+        pass
 
 @app.route('/shutdown', methods=['POST'])
 def shutdown():
@@ -312,3 +391,10 @@ def shutdown():
     logger.info("Server is shutting down...")
     shutdown_server()
     return 'Server shutting down...'
+
+
+if __name__ == '__main__':
+    last_ping = time.time()
+    ping_thread = threading.Thread(target=check_ping, daemon=True)
+    ping_thread.start()
+    app.run(host='127.0.0.1', port=5000)

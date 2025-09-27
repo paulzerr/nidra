@@ -15,10 +15,9 @@
     padding: 0;
 }
 
-html {
-    /* Base font size is now controlled by JS */
-}
-
+/* html {
+} */
+ 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--light-gray);

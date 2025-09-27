@@ -180,8 +180,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Auto-scroll to the bottom
                 consoleOutput.scrollTop = consoleOutput.scrollHeight;
             }
+            return logText;
         } catch (error) {
             console.error('Error fetching logs:', error);
+            return ""; // Return empty string on error to prevent breaking checks
         }
     }
 
@@ -203,8 +205,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Initial status check in case the server was already running a task
-    // The initial status check is not required and can clear the welcome message.
-    // Polling will now begin only after the user starts a scoring task.
+    // --- Initial Load ---
+    // Fetch the logs as soon as the page loads to display any startup messages
+    // from the server, such as system info or model download status.
+    // Poll for logs during startup to show model download progress.
+    const startupLogInterval = setInterval(async () => {
+        const logText = await fetchLogs();
+        // Stop polling once the welcome message is visible, indicating startup is complete.
+        if (logText.includes('Welcome to NIDRA')) {
+            clearInterval(startupLogInterval);
+        }
+    }, 1000); // Poll every second
 
+    // Also, check the status immediately in case a scoring task was somehow
+    // running before the GUI was opened.
+    checkStatus();
+
+    // --- Ping Server ---
+    const PING_INTERVAL = 2000; 
+
+    async function pingServer() {
+        try {
+            await fetch('/ping', { method: 'POST' });
+        } catch (error) {
+            console.error('Ping failed:', error);
+        }
+    }
+
+    setInterval(pingServer, PING_INTERVAL);
 });

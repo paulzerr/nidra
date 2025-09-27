@@ -10,7 +10,7 @@ from itertools import product
 from typing import List, Tuple, Dict, Any
 from NIDRA.plotting import plot_hypnodensity
 import importlib.resources
-from NIDRA.utils import get_model_path, is_running_in_pyinstaller_bundle, download_models
+from NIDRA.utils import get_model_path, is_running_in_pyinstaller_bundle
 
 
 # --- Channel Definitions ---
@@ -57,8 +57,6 @@ class PSGScorer:
         self.probabilities = None
         
         self.output_dir.mkdir(parents=True, exist_ok=True)
-
-        download_models()
 
     def score(self, plot: bool = False):
         self._load_recording()

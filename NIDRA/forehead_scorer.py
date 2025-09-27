@@ -5,7 +5,7 @@ from pathlib import Path
 import onnxruntime as ort
 from NIDRA.plotting import plot_hypnodensity
 import importlib.resources
-from NIDRA.utils import get_model_path, is_running_in_pyinstaller_bundle, download_models
+from NIDRA.utils import get_model_path, is_running_in_pyinstaller_bundle
 
 class ForeheadScorer:
     """
@@ -36,8 +36,6 @@ class ForeheadScorer:
         self.raw_predictions = None
 
         self.output_dir.mkdir(parents=True, exist_ok=True)
-
-        download_models()
 
     def score(self, plot: bool = False):
         self._load_model()

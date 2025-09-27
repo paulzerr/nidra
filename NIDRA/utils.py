@@ -8,6 +8,7 @@ import sys
 import numpy as np
 from typing import List
 import logging
+logger = logging.getLogger(__name__)
 import tempfile
 from pathlib import Path
 from datetime import datetime
@@ -274,63 +275,79 @@ def select_channels(psg_data: np.ndarray, sample_rate: int, channel_names: List[
 
 
 def setup_logging():
-    """Configures logging for the application and returns the log file path."""
+    """Configures logging for the application and returns the log file path and logger instance."""
     log_dir = Path(tempfile.gettempdir()) / "nidra_logs"
     log_dir.mkdir(exist_ok=True)
     log_file = log_dir / f"nidra_session_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+
+    # --- Custom Handler Setup for Line Buffering ---
+    # Open the file stream with line buffering (buffering=1)
+    log_file_stream = open(log_file, 'w', encoding='utf-8', buffering=1)
+    
+    # Create handlers
+    file_handler = logging.StreamHandler(log_file_stream)
+    stdout_handler = logging.StreamHandler(sys.stdout)
+    
+    # Use basicConfig with the custom handlers. force=True ensures this configuration is applied.
     logging.basicConfig(
         level=logging.INFO,
         format='%(message)s',
-        handlers=[
-            logging.FileHandler(log_file),
-            logging.StreamHandler()  # Also log to console for debugging
-        ]
+        handlers=[file_handler, stdout_handler],
+        force=True
     )
-    return log_file
+    
+    # Return the configured root logger instance
+    return log_file, logging.getLogger()
 
 
-def get_model_path(model_filename):
-    """
-    Constructs the path to a model file in the user's data directory.
-    This function assumes that download_models() has already been run.
-    """
-    app_name = "NIDRA"
-    app_author = "pzerr"
-    data_dir = user_data_dir(app_name, app_author)
-    models_dir = os.path.join(data_dir, "models")
-    return os.path.join(models_dir, model_filename)
 
-def download_models(tk_root=None, status_label=None, completion_label=None):
+def get_model_path(model_name: str) -> str:
     """
-    Checks for models and downloads them if they are missing.
-    Provides GUI feedback if tk_root and status_label are provided.
-    Returns True if a download was needed, False otherwise.
+    Determines the full path to a model file, accommodating both standard installs and PyInstaller bundles.
+
+    Args:
+        model_name (str): The filename of the model (e.g., "my_model.onnx").
+
+    Returns:
+        str: The absolute path to the model file.
     """
-    if hasattr(sys, '_MEIPASS'):
+    if is_running_in_pyinstaller_bundle():
+        # In a PyInstaller bundle, models are in a 'models' subdirectory of the base path
+        base_path = Path(sys._MEIPASS)
+        return str(base_path / 'models' / model_name)
+    else:
+        # In a standard install, models are in the user's data directory
+        app_name = "NIDRA"
+        app_author = "pzerr"
+        data_dir = user_data_dir(app_name, app_author)
+        return os.path.join(data_dir, "models", model_name)
+
+
+def download_models(logger):
+    """
+    Checks for models in the user's data directory and downloads them if missing.
+    Logs progress to the provided logger instance.
+    Returns True if a download was attempted, False otherwise.
+    """
+    if is_running_in_pyinstaller_bundle():
+        logger.info("Running in a PyInstaller bundle, models should be included. Skipping download check.")
         return False
 
     repo_id = "pzerr/NIDRA_models"
     models = ["u-sleep-nsrr-2024.onnx", "u-sleep-nsrr-2024_eeg.onnx", "ez6.onnx", "ez6moe.onnx"]
 
-    app_name = "NIDRA"
-    app_author = "pzerr"
-    data_dir = user_data_dir(app_name, app_author)
-    models_dir = os.path.join(data_dir, "models")
+    models_dir = os.path.dirname(get_model_path("dummy.onnx"))
     os.makedirs(models_dir, exist_ok=True)
 
-    models_to_download = [m for m in models if not os.path.exists(os.path.join(models_dir, m))]
+    models_to_download = [m for m in models if not os.path.exists(get_model_path(m))]
 
     if not models_to_download:
-        found_message = f"All models found at: {models_dir}"
-        if tk_root and status_label:
-            tk_root.after(0, lambda: status_label.config(text=found_message))
-        else:
-            print(found_message)
+        logger.info(f"All models found at: {models_dir}")
         return False
 
     # --- Download is needed ---
+    logger.info("--- NIDRA Model Download ---")
     
-    # Calculate total size
     total_size = 0
     for model_name in models_to_download:
         try:
@@ -340,46 +357,23 @@ def download_models(tk_root=None, status_label=None, completion_label=None):
             file_size = int(response.headers.get('content-length', 0))
             total_size += file_size
         except Exception:
-            # Could not get size for this model, continue to next
             continue
     
     total_size_mb = total_size / (1024 * 1024)
     if total_size_mb < 0.1:
-        total_size_mb = 152.0
+        total_size_mb = 152.0 # Fallback size
     size_info = f"({total_size_mb:.2f} MB)" if total_size_mb > 0 else ""
-    download_message = f"Downloading sleep scoring models to {models_dir}, please wait... {size_info}"
+    logger.info(f"Downloading sleep scoring models to {models_dir}, please wait... {size_info}")
 
-    if tk_root and status_label:
-        tk_root.after(0, lambda: status_label.config(text=download_message))
-    else:
-        print("--- NIDRA Model Download ---")
-        print(download_message)
-
-    # Download models
     for model_name in models_to_download:
         try:
-            if not (tk_root and status_label):
-                 print(f"Downloading {model_name}...")
-
+            logger.info(f"Downloading {model_name}...")
             hf_hub_download(repo_id=repo_id, filename=model_name, local_dir=models_dir)
-            
-            if not (tk_root and status_label):
-                print(f"Successfully downloaded {model_name}.")
-
+            logger.info(f"Successfully downloaded {model_name}.")
         except Exception as e:
-            error_message = f"Error downloading {model_name}: {e}"
-            if tk_root and status_label:
-                tk_root.after(0, lambda: status_label.config(text=error_message))
-            else:
-                print(error_message)
-            return True # Still, a download was attempted.
+            logger.error(f"Error downloading {model_name}: {e}", exc_info=True)
     
-    completion_message = "Model download complete. You can now use NIDRA."
-    if tk_root and completion_label:
-        tk_root.after(0, lambda: completion_label.config(text=completion_message))
-    else:
-        print("--- Model download complete ---")
-    
+    logger.info("--- Model download complete ---")
     return True
 
 def is_running_in_pyinstaller_bundle():

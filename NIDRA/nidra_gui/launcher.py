@@ -2,15 +2,14 @@ import subprocess
 import threading
 import sys
 import os
-import platform
 import socket
 import requests
 from pathlib import Path
 import webbrowser
 import time
 import multiprocessing
-from .app import app
-from ..utils import download_models
+from .app import app, check_ping
+import time
 import importlib.resources
 
 def get_resource_path(relative_path):
@@ -52,69 +51,8 @@ def find_free_port(preferred_ports=[5001, 5002, 5003, 62345, 62346, 62347, 62348
 def run_flask(port):
     """Runs the Flask app on a given port."""
     cli = sys.modules['flask.cli']
-    cli.show_server_banner = lambda *x: None # We don't want to show the Flask startup message
+    cli.show_server_banner = lambda *x: None # don't show the Flask startup message
     app.run(port=port)
-
-
-def fallback_gui(url):
-    """
-    Creates a small Tkinter window to inform the user that the app is running in the browser
-    and provides a way to shut down the server by closing the window.
-    """
-    import tkinter as tk
-    from tkinter import font as tkFont
-    import webbrowser
-
-    root = tk.Tk()
-    root.title("NIDRA GUI Server")
-
-    # Create a more visually appealing font
-    default_font = tkFont.nametofont("TkDefaultFont")
-    default_font.configure(size=18)
-    url_font = tkFont.Font(family=default_font.cget("family"), size=18, underline=True)
-
-    # Set up the window layout
-    root.geometry("800x400") # Adjusted for potential download messages
-    root.resizable(False, False)
-    container = tk.Frame(root, padx=15, pady=15)
-    container.pack(expand=True, fill="both")
-
-    # Center the window on the screen
-    root.update_idletasks()
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-    x = (screen_width // 2) - (root.winfo_width() // 2)
-    y = (screen_height // 2) - (root.winfo_height() // 2)
-    root.geometry(f'+{x}+{y}')
-
-    # Add informational labels
-    tk.Label(container, text="\n\nThe NIDRA GUI is now running in your web browser:").pack(pady=(0, 5))
-    
-    # Add a clickable URL label
-    url_label = tk.Label(container, text=url, fg="blue", cursor="hand2", font=url_font)
-    url_label.pack()
-    url_label.bind("<Button-1>", lambda e: webbrowser.open(url))
-    
-    tk.Label(container, text="\n\nClosing this window will shut down NIDRA.\n\n").pack(pady=(5, 0))
-
-    # --- Download Section ---
-    status_label = tk.Label(container, text="")
-    status_label.pack(pady=(5, 0))
-    completion_label = tk.Label(container, text="")
-    completion_label.pack(pady=(5, 0))
-
-    def download_in_thread():
-        download_needed = download_models(tk_root=root, status_label=status_label, completion_label=completion_label)
-        if not download_needed:
-            # If no download was needed, we can shrink the window.
-            root.after(0, lambda: root.geometry("800x300"))
-
-    download_thread = threading.Thread(target=download_in_thread, daemon=True)
-    download_thread.start()
-
-    # Ensure the server shuts down when the window is closed
-    root.protocol("WM_DELETE_WINDOW", root.destroy)
-    root.mainloop()
 
 
 def main():
@@ -124,6 +62,12 @@ def main():
 
     multiprocessing.set_start_method('spawn', force=True)
     port = find_free_port()
+    
+    # Start the ping check thread
+    app.last_ping = time.time()
+    ping_thread = threading.Thread(target=check_ping, args=(port,), daemon=True)
+    ping_thread.start()
+
     flask_thread = threading.Thread(target=run_flask, args=(port,), daemon=True)
     flask_thread.start()
 
@@ -150,9 +94,6 @@ def main():
                 stderr=devnull
             )
         
-        # download the models (if first run)
-        time.sleep(2)
-        download_models()
 
         # Wait for the Neutralino process to exit
         neutralino_process.wait()
@@ -164,12 +105,17 @@ def main():
         time.sleep(1)
         webbrowser.open(url)
 
-        # small Tkinter window
-        # to act as a control panel for shutting down the server.
-        fallback_gui(url)
+        # Keep the main thread alive to allow the Flask server to run
+        while flask_thread.is_alive():
+            time.sleep(1)
+
     finally:
         print("Neutralino window closed. Attempting to shut down Flask server...")
-        requests.post(f"http://127.0.0.1:{port}/shutdown", timeout=2)
+        try:
+            requests.post(f"http://127.0.0.1:{port}/shutdown", timeout=2)
+        except requests.exceptions.RequestException:
+            # This is expected if the server is already down
+            pass
 
 
 if __name__ == '__main__':
