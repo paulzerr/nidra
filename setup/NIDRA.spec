@@ -6,9 +6,9 @@ a = Analysis(
     pathex=['..', '../NIDRA/nidra_gui', '../NIDRA'],
     binaries=[],
     datas=[
-        ('../NIDRA/models', 'models'),
         ('../NIDRA/nidra_gui/neutralino', 'neutralino'),
-        ('../docs', 'docs')
+        ('../docs', 'docs'),
+        ('../NIDRA/models', 'NIDRA/models')
     ],
     hiddenimports=['decorator', 'scipy', 'scipy.io', 'webview', 'mne'],
     hookspath=['hooks'],

@@ -17,35 +17,18 @@ LOG_FILE = setup_logging()
 logger = logging.getLogger(__name__)
 
 
-def _open_dialog_in_process(queue):
-    """
-    Worker function to run the Tkinter dialog in a separate process.
-    This is necessary to prevent threading issues with Tkinter on macOS.
-    """
-    import tkinter as tk
-    from tkinter import filedialog
-    try:
-        root = tk.Tk()
-        root.withdraw()
-        root.attributes('-topmost', True)
-        directory_path = filedialog.askdirectory(title="Select Directory")
-        root.destroy()
-        queue.put(directory_path or '') # Put empty string if cancelled
-    except Exception as e:
-        # If there's an error, put the exception message in the queue
-        queue.put(f"ERROR:{e}")
 
 
 # --- UI Text ---
 TEXTS = {
-    "WINDOW_TITLE": "NIDRA Sleep Autoscorer", "INPUT_TITLE": "Input Directory", "MODEL_TITLE": "Model",
+    "WINDOW_TITLE": "NIDRA", "INPUT_TITLE": "Input Folder", "MODEL_TITLE": "Model",
     "OPTIONS_TITLE": "Options", "OPTIONS_PROBS": "Generate probabilities", "OPTIONS_PLOT": "Generate graph",
     "OPTIONS_STATS": "Generate sleep statistics", "OPTIONS_SCORE_SINGLE": "Score single recording",
     "OPTIONS_SCORE_SUBDIRS": "Score all recordings (in subfolders)", "DATA_SOURCE_TITLE": "Data Source",
-    "DATA_SOURCE_FEE": "EEG wearable (e.g. ZMax)   ", "DATA_SOURCE_PSG": "full PSG (EEG, optional: EOG, EMG)   ",
-    "OUTPUT_TITLE": "Output Directory", "RUN_BUTTON": "Run NIDRA autoscoring", "BROWSE_BUTTON": "Browse files...",
+    "DATA_SOURCE_FEE": "EEG wearable (e.g. ZMax)   ", "DATA_SOURCE_PSG": "PSG (EEG/EOG)   ",
+    "OUTPUT_TITLE": "Output Folder", "RUN_BUTTON": "Run autoscoring", "BROWSE_BUTTON": "Browse files...",
     "HELP_TITLE": "Help & Info (opens in browser)",
-    "CONSOLE_INIT_MESSAGE": "Welcome to NIDRA Web UI. Press 'Run Scoring' to begin.",
+    "CONSOLE_INIT_MESSAGE": "Welcome to NIDRA. Enter input folder (location of your sleep recordings) to begin.",
 }
 
 # Determine the base path for resources, accommodating PyInstaller and standard installs
@@ -91,30 +74,24 @@ def serve_docs(filename):
 @app.route('/select-directory')
 def select_directory():
     """
-    Opens a native directory selection dialog on the server using a separate
-    process to ensure it runs on a main thread.
+    Opens a native directory selection dialog on the server.
     """
     try:
-        # Use a multiprocessing queue to get the result back from the process
-        q = multiprocessing.Queue()
-        # Create and start the process
-        p = multiprocessing.Process(target=_open_dialog_in_process, args=(q,))
-        p.start()
-        # Wait for the process to finish
-        p.join()
-        # Get the result from the queue
-        result = q.get()
+        import subprocess
+        command = ['zenity', '--file-selection', '--directory']
+        result = subprocess.run(command, capture_output=True, text=True)
 
-        if result.startswith("ERROR:"):
-            raise RuntimeError(result.replace("ERROR:", "", 1))
-
-        if result:
-            return jsonify({'status': 'success', 'path': result})
+        if result.returncode == 0:
+            path = result.stdout.strip()
+            return jsonify({'status': 'success', 'path': path})
         else:
             return jsonify({'status': 'cancelled'})
 
+    except FileNotFoundError:
+        logger.error("zenity is not installed. Please install it to use the directory selection feature.")
+        return jsonify({'status': 'error', 'message': 'zenity is not installed.'}), 500
     except Exception as e:
-        logger.error(f"Error in directory dialog process: {e}", exc_info=True)
+        logger.error(f"An unexpected error occurred in select_directory: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/start-scoring', methods=['POST'])

@@ -4,7 +4,7 @@ cd "$(dirname "$0")" # Change to the script's directory so all relative paths wo
 set -e # Exit immediately if a command exits with a non-zero status.
 
 # --- Configuration ---
-CONDA_ENV_NAME="nidra-env"
+VENV_NAME="nidra-env"
 BUILD_DIR="../build"
 NEUTRALINO_APP_DIR="../NIDRA/nidra_gui"
 PYINSTALLER_SPEC_FILE="NIDRA.spec"
@@ -14,18 +14,17 @@ info() {
     echo "[INFO] $1"
 }
 
-# 1. Setup Conda Environment
-info "Setting up Conda environment..."
-if conda env list | grep -q "$CONDA_ENV_NAME"; then
-    info "Conda environment '$CONDA_ENV_NAME' already exists."
+# 1. Setup venv Environment
+info "Setting up venv environment..."
+if [ ! -d "$VENV_NAME" ]; then
+    info "Creating venv environment '$VENV_NAME'..."
+    python3 -m venv "$VENV_NAME"
 else
-    info "Creating Conda environment '$CONDA_ENV_NAME'..."
-    conda create -n "$CONDA_ENV_NAME" python=3.10 -y
+    info "venv environment '$VENV_NAME' already exists."
 fi
-eval "$(conda shell.bash hook)"
-conda activate "$CONDA_ENV_NAME"
-info "Installing dependencies from requirements.txt..."
-pip install -r ../requirements.txt
+source "$VENV_NAME/bin/activate"
+info "Installing dependencies from pyproject.toml..."
+pip install ..
 
 # 2. Prepare Build Directory
 info "Preparing build directory..."

@@ -27,6 +27,7 @@ body {
     border-right: 1px solid var(--border-color);
     padding: 2rem;
     box-sizing: border-box;
+    overflow-y: auto;
 }
 .sidebar-header {
     margin-bottom: 2rem;
@@ -49,7 +50,7 @@ body {
 }
 .sidebar ul li a {
     display: block;
-    padding: 0.2rem 0;
+    padding: 0.1rem 0;
     color: #495057;
     text-decoration: none;
     transition: color 0.2s ease-in-out;

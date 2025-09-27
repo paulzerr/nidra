@@ -27,8 +27,10 @@ dependencies = [
     "Flask",
     "pyinstaller",
     "huggingface_hub",
+    "hf_xet",
     "appdirs",
-    "requests"
+    "requests",
+    "pywebview"
 ]
 
 [project.urls]

@@ -11,7 +11,8 @@ NIDRA.egg-info/
 release/
 tests/
 executables/
-
+autoscorer_output/
+examples/test_data_zmax/autoscorer_output/
 build/
 dist/
 !NIDRA/nidra_gui/dist/

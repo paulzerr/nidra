@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Adjust these constants to fine-tune the UI's appearance.
     const BASE_UI_SCALE = 1.1; // Overall size of UI elements (padding, margins, etc.)
-    const BASE_FONT_SCALE = 2.6; // Overall font size
+    const BASE_FONT_SCALE = 1.6; // Overall font size
 
     const apect_ratio = 16 / 9;
     const apect_ratio_threshold = 0.1;

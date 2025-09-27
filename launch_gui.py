@@ -70,11 +70,11 @@ def fallback_gui(url):
 
     # Create a more visually appealing font
     default_font = tkFont.nametofont("TkDefaultFont")
-    default_font.configure(size=16)
-    url_font = tkFont.Font(family=default_font.cget("family"), size=16, underline=True)
+    default_font.configure(size=18)
+    url_font = tkFont.Font(family=default_font.cget("family"), size=18, underline=True)
 
     # Set up the window layout
-    root.geometry("800x600") # Adjusted for potential download messages
+    root.geometry("800x400") # Adjusted for potential download messages
     root.resizable(False, False)
     container = tk.Frame(root, padx=15, pady=15)
     container.pack(expand=True, fill="both")
@@ -88,14 +88,14 @@ def fallback_gui(url):
     root.geometry(f'+{x}+{y}')
 
     # Add informational labels
-    tk.Label(container, text="The NIDRA GUI is running in your web browser.").pack(pady=(0, 5))
+    tk.Label(container, text="\n\nThe NIDRA GUI is now running in your web browser:").pack(pady=(0, 5))
     
     # Add a clickable URL label
     url_label = tk.Label(container, text=url, fg="blue", cursor="hand2", font=url_font)
     url_label.pack()
     url_label.bind("<Button-1>", lambda e: webbrowser.open(url))
     
-    tk.Label(container, text="\n\nKEEP THIS WINDOW OPEN! Close it to shut down NIDRA.\n\n").pack(pady=(5, 0))
+    tk.Label(container, text="\n\nClosing this window will shut down NIDRA.\n\n").pack(pady=(5, 0))
 
     # --- Download Section ---
     status_label = tk.Label(container, text="")
@@ -107,7 +107,7 @@ def fallback_gui(url):
         download_needed = download_models(tk_root=root, status_label=status_label, completion_label=completion_label)
         if not download_needed:
             # If no download was needed, we can shrink the window.
-            root.after(0, lambda: root.geometry("800x600"))
+            root.after(0, lambda: root.geometry("800x300"))
 
     download_thread = threading.Thread(target=download_in_thread, daemon=True)
     download_thread.start()
@@ -133,7 +133,7 @@ def main():
     elif sys.platform == "darwin":
         binary_name = "neutralino-mac_10xxx" #workaround for macOS to force browser fallback
     else:
-        binary_name = "neutralino-linux_x64x"
+        binary_name = "neutralino-linux_x64"
     binary_path = get_resource_path(f"neutralino/{binary_name}")
 
     # Launch the Neutralino app (non-blocking)

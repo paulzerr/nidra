@@ -30,6 +30,7 @@
             <li><a href="#faq">FAQ & Troubleshooting</a></li>
             <li><a href="#attribution">Attribution</a></li>
             <li><a href="#license">License</a></li>
+            <li><a href="#contact">Contact</a></li>
         </ul>
     </nav>
     <main class="content">
@@ -88,19 +89,23 @@
             <h3>Data Structure Guide</h3>
             <p>Whether you are scoring a single file or batch processing, NIDRA expects each recording session to be in its own folder. When using the "Score all subdirectories" mode, NIDRA will treat every subfolder in your input directory as a separate recording.</p>
             <p><strong>Structure for Forehead EEG (e.g., ZMax):</strong></p>
-            <p>For two-channel forehead EEG data, the left and right channel files must be in the same directory and share a common base name, ending in <code>_L.edf</code> and <code>_R.edf</code>.</p>
+            <p>For two-channel forehead EEG data, the left and right channel files must be in the same directory. For ZMax data, these are typically named <code>EEG_L.edf</code> and <code>EEG_R.edf</code>.</p>
             <pre>
 forehead_study/
 └── subject_01/
-    ├── subject_01_L.edf
-    └── subject_01_R.edf
+    ├── EEG_L.edf
+    └── EEG_R.edf
 </pre>
             <p><strong>Structure for PSG:</strong></p>
-            <p>For PSG data, the EDF file should be alone in its directory.</p>
+            <p>For PSG data, each EDF file should be in its own directory. NIDRA can process multiple recordings in subdirectories, as shown in this example with three recordings:</p>
             <pre>
 psg_study/
-└── subject_02/
-    └── night_recording.edf
+├── subject_02/
+|   └── night_recording_1.edf
+├── subject_03/
+|   └── night_recording_2.edf
+└── subject_04/
+    └── another_night.edf
 </pre>
         </section>
 
@@ -162,8 +167,8 @@ psg_study/
                 <li><strong>1:</strong> N1 Sleep (Light Sleep)</li>
                 <li><strong>2:</strong> N2 Sleep</li>
                 <li><strong>3:</strong> N3 Sleep (Deep Sleep)</li>
-                <li><strong>4:</strong> Artifact</li>
                 <li><strong>5:</strong> REM Sleep</li>
+                <li><strong>6:</strong> Artifact</li>
             </ul>
         </section>
 
@@ -183,7 +188,26 @@ psg_study/
             <h2>Python Package: Advanced Integration</h2>
             <p>Using NIDRA as a Python package provides the ultimate flexibility, allowing you to integrate automated scoring directly into your data analysis pipelines.</p>
             <h3>Core Concept: The Scorer Object</h3>
-            <p>The main entry point is the <code>NIDRA.scorer</code> object. You initialize it with the configuration for your scoring task, and then call the <code>.score()</code> method to run the analysis.</p>
+            <p>The main entry point is the <code>NIDRA.scorer</code> class. You first create an instance of this class, providing it with the configuration for your scoring task. Then, you call the <code>.score()</code> method on the instance to run the analysis.</p>
+            <h4><code>NIDRA.scorer(...)</code> Parameters</h4>
+            <p>When initializing a scorer, you must provide the following arguments:</p>
+            <ul>
+                <li><code>scorer_type</code> (str): The type of data. Must be either <code>'forehead'</code> or <code>'psg'</code>.</li>
+                <li><code>input_file</code> (str): The full path to the input EDF file. For forehead EEG, this should be the path to the left channel file (e.g., ending in <code>_L.edf</code> or named <code>EEG_L.edf</code>).</li>
+                <li><code>output_dir</code> (str): The path to the directory where results will be saved.</li>
+                <li><code>model_name</code> (str, optional): The name of the model to use. If not provided, a default model will be selected based on the <code>scorer_type</code>.</li>
+            </ul>
+            <h4><code>scorer.score(...)</code> Method</h4>
+            <p>This method runs the scoring process. It takes one optional argument:</p>
+            <ul>
+                <li><code>plot</code> (bool, optional): If <code>True</code>, a hypnogram plot will be generated. Defaults to <code>True</code>.</li>
+            </ul>
+            <p><strong>Returns:</strong></p>
+            <p>The method returns a tuple containing two elements:</p>
+            <ol>
+                <li><strong>hypnogram</strong> (<code>numpy.ndarray</code>): A 1D array of integers representing the sleep stage for each 30-second epoch. See the <a href="#understanding-results">Sleep Stage Key</a> for the meaning of each integer.</li>
+                <li><strong>probabilities</strong> (<code>numpy.ndarray</code>): A 2D array of shape (n_epochs, n_classes). Each row corresponds to an epoch, and each column contains the model's predicted probability for a specific sleep stage. The order of classes is Wake, N1, N2, N3, REM, Artifact.</li>
+            </ol>
             <h3>Example: Batch Processing and Analyzing Statistics with Pandas</h3>
             <p>This example demonstrates a more realistic workflow: looping through a directory of subjects, scoring each one, and aggregating the sleep statistics into a single pandas DataFrame.</p>
             <pre>
@@ -248,6 +272,23 @@ source .venv/bin/activate</code></pre>
                 </li>
                 <li><strong>Install the package:</strong>
                     <pre><code>pip install .</code></pre>
+                </li>
+            </ol>
+            <h4>(Optional) Building the Executable</h4>
+            <p>After installing from source, you can also build the standalone executable yourself. This is useful for distributing your own modified version of NIDRA.</p>
+            <p>The repository includes build scripts for each operating system located in the <code>setup/</code> directory.</p>
+            <ol>
+                <li><strong>Navigate to the setup directory:</strong>
+                    <pre><code>cd setup</code></pre>
+                </li>
+                <li><strong>Run the build script for your OS:</strong>
+                    <p>On macOS and Linux:</p>
+                    <pre><code>./build.sh</code></pre>
+                    <p>On Windows:</p>
+                    <pre><code>build.bat</code></pre>
+                </li>
+                <li><strong>Find the executable:</strong>
+                    <p>Once the script finishes, the final executable will be located in the <code>dist</code> directory at the root of the project.</p>
                 </li>
             </ol>
         </section>
@@ -316,6 +357,11 @@ Rossi, A. D., et al. (2025). "SLEEPYLAND: trust begins with fair evaluation of a
         <section id="license">
             <h2>License</h2>
             <p>This project is licensed under the MIT License. See the LICENSE file for details.</p>
+        </section>
+
+        <section id="contact">
+            <h2>Contact</h2>
+            <p>For questions, bug reports, or feedback, please contact Paul Zerr at <a href="mailto:zerr.paul@gmail.com">zerr.paul@gmail.com</a>.</p>
         </section>
 
     </main>

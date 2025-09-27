@@ -61,7 +61,7 @@ def run_flask(port):
     """Runs the Flask app on a given port."""
     cli = sys.modules['flask.cli']
     cli.show_server_banner = lambda *x: None # We don't want to show the Flask startup message
-    app.run(port=port)
+    app.run(port=port, debug=True)
 
 
 def fallback_gui(url):
@@ -96,14 +96,14 @@ def fallback_gui(url):
     root.geometry(f'+{x}+{y}')
 
     # Add informational labels
-    tk.Label(container, text="The NIDRA GUI is running in your web browser.").pack(pady=(0, 5))
+    tk.Label(container, text="\n\nNIDRA GUI is now running in your web browser").pack(pady=(0, 5))
     
     # Add a clickable URL label
     url_label = tk.Label(container, text=url, fg="blue", cursor="hand2", font=url_font)
     url_label.pack()
     url_label.bind("<Button-1>", lambda e: webbrowser.open(url))
     
-    tk.Label(container, text="\n\nKEEP THIS WINDOW OPEN! Close it to shut down NIDRA.\n\n").pack(pady=(5, 0))
+    tk.Label(container, text="\n\nKEEP THIS WINDOW OPEN! \nClose this window to shut down NIDRA.\n\n").pack(pady=(5, 0))
 
     # --- Download Section ---
     status_label = tk.Label(container, text="")
@@ -141,7 +141,7 @@ def main():
     elif sys.platform == "darwin":
         binary_name = "neutralino-mac_10xxx" #workaround for macOS to force browser fallback
     else:
-        binary_name = "neutralino-linux_x64x"
+        binary_name = "neutralino-linux_x64"
     binary_path = get_resource_path(f"neutralino/{binary_name}")
 
     # Launch the Neutralino app (non-blocking)

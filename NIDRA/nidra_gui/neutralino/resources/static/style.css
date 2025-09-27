@@ -1,10 +1,10 @@
 /* --- CSS Variables and Reset --- */
 :root {
     --ui-scale: 1rem;      /* For layout, padding, etc. */
-    --font-scale: 1.2rem;    /* For font sizes */
+    --font-scale: 1rem;    /* For font sizes */
     --border-radius: 0.5rem; /* Stays relative to UI scale */
     --text-color: #333;
-    --primary-color: #007aff;
+    --primary-color: #1a6887;
     --light-gray: #f0f2f5;
     --border-color: #d9d9d9;
 }
@@ -139,6 +139,7 @@ input[type="radio"], input[type="checkbox"] {
     margin-right: var(--ui-scale);
     width: calc(1.4 * var(--font-scale)); /* Scale with font size */
     height: calc(1.4 * var(--font-scale));
+    accent-color: var(--primary-color);
 }
 
 .horizontal-group {
@@ -156,6 +157,9 @@ input[type="radio"], input[type="checkbox"] {
 .sub-group label {
     display: block;
     margin-bottom: var(--ui-scale);
+    font-size: 1.2em;
+    font-weight: 600;
+    color: #1a1a1a;
 }
 
 .options-group {
@@ -181,9 +185,9 @@ input[type="radio"], input[type="checkbox"] {
     margin-top: auto;
     margin-bottom: calc(1.5 * var(--ui-scale));
     width: 100%;
-    height: calc(5.5 * var(--ui-scale));
+    height: calc(7 * var(--ui-scale));
     padding: 0 calc(1.5 * var(--ui-scale));
-    font-size: 1.1em;
+    font-size: 1.2em;
     font-weight: 600;
     border: none;
     border-radius: var(--border-radius);
@@ -194,11 +198,11 @@ input[type="radio"], input[type="checkbox"] {
 }
 
 .run-btn:hover {
-    background-color: #005bb5;
+    background-color: #072d3b;
 }
 
 .run-btn:disabled {
-    background-color: #99caff;
+    background-color: #1388b3;
     cursor: not-allowed;
 }
 

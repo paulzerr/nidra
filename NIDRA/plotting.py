@@ -1,6 +1,29 @@
+import sys
+
+class StderrFilter:
+    """A class to filter specific messages from stderr."""
+    def __init__(self, original_stderr, filter_text):
+        self.original_stderr = original_stderr
+        self.filter_text = filter_text
+
+    def write(self, text):
+        if self.filter_text not in text:
+            self.original_stderr.write(text)
+
+    def flush(self):
+        self.original_stderr.flush()
+
+# Temporarily replace stderr with the filter
+original_stderr = sys.stderr
+filter_string = "NotoColorEmoji.ttf: Can not load face"
+sys.stderr = StderrFilter(original_stderr, filter_string)
+
 import matplotlib
 matplotlib.use('Agg')  # Use non-interactive backend to prevent GUI issues
 import matplotlib.pyplot as plt
+
+# Restore the original stderr
+sys.stderr = original_stderr
 import numpy as np
 import seaborn as sns
 import pandas as pd
@@ -233,40 +256,4 @@ def plot_hypnodensity(hyp, ypred, raw, nclasses=6, figoutdir='./', filename='das
         if 'fig' in locals():
             plt.close(fig)
         raise
-
-
-# def plot_hypnogram(hyp, epoch_duration=30, title="Hypnogram"):
-#     """
-#     Plots a hypnogram.
-#     """
-#     fig, ax = plt.subplots(figsize=(12, 4))
-#     n_epochs = len(hyp)
-#     t = np.arange(n_epochs) * epoch_duration / 3600
-
-#     # Hypnogram now uses standard order: W=0, N1=1, N2=2, N3=3, R=4, A=5
-#     # For plotting, we need to restore the original plotting behavior to match the ytick labels
-
-#     # Restore the original plotting behavior
-#     hyp_plot = _remap_hypnogram_for_plotting(hyp)
-
-#     ax.plot(t, hyp_plot, drawstyle="steps-post")
-#     ax.set_xlabel('Time (hrs)')
-#     ax.set_ylabel('Hypnogram')
-#     ax.set_title(title, fontweight='bold')
-
-#     # Scatter points for different sleep stages
-#     for stage, config in STAGE_CONFIG.items():
-#         if 'scatter_color' in config:
-#             size = 25 if stage != 'ART' else 12.5
-#             ax.scatter(t[hyp_plot == config['plot_val']], hyp_plot[hyp_plot == config['plot_val']],
-#                        color=config['scatter_color'], s=size, zorder=2)
-
-#     ax.set_yticks([STAGE_CONFIG[s]['plot_val'] for s in ['N3', 'N2', 'N1', 'REM', 'WAKE', 'ART']])
-#     ax.set_yticklabels(['N3', 'N2', 'N1', 'REM', 'WAKE', 'ART'])
-#     ax.set_xlim(t.min(), t.max())
-#     ax.set_ylim(ax.get_ylim()[0] - 0.125, ax.get_ylim()[1] + 0.125)
-
-#     plt.tight_layout()
-#     logger.debug("Hypnogram plot created successfully")
-#     return fig, ax
 
