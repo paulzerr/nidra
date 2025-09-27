@@ -17,3 +17,5 @@ def scorer(scorer_type: str, **kwargs):
         return PSGScorer(**kwargs)
     else:
         raise ValueError(f"Unknown scorer type: {scorer_type}")
+
+from .utils import batch_scorer

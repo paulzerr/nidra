@@ -11,6 +11,8 @@ import multiprocessing
 from .app import app, check_ping
 import time
 import importlib.resources
+import atexit
+import psutil
 
 def get_resource_path(relative_path):
     # PyInstaller creates a temp folder and stores path in _MEIPASS
@@ -84,6 +86,20 @@ def main():
     time.sleep(1)
     neutralino_process = None
     
+    def cleanup():
+        """Ensure Neutralino and any of its children are terminated."""
+        if neutralino_process and neutralino_process.poll() is None:
+            print("Terminating Neutralino process...")
+            try:
+                parent = psutil.Process(neutralino_process.pid)
+                for child in parent.children(recursive=True):
+                    child.terminate()
+                parent.terminate()
+            except psutil.NoSuchProcess:
+                pass # Process already terminated
+
+    atexit.register(cleanup)
+
     url = f"http://127.0.0.1:{port}"
     try:
         with open(os.devnull, 'w') as devnull:
@@ -94,7 +110,6 @@ def main():
                 stderr=devnull
             )
         
-
         # Wait for the Neutralino process to exit
         neutralino_process.wait()
 

@@ -8,6 +8,8 @@ import sys
 import numpy as np
 from typing import List
 import logging
+import time
+from NIDRA import scorer as scorer_factory
 logger = logging.getLogger(__name__)
 import tempfile
 from pathlib import Path
@@ -15,6 +17,124 @@ from datetime import datetime
 from huggingface_hub import hf_hub_download, hf_hub_url
 from appdirs import user_data_dir
 import requests
+
+class BatchScorer:
+    """
+    A class to handle batch scoring of a study directory.
+    It finds all valid recordings in subdirectories and scores them in a single run.
+    """
+    def __init__(self, input_dir, output_dir, scorer_type, model_name=None):
+        self.input_dir = Path(input_dir)
+        self.output_dir = Path(output_dir)
+        self.scorer_type = scorer_type
+        self.model_name = model_name
+        self.files_to_process = self._find_files()
+
+    def _find_files(self):
+        """Finds all valid recording files in the input directory."""
+        logger.info(f"Searching for recordings in '{self.input_dir}'...")
+        files = []
+        for subdir in sorted(self.input_dir.iterdir()):
+            if subdir.is_dir():
+                try:
+                    if self.scorer_type == 'psg':
+                        file = next(subdir.glob('*.edf'))
+                        files.append(file)
+                    else:  # 'forehead'
+                        l_file = next(subdir.glob('*[lL].edf'))
+                        next(subdir.glob('*[rR].edf'))  # Verify R file exists
+                        files.append(l_file)
+                except StopIteration:
+                    logger.warning(f"Could not find a complete recording in subdirectory '{subdir.name}'. Skipping.")
+                    continue
+        
+        if not files:
+            logger.warning(f"Could not find any suitable recordings in subdirectories of '{self.input_dir}'.")
+        else:
+            logger.info(f"Found {len(files)} recording(s) to process.")
+            logger.info("The following recordings will be processed:")
+            for file in files:
+                logger.info(f"  - {file}")
+        return files
+
+    def score(self, plot=True, gen_stats=True):
+        """
+        Runs the scoring process for all found recordings.
+        Args:
+            plot (bool): Generate a dashboard plot for each recording.
+            gen_stats (bool): Generate sleep statistics for each recording.
+        Returns:
+            tuple: A tuple containing (number_of_files_successfully_processed, total_files_found).
+        """
+        if not self.files_to_process:
+            return 0, 0
+
+        batch_start_time = time.time()
+        batch_output_dir = self.output_dir / f"batch_run_{time.strftime('%Y%m%d_%H%M%S')}"
+        batch_output_dir.mkdir(parents=True, exist_ok=True)
+        logger.info("\n" + "-" * 80)
+        logger.info(f"Starting batch processing. Results will be saved to: {batch_output_dir}")
+
+        processed_count = 0
+        for i, file in enumerate(self.files_to_process):
+            logger.info("\n" + "-" * 80)
+            logger.info(f"[{i + 1}/{len(self.files_to_process)}] Processing: {file}")
+            logger.info("-" * 80)
+            
+            recording_output_dir = batch_output_dir / file.parent.name
+            recording_output_dir.mkdir(exist_ok=True)
+
+            try:
+                start_time = time.time()
+                scorer = scorer_factory(
+                    scorer_type=self.scorer_type,
+                    input_file=str(file),
+                    output_dir=str(recording_output_dir),
+                    model_name=self.model_name
+                )
+                hypnogram, _ = scorer.score(plot=plot)
+                logger.info("Autoscoring completed.")
+
+                if gen_stats:
+                    logger.info("Calculating sleep statistics...")
+                    stats = compute_sleep_stats(hypnogram.tolist())
+                    stats_output_path = recording_output_dir / f"{file.stem}_sleep_statistics.csv"
+                    with open(stats_output_path, 'w') as f:
+                        f.write("Metric,Value\n")
+                        for key, value in stats.items():
+                            f.write(f"{key},{value:.2f}\n" if isinstance(value, float) else f"{key},{value}\n")
+                    logger.info(f"Sleep statistics saved to {stats_output_path}")
+
+                execution_time = time.time() - start_time
+                logger.info(f">> SUCCESS: Finished processing {file} in {execution_time:.2f} seconds.")
+                logger.info(f"  Results saved to: {recording_output_dir}")
+                processed_count += 1
+            except Exception as e:
+                logger.error(f">> FAILED to process {file}: {e}", exc_info=True)
+
+        total_execution_time = time.time() - batch_start_time
+        logger.info("\n" + "-" * 80)
+        logger.info("BATCH PROCESSING COMPLETE")
+        logger.info(f"Successfully processed {processed_count} of {len(self.files_to_process)} recordings.")
+        logger.info(f"Total execution time: {total_execution_time:.2f} seconds.")
+        logger.info(f"All results saved in: {batch_output_dir}")
+        logger.info("-" * 80)
+        
+        return processed_count, len(self.files_to_process)
+
+def batch_scorer(input_dir, output_dir, scorer_type, model_name=None):
+    """
+    Factory function to create a BatchScorer instance.
+    This is the recommended entry point for batch processing.
+    Args:
+        input_dir (str): Path to the main study directory.
+        output_dir (str): Path where results will be saved.
+        scorer_type (str): Type of data, either 'forehead' or 'psg'.
+        model_name (str, optional): Name of the model to use.
+    Returns:
+        BatchScorer: An instance of the BatchScorer class.
+    """
+    return BatchScorer(input_dir, output_dir, scorer_type, model_name)
 
 def calculate_font_size(screen_height, percentage, min_size, max_size):
     """Calculates font size as a percentage of screen height with min/max caps."""
@@ -372,6 +492,17 @@ def download_models(logger):
             logger.info(f"Successfully downloaded {model_name}.")
         except Exception as e:
             logger.error(f"Error downloading {model_name}: {e}", exc_info=True)
+            repo_url = "https://huggingface.co/pzerr/NIDRA_models"
+            download_dir = get_model_path(model_name)
+            error_message = (
+                f"\n--- MODEL DOWNLOAD FAILED ---\n"
+                f"Automatic download of the required model '{model_name}' failed.\n"
+                f"Please try one of the following solutions:\n"
+                f"1. Use the single-file executable version of NIDRA, which includes all models.\n"
+                f"2. Manually download the model from: {repo_url}\n"
+                f"   And place it in the following directory: {os.path.dirname(download_dir)}\n"
+            )
+            logger.error(error_message)
     
     logger.info("--- Model download complete ---")
     return True
@@ -422,6 +553,15 @@ def download_example_data(logger):
             logger.info(f"Successfully downloaded {filename}.")
         except Exception as e:
             logger.error(f"Error downloading {filename}: {e}", exc_info=True)
+            repo_url = "https://huggingface.co/pzerr/NIDRA_models"
+            download_dir = example_data_dir / filename
+            error_message = (
+                f"\n--- EXAMPLE DATA DOWNLOAD FAILED ---\n"
+                f"Automatic download of the example data file '{filename}' failed.\n"
+                f"Please try manually downloading the file from: {repo_url}\n"
+                f"And place it in the following directory: {example_data_dir}\n"
+            )
+            logger.error(error_message)
             # If a download fails, return None to indicate an error
             return None
 

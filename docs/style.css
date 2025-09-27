@@ -76,7 +76,7 @@ h3 {
     font-size: 1.5rem;
     color: #343A40;
 }
-p, li { margin-bottom: 1rem; }
+p, .content li { margin-bottom: 1rem; }
 a {
     color: var(--primary-color);
     text-decoration: none;

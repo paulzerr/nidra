@@ -267,59 +267,27 @@ scorer = NIDRA.scorer(
 hypnogram, probabilities = scorer.score()
 </pre>
             <h3>Example 3: Batch Processing a Study</h3>
-            <p>This example demonstrates a more realistic workflow: looping through a directory of subjects, scoring each one, and aggregating the sleep statistics into a single pandas DataFrame.</p>
+            <p>For batch processing, NIDRA provides a convenient <code>batch_scorer</code>. This function automatically discovers all valid recordings in the subdirectories of your input path, mirroring the behavior of the GUI. This is the recommended way to process a full study. Please see the <a href="#preparing-data">Preparing Your Data</a> section for details on how to structure your study directory.</p>
             <pre>
 import NIDRA
-from pathlib import Path
-import pandas as pd
 
-# --- Setup ---
-base_dir = Path('my_study_data/')
-# Assumes your data is structured like: my_study_data/subject_01/EEG_L.edf
-subjects = [p for p in base_dir.iterdir() if p.is_dir()]
-all_stats = []
+# --- 1. Initialize the batch scorer ---
+# Provide the path to your main study directory and where the results should go.
+batch = NIDRA.batch_scorer(
+    input_dir='/path/to/your/study_data',
+    output_dir='/path/to/your/study_output',
+    scorer_type='forehead',  # or 'psg'
+    model_name='ez6moe'
+)
 
-# --- Loop through subjects and score ---
-for subject_dir in subjects:
-    print(f"Processing {subject_dir.name}...")
-    
-    try:
-        # Find the correct input file for forehead EEG
-        input_file = next(subject_dir.glob('*_L.edf'))
-        
-        # Define a unique output directory for this subject's results
-        output_dir = subject_dir / 'nidra_output'
-        output_dir.mkdir(exist_ok=True)
-        
-        # Initialize and run the scorer
-        scorer = NIDRA.scorer(
-            scorer_type='forehead',
-            input_file=str(input_file),
-            output_dir=str(output_dir),
-            model_name='ez6moe'
-        )
-        hypnogram, probabilities = scorer.score(plot=True)
-        
-        # The scorer automatically saves stats, so we just load the CSV
-        stats_file = output_dir / f"{input_file.stem}_sleep_statistics.csv"
-        if stats_file.exists():
-            stats = pd.read_csv(stats_file)
-            stats['subject_id'] = subject_dir.name
-            all_stats.append(stats)
-        else:
-            print(f"Warning: Could not find stats file for {subject_dir.name}")
+# --- 2. Run the scoring process ---
+# This will find and score all recordings.
+# The results for each recording will be saved in a subfolder within a timestamped batch_run_* directory.
+processed_count, total_found = batch.score(plot=True, gen_stats=True)
 
-    except StopIteration:
-        print(f"Warning: No '*_L.edf' file found in {subject_dir}. Skipping.")
-    except Exception as e:
-        print(f"An error occurred while processing {subject_dir.name}: {e}")
-
-# --- Aggregate results ---
-if all_stats:
-    final_dataframe = pd.concat(all_stats, ignore_index=True)
-    final_dataframe.to_csv(base_dir / 'study_summary_statistics.csv', index=False)
-    print("Processing complete. Summary statistics saved.")
+print(f"Batch processing complete. Successfully scored {processed_count} out of {total_found} recordings.")
 </pre>
+            <p>This simplified approach removes the need to manually loop through directories and handle file paths, making your analysis scripts cleaner and more reliable.</p>
         </section>
 
         <section id="install-from-source">
