@@ -1,6 +1,5 @@
-name: PyInstaller Cross-Platform Build
+name: PyInstaller Windows Build
 
-# This workflow runs on every push or pull request to the main branches
 on:
   push:
     branches: [ master, main ]
@@ -8,30 +7,20 @@ on:
     branches: [ master, main ]
 
 jobs:
-  build:
-    # Give each job a 20-minute timeout to prevent it from running indefinitely
-    timeout-minutes: 20
-
-    # Use a build matrix to run this job on Windows, macOS, and Linux
-    strategy:
-      matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-
-    # The virtual machine image to run the job on, taken from the matrix
-    runs-on: ${{ matrix.os }}
+  build-windows:
+    # We are focusing only on the Windows runner for now
+    runs-on: windows-latest
+    timeout-minutes: 25 # Generous timeout for multiple install steps
 
     steps:
-      # Step 1: Check out the repository code
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up the specified Python version
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # You can change this to your required version, e.g., '3.10'
+          python-version: '3.11'
 
-      # Step 3: Cache pip dependencies to speed up subsequent builds
       - name: Cache pip packages
         uses: actions/cache@v4
         with:
@@ -40,49 +29,45 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # Step 4: Install dependencies in batches to avoid resource exhaustion
-      - name: Install dependencies in batches
+      # This is the targeted, multi-phase installation to avoid resource limits.
+      - name: Install dependencies strategically
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller
 
-          # Batch 1: Install the heaviest core packages first to manage memory
-          echo "Installing core scientific packages..."
-          pip install numpy scipy pandas matplotlib
+          echo "--- Phase 1: Install the heaviest, most common packages ---"
+          pip install numpy
+          pip install scipy
+          pip install pandas
+          pip install matplotlib
+          pip install onnxruntime
 
-          # Batch 2: Install the MNE package, which caused the previous failure
-          echo "Installing MNE..."
+          echo "--- Phase 2: Install MNE's smaller, pure-python dependencies ---"
+          # By installing these first, we break up the single large 'mne' install.
+          pip install pooch decorator jinja2 lazy-loader tqdm
+
+          echo "--- Phase 3: Install MNE (now that its dependencies are met) ---"
+          # This command should now be very fast and use minimal memory.
           pip install mne
 
-          # Batch 3: Install all remaining packages from the requirements file.
-          # Pip will automatically skip packages that are already installed.
-          echo "Installing remaining packages..."
+          echo "--- Phase 4: Install all remaining packages from requirements.txt ---"
+          # This catches any other dependencies and ensures everything is consistent.
+          # Pip will skip all the packages we've already installed.
           pip install -r requirements.txt
-        # Use the bash shell on all runners for script consistency
         shell: bash
 
-      # Step 5: Run the PyInstaller build using your .spec file
       - name: Build Executable with PyInstaller
         run: pyinstaller NIDRA.spec
 
-      # Step 6 (Optional but Recommended): A basic test to ensure the executable runs
       - name: Basic Executable Test (Smoke Test)
         run: |
           echo "Running smoke test on the built application..."
-          # The path to the executable differs slightly by OS.
-          # This script checks the OS and runs the correct command.
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            ./dist/NIDRA/NIDRA.exe --version
-          elif [ "$RUNNER_OS" == "macOS" ]; then
-            ./dist/NIDRA.app/Contents/MacOS/NIDRA --version
-          else
-            ./dist/NIDRA/NIDRA --version
-          fi
+          # The path for a PyInstaller one-dir build on Windows
+          ./dist/NIDRA/NIDRA.exe --version
         shell: bash
 
-      # Step 7: Upload the final executables as build artifacts
-      - name: Upload Build Artifacts
+      - name: Upload Windows Executable
         uses: actions/upload-artifact@v4
         with:
-          name: NIDRA-app-${{ matrix.os }}
-          path: dist/ # Upload the entire 'dist' folder created by PyInstaller
+          name: NIDRA-app-Windows
+          path: dist/
