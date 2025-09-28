@@ -27,7 +27,7 @@ jobs:
         pip install pyinstaller
         # 2. Install dependencies using your project's setup (from pyproject.toml)
         # We assume the project root is the current directory (which it is in GitHub Actions)
-        pip install . 
+        pip install . -v
         
     - name: Build Executable (PyInstaller)
       # CRITICAL: If NIDRA.spec is at the root, use this path.
