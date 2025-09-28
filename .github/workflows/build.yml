@@ -9,7 +9,7 @@ on:
 jobs:
   build-windows:
     # We are focusing only on the Windows runner for now
-    runs-on: windows-latest, ubuntu-latest, macos-latest
+    runs-on: [windows-latest, ubuntu-latest, macos-latest]
     timeout-minutes: 25 # Generous timeout for multiple install steps
 
     steps:
@@ -53,7 +53,7 @@ jobs:
           echo "--- Phase 4: Install all remaining packages from requirements.txt ---"
           # This catches any other dependencies and ensures everything is consistent.
           # Pip will skip all the packages we've already installed.
-          pip install -r requirements.txt
+          pip install .
         shell: bash
 
       - name: Build Executable with PyInstaller
