@@ -2,7 +2,7 @@
 :root {
     --background-color: #FFFFFF;
     --text-color: #212529;
-    --primary-color: #007BFF;
+    --primary-color: #2d2b4e;
     --sidebar-bg: #F8F9FA;
     --border-color: #DEE2E6;
     --code-bg: #E9ECEF;
@@ -30,7 +30,7 @@ body {
     overflow-y: auto;
 }
 .sidebar-header {
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 1rem;
 }
@@ -42,6 +42,12 @@ body {
 .sidebar-header span {
     font-size: 0.9rem;
     color: #6C757D;
+}
+.sidebar-logo {
+    display: block;
+    margin: -0.5rem auto 0.5rem;
+    max-width: 80%;
+    mix-blend-mode: multiply;
 }
 .sidebar ul {
     list-style: none;
@@ -71,6 +77,7 @@ h2 {
     margin-top: 0;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--border-color);
+    color: #2d2b4e;
 }
 h3 {
     font-size: 1.5rem;
