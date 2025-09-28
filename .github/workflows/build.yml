@@ -35,7 +35,7 @@ jobs:
       # The proven robust installation strategy to prevent memory/resource failures
       - name: Install dependencies strategically
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           pip install pyinstaller
 
           echo "--- Phase 1: Heavy Binaries ---"
@@ -124,7 +124,7 @@ jobs:
 
      - name: Install dependencies
        run: |
-         python -m pip install --upgrade pip
+         python -m pip install --upgrade pip setuptools wheel
          pip install pyinstaller
          pip install .
        shell: bash
@@ -196,7 +196,7 @@ jobs:
 
      - name: Install appimage-builder
        run: |
-         python -m pip install --upgrade pip setuptools
+         python -m pip install --upgrade pip setuptools wheel
          sudo apt-get update
          sudo apt-get install -y libfuse2
          pip install appimage-builder
