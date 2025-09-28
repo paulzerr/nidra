@@ -31,7 +31,8 @@ dependencies = [
     "appdirs",
     "requests",
     "pywebview",
-    "psutil"
+    "psutil",
+    "zenity"
 ]
 
 [project.urls]
