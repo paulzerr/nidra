@@ -4,13 +4,12 @@ on: [push, pull_request]
 
 jobs:
   build:
+    timeout-minutes: 20 # Increased timeout just in case
     strategy:
       matrix:
-        # Use your specific OS images
         os: [windows-latest, macos-latest, ubuntu-latest]
     
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
     
     steps:
     - uses: actions/checkout@v4
@@ -18,20 +17,35 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10' 
-        
-    - name: Install PyInstaller and Dependencies
+        python-version: '3.11' # Consider trying a different version like 3.11 if 3.10 fails
+
+    # This 'cache' step is highly recommended. It saves downloaded packages between runs,
+    # making your builds much faster and more reliable.
+    - name: Cache pip packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies one-by-one for debugging
       run: |
         python -m pip install --upgrade pip
-        # 1. Install PyInstaller
         pip install pyinstaller
-        # 2. Install dependencies using your project's setup (from pyproject.toml)
-        # We assume the project root is the current directory (which it is in GitHub Actions)
-        pip install -r requirements.txt -v
-        
+        # Read requirements.txt line by line and install each package individually
+        # This will show us exactly which package causes the crash.
+        while IFS= read -r package; do
+          if [[ -n "$package" && ! "$package" =~ ^# ]]; then
+            echo "Installing $package..."
+            pip install "$package"
+          fi
+        done < requirements.txt
+      # Use bash shell on all platforms for this script
+      shell: bash
+
     - name: Build Executable (PyInstaller)
-      # CRITICAL: If NIDRA.spec is at the root, use this path.
-      run: pyinstaller setup/NIDRA.spec 
+      run: pyinstaller NIDRA.spec 
 
     # Since GitHub Actions automatically saves the build output to 'dist/', 
     # the steps about creating VENVs and custom 'executables' folders are not needed.
