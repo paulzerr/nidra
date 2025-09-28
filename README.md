@@ -2,7 +2,7 @@
   <tr>
     <td width="200" valign="top"><img src="docs/logo.png" alt="NIDRA Logo" width="200"/></td>
     <td valign="top">
-      <h1>NIDRA: Neural Inferencer for Deep Rest Analysis</h1>
+      <h2>Neural Intelligence for Deep Rest Analysis</h2>
       <ul>
         <li>Advanced neural networks can perform highly accurate sleep scoring, but these technologies are often difficult to implement.</li>
         <li>NIDRA is a fool-proof, simple-to-use tool for scoring sleep recordings using the best currently available autoscoring machine learning algorithms. No programming required, but a CLI and python endpoints are available.</li>
