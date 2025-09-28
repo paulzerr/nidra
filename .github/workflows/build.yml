@@ -181,7 +181,7 @@ jobs:
          echo "download_url=$download_url" >> $GITHUB_OUTPUT
        shell: bash
 
- build-linux:
+  build-linux:
    runs-on: ubuntu-latest
    timeout-minutes: 30
 
