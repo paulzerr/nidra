@@ -4,40 +4,52 @@ on: [push, pull_request]
 
 jobs:
   build:
-    # The matrix runs this job 3 times, one for each OS
     strategy:
       matrix:
+        # Use your specific OS images
         os: [windows-latest, macos-latest, ubuntu-latest]
-
+    
     runs-on: ${{ matrix.os }}
-
+    
     steps:
     - uses: actions/checkout@v4
-
+    
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.x' # Use your required Python version
-
-    - name: Install Dependencies
+        python-version: '3.10' 
+        
+    - name: Install PyInstaller and Dependencies
       run: |
         python -m pip install --upgrade pip
+        # 1. Install PyInstaller
         pip install pyinstaller
-        pip install -r requirements.txt # Include your app's dependencies
-
+        # 2. Install dependencies using your project's setup (from pyproject.toml)
+        # We assume the project root is the current directory (which it is in GitHub Actions)
+        pip install . 
+        
     - name: Build Executable (PyInstaller)
-      run: pyinstaller your_script_name.py # Use your actual script/spec file
+      # CRITICAL: If NIDRA.spec is at the root, use this path.
+      run: pyinstaller NIDRA.spec 
 
-    - name: Basic Executable Test (Smoke Test)
-      # This is your automated test step to run the built executable.
+    # Since GitHub Actions automatically saves the build output to 'dist/', 
+    # the steps about creating VENVs and custom 'executables' folders are not needed.
+
+    - name: 🧪 Basic Executable Test (Smoke Test)
       run: |
-        # Example: Run the executable with a version flag or simple command
-        # The path varies by OS. Adjust this to your specific app.
         echo "Running smoke test on the built app..."
-        ./dist/your_script_name --version
-
-    - name: Upload Artifacts
+        # On all OSs, the main executable is placed in dist/
+        # Check OS for the correct name
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          ./dist/NIDRA.exe --version
+        elif [ "$RUNNER_OS" == "macOS" ]; then
+          ./dist/NIDRA --version # This may need to be a path to the app bundle on macOS
+        else
+          ./dist/NIDRA --version
+        fi
+        
+    - name: 📤 Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: my-app-${{ matrix.os }}
-        path: dist/ # PyInstaller output folder
+        name: NIDRA${{ matrix.os }}
+        path: dist/ # PyInstaller output folder containing the exe, app, or binary
