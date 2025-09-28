@@ -1,4 +1,4 @@
-name: NIDRA Windows Build
+name: NIDRA Windows 10 Compatible Build
 
 # This workflow runs only on the 'master' branch
 on:
@@ -8,18 +8,9 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
-    # The matrix will create a separate job for each Windows version listed.
-    # The default behavior is 'fail-fast: true', so if one job fails, the others will be canceled.
-    strategy:
-      matrix:
-        include:
-          - os: windows-2022 # Windows Server 2022
-            artifact_name: NIDRA-Windows-Server-2022
-          - os: windows-2019 # Windows Server 2019
-            artifact_name: NIDRA-Windows-Server-2019
-
-    runs-on: ${{ matrix.os }}
+  build-windows:
+    # Use the runner for Windows Server 2019 for best Windows 10 compatibility
+    runs-on: windows-2019
     timeout-minutes: 30 # A generous timeout for the entire job
 
     steps:
@@ -35,11 +26,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
+          # The cache key is based on the OS and the contents of requirements.txt
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # The most robust installation strategy to prevent memory spikes
+      # The proven robust installation strategy to prevent memory/resource failures
       - name: Install dependencies strategically
         run: |
           python -m pip install --upgrade pip
@@ -57,14 +49,13 @@ jobs:
         shell: bash
 
       - name: Build Executable with PyInstaller
-        # This assumes your NIDRA.spec file is configured to create a one-dir build
-        # and the final executable is named NIDRA.exe
+        # This runs your .spec file to build the application
         run: pyinstaller NIDRA.spec
 
       - name: Upload Windows Executable
         uses: actions/upload-artifact@v4
         with:
-          # Use the artifact name defined in the matrix for clarity
-          name: ${{ matrix.artifact_name }}
+          # A descriptive name for the downloadable artifact
+          name: NIDRA-Windows-10-compatible
           # Upload the entire output folder created by PyInstaller (e.g., dist/NIDRA)
           path: dist/NIDRA
