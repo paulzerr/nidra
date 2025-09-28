@@ -73,66 +73,91 @@ def main():
     flask_thread = threading.Thread(target=run_flask, args=(port,), daemon=True)
     flask_thread.start()
 
-    # get platform-specific Neutralino binary path
-    # TODO: robustify platform recognition
-    if sys.platform == "win32":
-        binary_name = "neutralino-win_x64.exe"
-    elif sys.platform == "darwin":
-        binary_name = "neutralino-mac_10xxx" #workaround for macOS to force browser fallback
-    else:
-        binary_name = "neutralino-linux_x64"
-    binary_path = get_resource_path(f"neutralino/{binary_name}")
 
-    
-    time.sleep(1)
-    neutralino_process = None
-    
-    def cleanup():
-        """Ensure Neutralino and any of its children are terminated."""
-        if neutralino_process and neutralino_process.poll() is None:
-            print("Terminating Neutralino process...")
-            try:
-                # Launch the Neutralino app (non-blocking)
-                parent = psutil.Process(neutralino_process.pid)
-                for child in parent.children(recursive=True):
-                    child.terminate()
-                parent.terminate()
-            except psutil.NoSuchProcess:
-                pass # Process already terminated
+    run_neutralino = False
 
-    atexit.register(cleanup)
-
-    url = f"http://127.0.0.1:{port}"
-    try:
-        with open(os.devnull, 'w') as devnull:
-            neutralino_process = subprocess.Popen(
-                [binary_path, '--load-dir-res', f'--url={url}'],
-                cwd=os.path.dirname(binary_path),
-                stdout=devnull,
-                stderr=devnull
-            )
-        
-        # Wait for the Neutralino process to exit
-        neutralino_process.wait()
-
-    except Exception as e:
-        print(f"Could not launch Neutralino app: {e}")
-        print("Falling back to opening in the default web browser.")
-
-        time.sleep(1)
-        webbrowser.open(url)
-
-        # Keep the main thread alive to allow the Flask server to run
-        while flask_thread.is_alive():
-            time.sleep(1)
-
-    finally:
-        print("Neutralino window closed. Attempting to shut down Flask server...")
+    if not run_neutralino:
+        url = f"http://127.0.0.1:{port}"
         try:
-            requests.post(f"http://127.0.0.1:{port}/shutdown", timeout=2)
-        except requests.exceptions.RequestException:
-            # This is expected if the server is already down
+            print("trying to run")
+            time.sleep(1)
+            webbrowser.open(url)
+            # Keep the main thread alive to allow the Flask server to run
+            while flask_thread.is_alive():
+                time.sleep(1)
+        except Exception as e:
+            print({e})
             pass
+        finally:
+            print("Browser tab closed. Attempting to shut down Flask server...")
+            try:
+                requests.post(f"http://127.0.0.1:{port}/shutdown", timeout=2)
+            except requests.exceptions.RequestException:
+                # This is expected if the server is already down
+                pass
+
+    else:
+
+        # get platform-specific Neutralino binary path
+        # TODO: robustify platform recognition
+        if sys.platform == "win32":
+            binary_name = "neutralino-win_x64.exex"
+        elif sys.platform == "darwin":
+            binary_name = "neutralino-mac_10xxx" #workaround for macOS to force browser fallback
+        else:
+            binary_name = "neutralino-linux_x64x"
+        binary_path = get_resource_path(f"neutralino/{binary_name}")
+
+        
+        time.sleep(1)
+        neutralino_process = None
+        
+        def cleanup():
+            """Ensure Neutralino and any of its children are terminated."""
+            if neutralino_process and neutralino_process.poll() is None:
+                print("Terminating Neutralino process...")
+                try:
+                    # Launch the Neutralino app (non-blocking)
+                    parent = psutil.Process(neutralino_process.pid)
+                    for child in parent.children(recursive=True):
+                        child.terminate()
+                    parent.terminate()
+                except psutil.NoSuchProcess:
+                    pass # Process already terminated
+
+        atexit.register(cleanup)
+
+        url = f"http://127.0.0.1:{port}"
+        try:
+            with open(os.devnull, 'w') as devnull:
+                neutralino_process = subprocess.Popen(
+                    [binary_path, '--load-dir-res', f'--url={url}'],
+                    cwd=os.path.dirname(binary_path),
+                    stdout=devnull,
+                    stderr=devnull
+                )
+            
+            # Wait for the Neutralino process to exit
+            neutralino_process.wait()
+
+        except Exception as e:
+            print(f"Could not launch Neutralino app: {e}")
+            print("Falling back to opening in the default web browser.")
+
+            time.sleep(1)
+            webbrowser.open(url)
+
+            # Keep the main thread alive to allow the Flask server to run
+            while flask_thread.is_alive():
+                time.sleep(1)
+
+        finally:
+            print("Neutralino window closed. Attempting to shut down Flask server...")
+            try:
+                requests.post(f"http://127.0.0.1:{port}/shutdown", timeout=2)
+            except requests.exceptions.RequestException:
+                # This is expected if the server is already down
+                pass
 
 
 if __name__ == '__main__':

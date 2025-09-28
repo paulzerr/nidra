@@ -3,7 +3,7 @@ function initializeApp() {
 
     // Adjust these constants to fine-tune the UI's appearance.
     const BASE_UI_SCALE = 1.4; // Overall size of UI elements (padding, margins, etc.)
-    const BASE_FONT_SCALE = 2.8; // Overall font size
+    const BASE_FONT_SCALE = 2.4; // Overall font size
 
     const apect_ratio = 16 / 9;
     const apect_ratio_threshold = 0.1;
@@ -266,14 +266,4 @@ function initializeApp() {
     setInterval(pingServer, PING_INTERVAL);
 }
 
-function onReady() {
-    try {
-        Neutralino.window.maximize();
-    } catch (err) {
-        // This will fail in browser mode, which is fine.
-    }
-    initializeApp();
-}
-
-Neutralino.init();
-Neutralino.events.on('ready', onReady);
+document.addEventListener('DOMContentLoaded', initializeApp);

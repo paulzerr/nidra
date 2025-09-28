@@ -69,7 +69,12 @@ jobs:
         run: pyinstaller NIDRA.spec
 
       - name: Sign Executable
-        if: secrets.CODE_SIGNING_CERTIFICATE_BASE64 != '' && secrets.CODE_SIGNING_CERTIFICATE_PASSWORD != ''
+        # CORRECTED SECTION: Secrets are mapped to environment variables first.
+        env:
+          CODE_SIGNING_CERTIFICATE_BASE64: ${{ secrets.CODE_SIGNING_CERTIFICATE_BASE64 }}
+          CODE_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.CODE_SIGNING_CERTIFICATE_PASSWORD }}
+        # The 'if' condition now correctly checks the environment variables.
+        if: env.CODE_SIGNING_CERTIFICATE_BASE64 != '' && env.CODE_SIGNING_CERTIFICATE_PASSWORD != ''
         run: |
           echo "${{ secrets.CODE_SIGNING_CERTIFICATE_BASE64 }}" > certificate.pfx.b64
           certutil -decode certificate.pfx.b64 certificate.pfx
@@ -93,5 +98,5 @@ jobs:
           download_url=$(echo $response | grep -o '"downloadPage":"[^"]*' | cut -d'"' -f4)
           echo "Public Download Link: $download_url"
           # Make the URL available to subsequent steps if needed
-          echo "::set-output name=download_url::$download_url"
+          echo "download_url=$download_url" >> $GITHUB_OUTPUT
         shell: bash
