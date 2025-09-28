@@ -2,14 +2,14 @@ name: PyInstaller Windows Build
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, main ]
+    branches: [ master ]
 
 jobs:
   build-windows:
     # We are focusing only on the Windows runner for now
-    runs-on: windows-latest
+    runs-on: windows-latest, ubuntu-latest, macos-latest
     timeout-minutes: 25 # Generous timeout for multiple install steps
 
     steps:
@@ -57,7 +57,7 @@ jobs:
         shell: bash
 
       - name: Build Executable with PyInstaller
-        run: pyinstaller NIDRA.spec
+        run: pyinstaller setup/NIDRA.spec
 
       - name: Basic Executable Test (Smoke Test)
         run: |
