@@ -180,7 +180,7 @@ def show_example():
 
         # If running as a PyInstaller bundle, use local examples
         if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-            example_data_path = Path(sys._MEIPASS) / 'examples'
+            example_data_path = Path(sys._MEIPASS) / 'examples' / 'test_data_zmax'
             if example_data_path.exists():
                 logger.info(f"Using local example data from: {example_data_path}")
                 return jsonify({'status': 'success', 'path': str(example_data_path)})
