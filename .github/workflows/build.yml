@@ -1,0 +1,43 @@
+name: PyInstaller Cross-Platform Build
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    # The matrix runs this job 3 times, one for each OS
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x' # Use your required Python version
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        pip install -r requirements.txt # Include your app's dependencies
+
+    - name: Build Executable (PyInstaller)
+      run: pyinstaller your_script_name.py # Use your actual script/spec file
+
+    - name: Basic Executable Test (Smoke Test)
+      # This is your automated test step to run the built executable.
+      run: |
+        # Example: Run the executable with a version flag or simple command
+        # The path varies by OS. Adjust this to your specific app.
+        echo "Running smoke test on the built app..."
+        ./dist/your_script_name --version
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: my-app-${{ matrix.os }}
+        path: dist/ # PyInstaller output folder
