@@ -60,12 +60,11 @@ jobs:
 
       - name: Build Executable with PyInstaller
         # This runs your .spec file to build the application
-        run: pyinstaller setup/NIDRA.spec
+        run: pyinstaller NIDRA.spec
 
       - name: Upload Windows Executable
         uses: actions/upload-artifact@v4
         with:
           # A descriptive name for the downloadable artifact
           name: NIDRA-Windows
-          # The spec file places output in <root>/build/dist
-          path: build/dist/
+          path: dist/
