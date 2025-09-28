@@ -1,4 +1,4 @@
-name: NIDRA Windows 10 Compatible Build
+name: NIDRA Windows Build
 
 # This workflow runs only on the 'master' branch
 on:
@@ -9,8 +9,9 @@ on:
 
 jobs:
   build-windows:
-    # Use the runner for Windows Server 2019 for best Windows 10 compatibility
-    runs-on: windows-2019
+    # Use the current, supported Windows runner. This is the standard for ensuring
+    # broad compatibility with both Windows 10 and Windows 11.
+    runs-on: windows-latest
     timeout-minutes: 30 # A generous timeout for the entire job
 
     steps:
@@ -56,6 +57,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           # A descriptive name for the downloadable artifact
-          name: NIDRA-Windows-10-compatible
+          name: NIDRA-Windows
           # Upload the entire output folder created by PyInstaller (e.g., dist/NIDRA)
           path: dist/NIDRA
