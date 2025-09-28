@@ -49,6 +49,15 @@ jobs:
           pip install .
         shell: bash
 
+      - name: Download Models from Hugging Face
+        run: |
+          mkdir -p NIDRA/models
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6.onnx -o NIDRA/models/ez6.onnx
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6moe.onnx -o NIDRA/models/ez6moe.onnx
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024.onnx -o NIDRA/models/u-sleep-nsrr-2024.onnx
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024_eeg.onnx -o NIDRA/models/u-sleep-nsrr-2024_eeg.onnx
+        shell: bash
+
       - name: Build Executable with PyInstaller
         # This runs your .spec file to build the application
         working-directory: ./setup
