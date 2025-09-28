@@ -1,21 +1,21 @@
-<table>
+<h1>NIDRA v0.1 - super simple sleep scoring</h1>
+
+<table style="border: none;">
   <tr>
     <td width="200" valign="top"><img src="docs/logo.png" alt="NIDRA Logo" width="200"/></td>
     <td valign="top">
-      <h2>Neural Intelligence for Deep Rest Analysis</h2>
       <ul>
-        <li>Advanced neural networks can perform highly accurate sleep scoring, but these technologies are often difficult to implement.</li>
-        <li>NIDRA is a fool-proof, simple-to-use tool for scoring sleep recordings using the best currently available autoscoring machine learning algorithms. No programming required, but a CLI and python endpoints are available.</li>
-        <li>NIDRA can autoscore data from polysomnography (PSG) recordings, as well as from EEG wearables (such as ZMax).</li>
+        <li></li>
+        <li>NIDRA is a simple-to-use tool for scoring sleep recordings using the best currently available autoscoring machine learning algorithms. No programming required, but a CLI and python endpoints are available.</li>
+        <li>NIDRA can accurately autoscore data from polysomnography (PSG) recordings, as well as from 2-channel EEG wearables (such as ZMax).</li>
         <li>NIDRA enables anyone, including researchers without any programming experience, to use cutting-edge sleep scoring models.</li>
-        <li>NIDRA per default uses the U-Sleep2.0 model for PSG, and ez6moe for EEG wearables. Both models are validated (see below) and are highly accurate, on the level of interrater agreement between human scorers.</li>
+        <li>NIDRA uses the highly accurate U-Sleep2.0 and ez6moe models by default. Both models have been validated (see below) and perform sleep scoring on the level of human interrater agreement.</li>
       </ul>
     </td>
   </tr>
 </table>
 
-## User Manual
-For a detailed user guide, please see the **[NIDRA Manual](https://nidra.netlify.app/)**.
+<h2>For a detailed user guide, please see the <a href="https://nidra.netlify.app/">NIDRA Manual</a></h2>
 
 ## Installation
 
