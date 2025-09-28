@@ -1,4 +1,4 @@
-name: PyInstaller Cross-Platform Build
+name: NIDRA Windows Build
 
 # This workflow runs only on the 'master' branch
 on:
@@ -9,13 +9,18 @@ on:
 
 jobs:
   build:
-    # Use a build matrix to run this job on all three major operating systems
+    # The matrix will create a separate job for each Windows version listed.
+    # The default behavior is 'fail-fast: true', so if one job fails, the others will be canceled.
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-    
+        include:
+          - os: windows-2022 # Windows Server 2022
+            artifact_name: NIDRA-Windows-Server-2022
+          - os: windows-2019 # Windows Server 2019
+            artifact_name: NIDRA-Windows-Server-2019
+
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25 # Set a generous timeout
+    timeout-minutes: 30 # A generous timeout for the entire job
 
     steps:
       - name: Check out repository
@@ -24,7 +29,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11' # Or your project's specific Python version
+          python-version: '3.11'
 
       - name: Cache pip packages
         uses: actions/cache@v4
@@ -34,37 +39,32 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # This multi-phase installation is critical to prevent resource exhaustion
+      # The most robust installation strategy to prevent memory spikes
       - name: Install dependencies strategically
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller
 
-          echo "--- Phase 1: Install heavy binary packages ---"
-          pip install numpy scipy pandas matplotlib onnxruntime
+          echo "--- Phase 1: Heavy Binaries ---"
+          pip install numpy scipy pandas matplotlib onnxruntime pillow
 
-          echo "--- Phase 2: Install MNE's smaller dependencies ---"
-          pip install pooch decorator jinja2 lazy-loader tqdm
+          echo "--- Phase 2: Medium & Complex Dependencies ---"
+          pip install mne sympy
 
-          echo "--- Phase 3: Install MNE itself ---"
-          pip install mne
-
-          echo "--- Phase 4: Install all remaining packages from requirements.txt ---"
-          # This step ensures all external dependencies are met before your project is installed.
+          echo "--- Phase 3: All Remaining Dependencies & Project ---"
           pip install -r requirements.txt
-
-          echo "--- Phase 5: Install the project itself using pyproject.toml ---"
-          # Now that all dependencies are present, this step will be fast and low-memory.
           pip install .
         shell: bash
 
       - name: Build Executable with PyInstaller
+        # This assumes your NIDRA.spec file is configured to create a one-dir build
+        # and the final executable is named NIDRA.exe
         run: pyinstaller NIDRA.spec
 
-      - name: Upload Build Artifacts
+      - name: Upload Windows Executable
         uses: actions/upload-artifact@v4
         with:
-          # Name the artifact based on the OS for clarity
-          name: NIDRA-app-${{ matrix.os }}
-          # Upload the entire 'dist' folder created by PyInstaller
-          path: dist/
+          # Use the artifact name defined in the matrix for clarity
+          name: ${{ matrix.artifact_name }}
+          # Upload the entire output folder created by PyInstaller (e.g., dist/NIDRA)
+          path: dist/NIDRA
