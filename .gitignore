@@ -2,7 +2,7 @@
 *.tmp
 *.pyc
 .*/
-
+!.github
 
 __pycache__/
 models/

@@ -62,9 +62,22 @@ jobs:
         # This runs your .spec file to build the application
         run: pyinstaller NIDRA.spec
 
-      - name: Upload Windows Executable
+      - name: Upload Windows Executable (Internal Artifact)
         uses: actions/upload-artifact@v4
         with:
           # A descriptive name for the downloadable artifact
           name: NIDRA-Windows
           path: dist/
+
+      - name: Upload Public Test Artifact to GoFile
+        id: gofile_upload
+        run: |
+          # Upload the file and capture the JSON response
+          response=$(curl -F "file=@dist/NIDRA.exe" https://store1.gofile.io/uploadFile)
+          echo "GoFile Response: $response"
+          # Extract the download page URL from the JSON response
+          download_url=$(echo $response | grep -o '"downloadPage":"[^"]*' | cut -d'"' -f4)
+          echo "Public Download Link: $download_url"
+          # Make the URL available to subsequent steps if needed
+          echo "::set-output name=download_url::$download_url"
+        shell: bash

@@ -104,24 +104,40 @@ def serve_docs(filename):
 def select_directory():
     """
     Opens a native directory selection dialog on the server.
+    This function runs the dialog in a separate thread to avoid blocking the Flask server.
     """
-    try:
-        import subprocess
-        command = ['zenity', '--file-selection', '--directory']
-        result = subprocess.run(command, capture_output=True, text=True)
+    result = {}
+    def open_dialog():
+        import tkinter as tk
+        from tkinter import filedialog
+        try:
+            root = tk.Tk()
+            root.withdraw()  # Hide the main window
+            root.attributes('-topmost', True)  # Bring the dialog to the front
+            path = filedialog.askdirectory(title="Select a Folder")
+            if path:
+                result['path'] = path
+        except Exception as e:
+            # On some systems (like Linux without a display server), tkinter can fail.
+            logger.error(f"An error occurred in the tkinter dialog thread: {e}", exc_info=True)
+            result['error'] = "Could not open the file dialog. Please ensure you have a graphical environment configured."
+        finally:
+            try:
+                # This ensures the tkinter root window is always destroyed.
+                root.destroy()
+            except:
+                pass
 
-        if result.returncode == 0:
-            path = result.stdout.strip()
-            return jsonify({'status': 'success', 'path': path})
-        else:
-            return jsonify({'status': 'cancelled'})
+    dialog_thread = threading.Thread(target=open_dialog)
+    dialog_thread.start()
+    dialog_thread.join()
 
-    except FileNotFoundError:
-        logger.error("zenity is not installed. Please install it to use the directory selection feature.")
-        return jsonify({'status': 'error', 'message': 'zenity is not installed.'}), 500
-    except Exception as e:
-        logger.error(f"An unexpected error occurred in select_directory: {e}", exc_info=True)
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+    if 'error' in result:
+        return jsonify({'status': 'error', 'message': result['error']}), 500
+    if 'path' in result:
+        return jsonify({'status': 'success', 'path': result['path']})
+    else:
+        return jsonify({'status': 'cancelled'})
 
 @app.route('/start-scoring', methods=['POST'])
 def start_scoring():

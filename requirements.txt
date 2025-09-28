@@ -2,7 +2,7 @@ numpy
 scipy
 mne
 seaborn
-pandas
+pandasa
 onnxruntime
 matplotlib
 Flask
@@ -13,4 +13,3 @@ appdirs
 requests
 pywebview
 psutil
-zenity
