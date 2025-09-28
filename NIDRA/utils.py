@@ -520,17 +520,6 @@ def download_example_data(logger):
     Logs progress to the provided logger instance.
     Returns the path to the example data directory.
     """
-    if is_running_in_pyinstaller_bundle():
-        logger.info("Running in a PyInstaller bundle, example data should be included. Skipping download check.")
-        # In a bundle, data would be next to the executable.
-        base_path = Path(sys.executable).parent
-        example_data_dir = base_path / "example_zmax_data"
-        if example_data_dir.exists():
-            return str(example_data_dir)
-        else:
-            # Fallback for development mode within a bundled app structure
-            return str(Path(sys._MEIPASS) / "example_zmax_data")
-
     repo_id = "pzerr/NIDRA_models"
     example_files = ["EEG_L.edf", "EEG_R.edf"]
 

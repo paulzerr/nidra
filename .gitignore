@@ -9,6 +9,8 @@ models/
 examples/
 executables/
 
+nidra-env/
+
 autoscorer_output/
 build/
 dist/

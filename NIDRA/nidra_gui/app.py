@@ -161,13 +161,26 @@ def show_example():
     """Downloads example data and returns the path."""
     try:
         logger.info("\n--- Preparing scoring of example data ---")
-        example_data_path = download_example_data(logger=logger)
-        if example_data_path:
-            logger.info(f"Example data is ready at: {example_data_path}")
-            return jsonify({'status': 'success', 'path': example_data_path})
+
+        # If running as a PyInstaller bundle, use local examples
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            example_data_path = Path(sys._MEIPASS) / 'examples'
+            if example_data_path.exists():
+                logger.info(f"Using local example data from: {example_data_path}")
+                return jsonify({'status': 'success', 'path': str(example_data_path)})
+            else:
+                logger.error(f"Could not find local example data folder at: {example_data_path}")
+                return jsonify({'status': 'error', 'message': 'Could not find local example data.'}), 500
         else:
-            logger.error("Failed to download or locate the example data.")
-            return jsonify({'status': 'error', 'message': 'Could not download example data.'}), 500
+            # Otherwise, download it
+            example_data_path = download_example_data(logger=logger)
+            if example_data_path:
+                logger.info(f"Example data is ready at: {example_data_path}")
+                return jsonify({'status': 'success', 'path': example_data_path})
+            else:
+                logger.error("Failed to download or locate the example data.")
+                return jsonify({'status': 'error', 'message': 'Could not download example data.'}), 500
+
     except Exception as e:
         logger.error(f"An error occurred while preparing the example: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500

@@ -14,6 +14,9 @@
   </tr>
 </table>
 
+## User Manual
+For a detailed user guide, please see the **[NIDRA Manual](https://nidra.netlify.app/)**.
+
 ## Installation
 
 #### Option 1: Standalone Executable (Recommended for non-technical users)
