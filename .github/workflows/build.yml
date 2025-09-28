@@ -101,7 +101,7 @@ jobs:
           echo "download_url=$download_url" >> $GITHUB_OUTPUT
         shell: bash
 
- build-macos:
+  build-macos:
    runs-on: macos-10.15
    timeout-minutes: 30
 
