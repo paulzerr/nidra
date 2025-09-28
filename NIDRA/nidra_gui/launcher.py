@@ -65,7 +65,7 @@ def main():
     multiprocessing.set_start_method('spawn', force=True)
     port = find_free_port()
     
-    # Start the ping check thread
+    # Start the ping check thread (used to keep app alive)
     app.last_ping = time.time()
     ping_thread = threading.Thread(target=check_ping, args=(port,), daemon=True)
     ping_thread.start()
@@ -74,15 +74,16 @@ def main():
     flask_thread.start()
 
     # get platform-specific Neutralino binary path
+    # TODO: robustify platform recognition
     if sys.platform == "win32":
         binary_name = "neutralino-win_x64.exe"
     elif sys.platform == "darwin":
         binary_name = "neutralino-mac_10xxx" #workaround for macOS to force browser fallback
     else:
-        binary_name = "neutralino-linux_x64"
+        binary_name = "neutralino-linux_x64x"
     binary_path = get_resource_path(f"neutralino/{binary_name}")
 
-    # Launch the Neutralino app (non-blocking)
+    
     time.sleep(1)
     neutralino_process = None
     
@@ -91,6 +92,7 @@ def main():
         if neutralino_process and neutralino_process.poll() is None:
             print("Terminating Neutralino process...")
             try:
+                # Launch the Neutralino app (non-blocking)
                 parent = psutil.Process(neutralino_process.pid)
                 for child in parent.children(recursive=True):
                     child.terminate()

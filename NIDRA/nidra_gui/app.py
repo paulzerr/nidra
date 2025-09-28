@@ -137,7 +137,7 @@ def start_scoring():
         return jsonify({'status': 'error', 'message': 'Missing required parameters.'}), 400
 
     is_scoring_running = True
-    logger.info("\n" + "="*80 + "\nStarting new scoring process via Web UI...\n" + "="*80)
+    logger.info("\n" + "="*80 + "\nStarting new scoring process on python backend...\n" + "="*80)
 
     # --- Direct Call to the Original Worker Function ---
     worker_thread = threading.Thread(
@@ -185,14 +185,12 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
         success_count, total_count = 0, 0  # Assume failure
     finally:
         is_scoring_running = False
-        if total_count > 0:
-            if 0 < success_count < total_count:
-                logger.info(f"Autoscoring completed with {total_count - success_count} failure(s): "
-                            f"Successfully processed {success_count} of {total_count} recordings.")
-            elif success_count == 0 and total_count > 0:
-                logger.info("Autoscoring failed for all recordings.")
-        elif total_count == 0:
-            logger.info("Autoscoring failed.")
+        if 0 < success_count < total_count:
+            logger.info(f"Autoscoring completed with {total_count - success_count} failure(s): "
+                        f"Successfully processed {success_count} of {total_count} recordings.")
+        elif success_count == 0:
+            logger.info("Autoscoring failed for all recordings.")
+
         # A total_count of -1 indicates an unexpected error before the worker could return.
 
         logger.info("\n" + "="*80 + "\nScoring process finished.\n" + "="*80)
@@ -413,4 +411,5 @@ if __name__ == '__main__':
     last_ping = time.time()
     ping_thread = threading.Thread(target=check_ping, daemon=True)
     ping_thread.start()
+    # TODO: randomize port
     app.run(host='127.0.0.1', port=5000)
