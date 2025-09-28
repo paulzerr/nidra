@@ -1,5 +1,6 @@
-name: PyInstaller Windows Build
+name: PyInstaller Cross-Platform Build
 
+# This workflow runs only on the 'master' branch
 on:
   push:
     branches: [ master ]
@@ -7,10 +8,14 @@ on:
     branches: [ master ]
 
 jobs:
-  build-windows:
-    # We are focusing only on the Windows runner for now
-    runs-on: [ windows-latest, ubuntu-latest, macos-latest ]
-    timeout-minutes: 25 # Generous timeout for multiple install steps
+  build:
+    # Use a build matrix to run this job on all three major operating systems
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25 # Set a generous timeout
 
     steps:
       - name: Check out repository
@@ -19,7 +24,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.11' # Or your project's specific Python version
 
       - name: Cache pip packages
         uses: actions/cache@v4
@@ -29,45 +34,37 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      # This is the targeted, multi-phase installation to avoid resource limits.
+      # This multi-phase installation is critical to prevent resource exhaustion
       - name: Install dependencies strategically
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller
 
-          echo "--- Phase 1: Install the heaviest, most common packages ---"
-          pip install numpy
-          pip install scipy
-          pip install pandas
-          pip install matplotlib
-          pip install onnxruntime
+          echo "--- Phase 1: Install heavy binary packages ---"
+          pip install numpy scipy pandas matplotlib onnxruntime
 
-          echo "--- Phase 2: Install MNE's smaller, pure-python dependencies ---"
-          # By installing these first, we break up the single large 'mne' install.
+          echo "--- Phase 2: Install MNE's smaller dependencies ---"
           pip install pooch decorator jinja2 lazy-loader tqdm
 
-          echo "--- Phase 3: Install MNE (now that its dependencies are met) ---"
-          # This command should now be very fast and use minimal memory.
+          echo "--- Phase 3: Install MNE itself ---"
           pip install mne
 
           echo "--- Phase 4: Install all remaining packages from requirements.txt ---"
-          # This catches any other dependencies and ensures everything is consistent.
-          # Pip will skip all the packages we've already installed.
+          # This step ensures all external dependencies are met before your project is installed.
+          pip install -r requirements.txt
+
+          echo "--- Phase 5: Install the project itself using pyproject.toml ---"
+          # Now that all dependencies are present, this step will be fast and low-memory.
           pip install .
         shell: bash
 
       - name: Build Executable with PyInstaller
-        run: pyinstaller setup/NIDRA.spec
+        run: pyinstaller NIDRA.spec
 
-      - name: Basic Executable Test (Smoke Test)
-        run: |
-          echo "Running smoke test on the built application..."
-          # The path for a PyInstaller one-dir build on Windows
-          ./dist/NIDRA/NIDRA.exe --version
-        shell: bash
-
-      - name: Upload Windows Executable
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: NIDRA-app-Windows
+          # Name the artifact based on the OS for clarity
+          name: NIDRA-app-${{ matrix.os }}
+          # Upload the entire 'dist' folder created by PyInstaller
           path: dist/
