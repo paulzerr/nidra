@@ -45,7 +45,6 @@ jobs:
           pip install mne sympy
 
           echo "--- Phase 3: All Remaining Dependencies & Project ---"
-          pip install -r requirements.txt
           pip install .
         shell: bash
 

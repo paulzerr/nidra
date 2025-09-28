@@ -2,7 +2,7 @@ numpy
 scipy
 mne
 seaborn
-pandasa
+pandas
 onnxruntime
 matplotlib
 Flask
