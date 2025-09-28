@@ -103,9 +103,9 @@ jobs:
 
   build-macos:
     runs-on: macos-13
-   timeout-minutes: 30
+    timeout-minutes: 30
 
-   steps:
+    steps:
      - name: Check out repository
        uses: actions/checkout@v4
 
@@ -182,10 +182,10 @@ jobs:
        shell: bash
 
   build-linux:
-   runs-on: ubuntu-latest
-   timeout-minutes: 30
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
 
-   steps:
+    steps:
      - name: Check out repository
        uses: actions/checkout@v4
 
