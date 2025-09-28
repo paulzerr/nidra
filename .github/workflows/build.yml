@@ -31,7 +31,7 @@ jobs:
         
     - name: Build Executable (PyInstaller)
       # CRITICAL: If NIDRA.spec is at the root, use this path.
-      run: pyinstaller NIDRA.spec 
+      run: pyinstaller setup/NIDRA.spec 
 
     # Since GitHub Actions automatically saves the build output to 'dist/', 
     # the steps about creating VENVs and custom 'executables' folders are not needed.
