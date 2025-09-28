@@ -3,7 +3,8 @@
 import os
 
 # Get the directory of the spec file
-spec_dir = os.path.dirname(os.path.abspath(__file__))
+# PyInstaller provides the SPEC_DIR variable, which is the absolute path to the directory containing the spec file.
+spec_dir = SPEC_DIR
 # Get the project root (one level up from the spec file dir)
 root_dir = os.path.dirname(spec_dir)
 
