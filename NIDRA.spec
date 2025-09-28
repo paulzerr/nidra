@@ -8,7 +8,8 @@ a = Analysis(
     datas=[
         ('NIDRA/nidra_gui/neutralino', 'neutralino'),
         ('docs', 'docs'),
-        ('NIDRA/models', 'NIDRA/models')
+        ('NIDRA/models', 'NIDRA/models'),
+        ('examples', 'examples')
     ],
     hiddenimports=['decorator', 'scipy', 'scipy.io', 'webview', 'mne'],
     hookspath=['setup/hooks'],

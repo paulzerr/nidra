@@ -406,13 +406,22 @@ def setup_logging():
     
     # Create handlers
     file_handler = logging.StreamHandler(log_file_stream)
-    stdout_handler = logging.StreamHandler(sys.stdout)
+    handlers = [file_handler]
     
+    # Only add stdout handler if stdout is not None (e.g., when not running in a GUI)
+    if sys.stdout:
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        handlers.append(stdout_handler)
+
+    # Redirect stderr to the log file stream if it's None or not a valid stream
+    if not hasattr(sys.stderr, 'write'):
+        sys.stderr = log_file_stream
+
     # Use basicConfig with the custom handlers. force=True ensures this configuration is applied.
     logging.basicConfig(
         level=logging.INFO,
         format='%(message)s',
-        handlers=[file_handler, stdout_handler],
+        handlers=handlers,
         force=True
     )
     
