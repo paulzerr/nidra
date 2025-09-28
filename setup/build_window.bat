@@ -63,7 +63,7 @@ if %errorlevel% neq 0 (
 REM 4. Post-Build & Cleanup
 call :info "Copying executable to 'executables' directory..."
 mkdir "..\executables" 2>nul
-xcopy "%BUILD_DIR%\dist\NIDRA" "..\executables\NIDRA" /s /i /y /q
+xcopy "%BUILD_DIR%\dist\NIDRA.exe" "..\executables\NIDRA" /s /i /y /q
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to copy executable.
     exit /b 1
