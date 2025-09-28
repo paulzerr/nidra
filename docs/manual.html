@@ -16,11 +16,11 @@
         </div>
         <ul>
             <li><a href="#introduction">Introduction</a></li>
-            <li><a href="#installation">Installation & Usage</a></li>
+            <li><a href="#installation">Installation</a></li>
             <li><a href="#gui-guide">GUI (Overview)</a></li>
             <li><a href="#preparing-data">Preparing Your Data</a></li>
             <li><a href="#gui-walkthrough">GUI (Walkthrough)</a></li>
-            <li><a href="#model-performance">Model Performance</a></li>
+            <li><a href="#model-performance">Model Validation</a></li>
             <li><a href="#understanding-results">Understanding Results</a></li>
             <li><a href="#cli-guide">CLI Guide</a></li>
             <li><a href="#python-package">Python Guide</a></li>
@@ -37,9 +37,9 @@
             <h2>NIDRA: Neural Inferencer for Deep Rest Analysis</h2>
             <p>Advanced neural networks can perform highly accurate sleep scoring, but these technologies are often difficult to implement.</p>
             <p>NIDRA is a fool-proof, simple-to-use tool for scoring sleep recordings using the best currently available autoscoring machine learning algorithms. No programming required, but a CLI and python endpoints are available.</p>
-            <p>NIDRA can autoscore data from polysomnography (PSG) recordings, as well as from sleep EEG wearables (such as ZMax).</p>
+            <p>NIDRA can autoscore data from polysomnography (PSG) recordings, as well as from EEG wearables (such as ZMax).</p>
             <p>NIDRA enables anyone, including researchers without any programming experience, to use cutting-edge sleep scoring models.</p>
-            <p>NIDRA by default uses the highly accurate U-Sleep 2.0 model for PSG, and the recently validated high-accuracy ez6 and ez6moe sleep scoring models for ZMax data and simliar sleep EEG wearables. For a validation of the ez models see <a href="https://www.biorxiv.org/content/10.1101/2025.06.02.657451v1">https://www.biorxiv.org/content/10.1101/2025.06.02.657451v1</a></p>
+            <p>NIDRA per default uses the U-Sleep2.0 model for PSG, and ez6moe for EEG wearables. Both models are validated (see below) and are highly accurate, on the level of interrater agreement between human scorers.</p>
         </section>
 
         <section id="installation">
@@ -57,9 +57,10 @@
             <pre><code>pip install nidra</code></pre>
             <p>Once installed, you can launch the graphical interface by running the command: </p> 
             <pre><code>nidra</code></pre>
+            <p><strong>Note:</strong> If you installed NIDRA via pip, the first time you run a scoring process, the necessary model files will be automatically downloaded from (<a href="https://huggingface.co/pzerr/NIDRA_models/">https://huggingface.co/pzerr/NIDRA_models/</a> (~152MB)). </p>
             <br>    
             <strong>Option 3: Clone the github</strong>: please see <a href="#install-from-source">[Install from source]</a> section.
-            <p><strong>Note:</strong> If you installed NIDRA via pip, the first time you run a scoring process, the necessary model files will be automatically downloaded from (<a href="https://huggingface.co/pzerr/NIDRA_models/">https://huggingface.co/pzerr/NIDRA_models/</a> (~152MB)). </p>
+            
         </section>
 
         <section id="gui-guide">
@@ -169,10 +170,10 @@ psg_study/
             <p>The hypnogram uses the following standard numeric codes for sleep stages:</p>
             <ul>
                 <li><strong>0:</strong> Wake</li>
-                <li><strong>1:</strong> N1 Sleep (Light Sleep)</li>
-                <li><strong>2:</strong> N2 Sleep</li>
-                <li><strong>3:</strong> N3 Sleep (Deep Sleep)</li>
-                <li><strong>5:</strong> REM Sleep</li>
+                <li><strong>1:</strong> NREM1</li>
+                <li><strong>2:</strong> NREM2</li>
+                <li><strong>3:</strong> NREM3</li>
+                <li><strong>5:</strong> REM</li>
                 <li><strong>6:</strong> Artifact</li>
             </ul>
         </section>

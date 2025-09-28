@@ -1,44 +1,47 @@
-# NIDRA 
-### Neural Inferencer for Deep Rest Analysis
-<br>
-
-Advanced neural networks can perform highly accurate sleep scoring, but these technologies are often difficult to implement. 
-
-NIDRA is a fool-proof, simple-to-use tool for scoring sleep recordings using the best currently available autoscoring machine learning algorithms. No programming required, but a CLI and python endpoints are available. 
-
-NIDRA can be downloaded as a standalone executable file, without installing anything (useful in restricted environments), but is also pip installable, or by downloading this repository.
-
-NIDRA can autoscore data from polysomnography (PSG) recordings, as well as from sleep EEG wearables (such as ZMax). 
-
-NIDRA enables anyone, including researchers without any programming experience, to use cutting-edge sleep scoring models.
-
-NIDRA by default uses the highly accurate U-Sleep 2.0 model for PSG, and the recently validated high-accuracy ez6 and ez6moe sleep scoring models for ZMax data and simliar sleep EEG wearables. For a validation of the ez models see https://www.biorxiv.org/content/10.1101/2025.06.02.657451v1
-
-
-<br>
-
-# Usage:
-
-NIDRA can be used without installation using portable, ready-to-go executables:
-
-Linux: LINK
-
-MacOS: LINK
-
-Windows: LINK
-
+<table>
+  <tr>
+    <td width="200" valign="top"><img src="docs/logo.png" alt="NIDRA Logo" width="200"/></td>
+    <td valign="top">
+      <h1>NIDRA: Neural Inferencer for Deep Rest Analysis</h1>
+      <ul>
+        <li>Advanced neural networks can perform highly accurate sleep scoring, but these technologies are often difficult to implement.</li>
+        <li>NIDRA is a fool-proof, simple-to-use tool for scoring sleep recordings using the best currently available autoscoring machine learning algorithms. No programming required, but a CLI and python endpoints are available.</li>
+        <li>NIDRA can autoscore data from polysomnography (PSG) recordings, as well as from EEG wearables (such as ZMax).</li>
+        <li>NIDRA enables anyone, including researchers without any programming experience, to use cutting-edge sleep scoring models.</li>
+        <li>NIDRA per default uses the U-Sleep2.0 model for PSG, and ez6moe for EEG wearables. Both models are validated (see below) and are highly accurate, on the level of interrater agreement between human scorers.</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
 ## Installation
 
-Alternatively, NIDRA can be installed by cloning this github repository:
+#### Option 1: Standalone Executable (Recommended for non-technical users)
+The easiest way to use NIDRA is via the portable, ready-to-go executables which require no installation. Simply download the correct version for your operating system and run it.
+
+*   **[Download for Linux](LINK)**
+*   **[Download for MacOS](LINK)**
+*   **[Download for Windows](LINK)**
+
+#### Option 2: Install from PyPI
+Alternatively, NIDRA can be installed as a Python package using pip (Python 3.10 or later recommended).
+```bash
+pip install nidra
+```
+Once installed, you can launch the graphical interface by running the command:
+```bash
+nidra
+```
+**Note:** If you installed NIDRA via pip, the first time you run a scoring process, the necessary model files will be automatically downloaded from (https://huggingface.co/pzerr/NIDRA_models/) (~152MB).
+
+#### Option 3: Install from source
+For developers or users who need the latest (potentially unstable) version, NIDRA can be installed by cloning the git repository:
 
 1.  **Clone the repository:**
-
     ```bash
     git clone https://codeberg.org/pzerr/NIDRA.git
     cd NIDRA
     ```
-
 2.  **Create and activate a virtual environment:**
 
     On macOS and Linux:
@@ -46,186 +49,224 @@ Alternatively, NIDRA can be installed by cloning this github repository:
     python3 -m venv .venv
     source .venv/bin/activate
     ```
-    
     On Windows:
     ```bash
     python -m venv .venv
     .venv\Scripts\activate
     ```
-
 3.  **Install the package:**
-    
     ```bash
     pip install .
     ```
 
+## Graphical User Interface (GUI)
+The GUI provides an intuitive, point-and-click way to score sleep recordings. The easiest way to launch the GUI is by running the standalone executable. If you installed NIDRA as a package, you can launch it by opening your terminal and running the command: `nidra`
 
-Or, (in the near future), from PyPI:
+<img src="docs/gui.png" alt="Screenshot of the NIDRA GUI" style="width: 100%; max-width: 960px; display: block; margin: 20px 0;">
+<b>Fig.1</b> - Screenshot of the GUI
 
-```bash
-pip install NIDRA
-```
-
-
-
-# Graphical User Interface:
-
-The GUI provides an intuitive way to score sleep recordings. To launch the GUI, run the portable executable (see above),
-
-or run the following command in your terminal after installation:
-
-```bash
-nidra-gui
-```
-
-<br>
-<img src="docs/gui.png" alt="Screenshot of the NIDRA GUI" width="80%"/>
-<br>
-Fig.1 - Screenshot of the GUI
-<br>
-<br>
-
-
-
-# Model Validation:
-
-### ez6 and ez6moe
-
-ez6 is the first accurate autoscoring model for 2-channel forehead sleep EEG devices, such as the ZMax.
-
-ez6moe is multiple-expert model and a variant of ez6. It is accurate on the level of the interrater agreement between human scorers. 
-
-<br>
-<img src="docs/matrix.png" alt="Screenshot of the NIDRA GUI" width="50%"/>
-<br>
-Fig.2 - Confusion matrix (vs. manually scored PSG) of the artefact-aware ez6moe model 
-<br>
-<br>
-
-### U-Sleep
-
-For U-Sleep models see https://www.nature.com/articles/s41746-021-00440-5
-
-
-<br>
-<br>
-
-
-
-
-# **Manual:**
-
-1.  **Input Directory**: Select the directory containing the sleep recording data.
-2.  **Output Directory**: Select the directory where the results will be saved. This defaults to a new folder in the Input Directory.
-3.  **Scoring Mode**:
-    *   **Score single recording**: Scores a single recording in the selected input directory.
-    *   **Score all subdirectories**: Scores all recordings in the subdirectories of the selected input directory.
-4.  **Data Source**:
-    *   **Forehead EEG**: For data from forehead EEG recordings.
-    *   **PSG**: For data from PSG recordings.
-5.  **Model**: Select the model to use for scoring. The available models depend on the selected data source.
-6.  **Options**:
-    *   **Generate Plots**: Generate plots of the sleep stages.
-    *   **Generate Statistics**: Generate statistics of the sleep stages, such as WASO, sleep efficiency, etc.
+### Quick Guide
+1.  **Input Folder**: Select the directory containing the sleep recording data.
+2.  **Output Folder**: Select the directory where the results will be saved.
+3.  **Scoring Mode**: Choose to score a single recording or batch-process all subdirectories, eaching containing one recording.
+4.  **Data Source**: Select "Forehead EEG" or "PSG".
+5.  **Model**: Select the appropriate model for your data source. Default models are reliable.
+6.  **Options**: Choose whether to generate plots and statistics.
 7.  **Run**: Start the scoring process.
 
+## Preparing Your Data
+For NIDRA to process your recordings correctly, your files and folders must be organized in a specific way. Please follow these guidelines to avoid errors.
 
-**Example:**
+### General Requirements
+*   **File Format:** NIDRA exclusively works with European Data Format (.edf) files.
+*   **Channel Labels:** Ensure your EDF files have standard channel labels (e.g., 'EEG Fpz-Cz', 'EOG left', 'Fp1', 'O2-M1') for PSG data, as NIDRA uses these to identify channel types.
 
+### Data Structure Guide
+Whether you are scoring a single file or batch processing, NIDRA expects each recording session to be in its own folder. When using the "Score all subdirectories" mode, NIDRA will treat every subfolder in your input directory as a separate recording.
+
+**Structure for Forehead EEG (e.g., ZMax):**
+For two-channel forehead EEG data, the left and right channel files must be in the same directory. For ZMax data, these are typically named `EEG_L.edf` and `EEG_R.edf`.
+```
+forehead_study/
+├── subject_01/
+|   ├── EEG_L.edf
+|   └── EEG_R.edf
+├── subject_02/
+|   ├── night01_L.edf
+|   └── night01_R.edf
+```
+**Structure for PSG:**
+For PSG data, each EDF file should be in its own directory. NIDRA can process multiple recordings in subdirectories, as shown in this example with three recordings:
+```
+psg_study/
+├── subject_02/
+|   └── night_recording_1.edf
+├── subject_03/
+|   └── night_recording_2.edf
+└── subject_04/
+    └── another_night.edf
+```
+
+## Understanding Your Results
+Once NIDRA has finished processing, you will find several output files in your specified output directory. Here's what they are and how to use them.
+
+### The Output Files
+For each recording, NIDRA generates up to four files:
+*   **Hypnogram File (`..._hypnogram.csv`):** This is the main output. It's a CSV file with a single column of numbers, where each number is the sleep stage for one 30-second epoch.
+*   **Probabilities File (`..._probabilities.csv`):** This file contains the raw probabilities for each sleep stage for every epoch. Each row corresponds to an epoch, and each column corresponds to a sleep stage (Wake, N1, N2, N3, REM, Artifact). This is useful for advanced analysis of model confidence.
+*   **Dashboard Plot (`..._dashboard.png`):** An image that visualizes the hypnogram and underlying data, showing the progression of sleep stages over the night.
+*   **Sleep Statistics (`..._sleep_statistics.csv`):** A CSV file with a detailed summary of sleep metrics like Total Sleep Time, Sleep Efficiency, and time spent in each stage.
+
+### Sleep Stage Key
+The hypnogram uses the following standard numeric codes for sleep stages:
+*   **0:** Wake
+*   **1:** N1 Sleep (Light Sleep)
+*   **2:** N2 Sleep
+*   **3:** N3 Sleep (Deep Sleep)
+*   **5:** REM Sleep
+*   **6:** Artifact
+
+## Model Validation and Performance
+The models included in NIDRA have been rigorously validated against manually scored data from human experts. Below is a summary of their performance.
+
+### ez6 and ez6moe for Forehead EEG
+The `ez6moe` model was validated against expert-scored PSG recordings. The confusion matrix below shows the model's predictions (y-axis) versus the expert labels (x-axis). The diagonal represents correct classifications. As you can see, the model shows high agreement with the expert scorer, particularly for Wake, N2, and REM sleep.
+
+<img src="docs/matrix.png" alt="Confusion matrix of the ez6moe model" style="width: 60%; max-width: 600px; display: block; margin: 20px 0;">
+<b>Fig.2</b> - Confusion matrix (vs. manually scored PSG) of the artefact-aware ez6moe model.
+
+Key performance metrics, such as accuracy and Cohen's Kappa (a measure of inter-rater agreement), are comparable to the agreement levels seen between different human experts. For full details, please refer to the original publication.
+
+### U-Sleep for PSG
+The U-Sleep model is a well-established, state-of-the-art algorithm for PSG sleep scoring. The version used in NIDRA (`u-sleep-nsrr-2024`) is a robust implementation trained on a large dataset. It demonstrates high performance across diverse populations and recording conditions. For detailed performance metrics, please see the original U-Sleep and SLEEPYLAND publications linked in the Attribution section.
+
+## CLI Guide: Automating Scoring
+The Command-Line Interface (CLI) is a powerful feature for processing large datasets and integrating NIDRA into automated workflows.
+
+### Basic Command Structure
+The fundamental command is `nidra score`. You must provide the input path, output directory, and the type of scorer.
+```bash
+nidra score --input_path /path/to/data --output_dir /path/to/output --scorer_type forehead
+```
+### Example: Batch Processing a Full Study
+Let's say you have a study with data structured as recommended in the "Preparing Your Data" section. You can process all subjects with a single command by pointing the `--input_path` to the main study directory.
+```bash
+nidra score --input_path /my_study_data/ --output_dir /my_study_results/ --scorer_type forehead --model_name ez6moe
+```
+NIDRA will automatically find the subdirectories (subject_01, subject_02, etc.), process each one, and place the results in a correspondingly named folder inside `/my_study_results/`.
+
+## Python Package: Advanced Integration
+Using NIDRA as a Python package provides the ultimate flexibility, allowing you to integrate automated scoring directly into your data analysis pipelines.
+
+### Core Concept: The Scorer Factory
+The main entry point is the `NIDRA.scorer()` factory function. You call this function to create a scorer instance, providing it with the configuration for your scoring task. Then, you call the `.score()` method on the returned object to run the analysis.
+
+### Example 1: Scoring a PSG File
+This example shows how to score a single PSG recording from an EDF file.
 ```python
 import NIDRA
-from pathlib import Path
 
-# --- EEG wearable example ---
-forehead_input_file = Path('test_data_zmax/EEG_L.edf')
-forehead_output_dir = Path('test_data_zmax/autoscoring_output')
-
-forehead_scorer = NIDRA.scorer(
-    scorer_type='forehead',
-    input_file=str(forehead_input_file),
-    output_dir=str(forehead_output_dir),
-    model_name='ez6'
-)
-
-forehead_hypnogram, forehead_probabilities = forehead_scorer.score(plot=True)
-
-
-
-# --- PSG example ---
-psg_input_file = Path('test_data_psg/sleeprecording.edf')
-psg_output_dir = Path('test_data_psg/autoscoring_output')
-
-psg_scorer = NIDRA.scorer(
+# Initialize the scorer
+scorer = NIDRA.scorer(
     scorer_type='psg',
-    input_file=str(psg_input_file),
-    output_dir=str(psg_output_dir),
+    input_file='/path/to/your/data/sleep_recording.edf',
+    output_dir='/path/to/your/output',
     model_name='u-sleep-nsrr-2024'
 )
 
-psg_hypnogram, psg_probabilities = psg_scorer.score(plot=True)
+# Run scoring
+hypnogram, probabilities = scorer.score(plot=True)
 
-
+print("Scoring complete.")
+print("Hypnogram shape:", hypnogram.shape)
+print("Probabilities shape:", probabilities.shape)
 ```
 
+### Example 2: Scoring In-Memory NumPy Data
+You can also score data that you already have in memory as a NumPy array, bypassing the need for file I/O. This is useful for real-time applications or custom data loading pipelines. When scoring PSG data from an array, you must provide the sampling frequency (`sfreq`). Providing channel names is recommended but optional; if not provided, they will be auto-generated.
+```python
+import NIDRA
+import numpy as np
 
-### Command-Line Interface (CLI)
+# --- Create some dummy PSG data ---
+sfreq = 256
+ch_names = ['F3-A2', 'C4-A1', 'O2-A1', 'EOG-L']
+n_samples = sfreq * 60 * 60  # 1 hour of data
+dummy_data = np.random.randn(len(ch_names), n_samples)
 
-The CLI is ideal for batch processing and integration into automated workflows.
-
-**Command:**
-```bash
-nidra score [OPTIONS]
+# --- Initialize and run the scorer ---
+scorer = NIDRA.scorer(
+    scorer_type='psg',
+    output_dir='/path/to/numpy_psg_output',
+    data=dummy_data,
+    sfreq=sfreq,
+    ch_names=ch_names  # This parameter is optional
+)
+hypnogram, probabilities = scorer.score()
 ```
 
-**Arguments:**
+### Example 3: Batch Processing a Study
+For batch processing, NIDRA provides a convenient `batch_scorer`. This function automatically discovers all valid recordings in the subdirectories of your input path, mirroring the behavior of the GUI. This is the recommended way to process a full study. Please see the [Preparing Your Data](#preparing-your-data) section for details on how to structure your study directory.
+```python
+import NIDRA
 
-*   `--input_path`: Path to the input file (.edf) or a directory containing .edf files. (Required)
-*   `--output_dir`: Path to the directory where the results will be saved. (Required)
-*   `--scorer_type`: The type of scorer to use. (Required, choices: `psg`, `forehead`)
-*   `--model_name`: The name of the model to use. (Optional)
-*   `--no_plot`: If set, no plots will be generated. (Optional)
+# --- 1. Initialize the batch scorer ---
+# Provide the path to your main study directory and where the results should go.
+batch = NIDRA.batch_scorer(
+    input_dir='/path/to/your/study_data',
+    output_dir='/path/to/your/study_output',
+    scorer_type='forehead',  # or 'psg'
+    model_name='ez6moe'
+)
 
-**Example:**
+# --- 2. Run the scoring process ---
+# This will find and score all recordings.
+# The results for each recording will be saved in a subfolder within a timestamped batch_run_* directory.
+processed_count, total_found = batch.score(plot=True, gen_stats=True)
 
-```bash
-nidra score --input_path test_data_zmax/ --output_dir test_data_zmax/autoscoringoutput/ --scorer_type forehead --model_name ez6
+print(f"Batch processing complete. Successfully scored {processed_count} out of {total_found} recordings.")
 ```
 
+## How to Cite NIDRA
+If you use NIDRA in your research, please cite both the NIDRA software itself and the paper for the specific model you used.
 
-
-
-## Citing
-
-If you use NIDRA, please cite the following publication:
-
-Coon WG, Zerr P, Milsap G, Sikder N, Smith M, Dresler M, Reid M. "ezscore-f: A Set of Freely Available, Validated Sleep Stage Classifiers for Forehead EEG." bioRxiv, 2025, doi: 10.1101/2025.06.02.657451.
-https://www.biorxiv.org/content/10.1101/2025.06.02.657451v1
-
+### 1. Citing the NIDRA Software
+Please cite this repository to ensure reproducibility:
+```
+Zerr, P. (2025). NIDRA: Neural Inferencer for Deep Rest Analysis. Codeberg. https://codeberg.org/pzerr/NIDRA
+```
+### 2. Citing the Scoring Model
+**If you used the ez6 or ez6moe models:**
+```
+Coon WG, Zerr P, Milsap G, et al. (2025). "ezscore-f: A Set of Freely Available, Validated Sleep Stage Classifiers for Forehead EEG." bioRxiv. doi: 10.1101/2025.06.02.657451.
+```
+**If you used the u-sleep-nsrr-2024 model:**
+Please cite the original U-Sleep paper and the SLEEPYLAND paper for the re-trained model weights:
+```
+Perslev, M., et al. (2021). "U-Sleep: resilient high-frequency sleep staging." NPJ digital medicine.
+Rossi, A. D., et al. (2025). "SLEEPYLAND: trust begins with fair evaluation of automatic sleep staging models." arXiv preprint.
+```
 
 ## Attribution
-
 ez6 and ez6moe models were developed by Coon et al., see:
-Coon WG, Zerr P, Milsap G, Sikder N, Smith M, Dresler M, Reid M.
-"ezscore-f: A Set of Freely Available, Validated Sleep Stage Classifiers for Forehead EEG."
-https://www.biorxiv.org/content/10.1101/2025.06.02.657451v1
-github.com/coonwg1/ezscore
+<br>Coon WG, Zerr P, Milsap G, Sikder N, Smith M, Dresler M, Reid M.
+<br>"ezscore-f: A Set of Freely Available, Validated Sleep Stage Classifiers for Forehead EEG."
+<br><a href="https://www.biorxiv.org/content/10.1101/2025.06.02.657451v1">https://www.biorxiv.org/content/10.1101/2025.06.02.657451v1</a>
+<br><a href="https://github.com/coonwg1/ezscore">github.com/coonwg1/ezscore</a>
 
 U-Sleep models were developed by  Perslev et al., see:
-Perslev, M., Darkner, S., Kempfner, L., Nikolic, M., Jennum, P. J., & Igel, C. (2021).
-U-Sleep: resilient high-frequency sleep staging. NPJ digital medicine
-https://www.nature.com/articles/s41746-021-00440-5
-https://github.com/perslev/U-Time
+<br>Perslev, M., Darkner, S., Kempfner, L., Nikolic, M., Jennum, P. J., & Igel, C. (2021).
+<br>U-Sleep: resilient high-frequency sleep staging. NPJ digital medicine
+<br><a href="https://www.nature.com/articles/s41746-2021-00440-5">https://www.nature.com/articles/s41746-021-00440-5</a>
+<br><a href="https://github.com/perslev/U-Time">https://github.com/perslev/U-Time</a>
 
 The U-Sleep model weights used in this repo were re-trained by Rossi et al., see:
-Rossi, A. D., Metaldi, M., Bechny, M., Filchenko, I., van der Meer, J., Schmidt, M. H., ... & Fiorillo, L. (2025).
-SLEEPYLAND: trust begins with fair evaluation of automatic sleep staging models. arXiv preprint arXiv:2506.08574.
-https://arxiv.org/abs/2506.08574v1
-
+<br>Rossi, A. D., Metaldi, M., Bechny, M., Filchenko, I., van der Meer, J., Schmidt, M. H., ... & Fiorillo, L. (2025).
+<br>SLEEPYLAND: trust begins with fair evaluation of automatic sleep staging models. arXiv preprint arXiv:2506.08574.
+<br><a href="https://arxiv.org/abs/2506.08574v1">https://arxiv.org/abs/2506.08574v1</a>
 
 ## License
-
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-## Author
-
-Paul Zerr (zerr.paul@gmail.com)
+## Contact
+For questions, bug reports, or feedback, please contact Paul Zerr at [zerr.paul@gmail.com](mailto:zerr.paul@gmail.com).
