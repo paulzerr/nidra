@@ -42,6 +42,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    manifest='NIDRA.manifest',
     onefile=True,
     icon='docs/logo.ico',
 )

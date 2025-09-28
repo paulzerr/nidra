@@ -1,10 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
-    try {
-        Neutralino.window.maximize();
-    } catch (err) {
-        // This will fail in browser mode, which is fine.
-    }
-
+function initializeApp() {
     // --- Dynamic UI Scaling ---
 
     // Adjust these constants to fine-tune the UI's appearance.
@@ -270,4 +264,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     setInterval(pingServer, PING_INTERVAL);
-});
+}
+
+function onReady() {
+    try {
+        Neutralino.window.maximize();
+    } catch (err) {
+        // This will fail in browser mode, which is fine.
+    }
+    initializeApp();
+}
+
+Neutralino.init();
+Neutralino.events.on('ready', onReady);

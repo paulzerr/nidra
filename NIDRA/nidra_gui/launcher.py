@@ -80,7 +80,7 @@ def main():
     elif sys.platform == "darwin":
         binary_name = "neutralino-mac_10xxx" #workaround for macOS to force browser fallback
     else:
-        binary_name = "neutralino-linux_x64x"
+        binary_name = "neutralino-linux_x64"
     binary_path = get_resource_path(f"neutralino/{binary_name}")
 
     
