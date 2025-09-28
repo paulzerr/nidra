@@ -1,0 +1,16 @@
+numpy
+scipy
+mne
+seaborn
+pandas
+onnxruntime
+matplotlib
+Flask
+pyinstaller
+huggingface_hub
+hf_xet
+appdirs
+requests
+pywebview
+psutil
+zenity
