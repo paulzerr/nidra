@@ -1,14 +1,20 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+
+# Get the directory of the spec file
+spec_dir = os.path.dirname(os.path.abspath(__file__))
+# Get the project root (one level up from the spec file dir)
+root_dir = os.path.dirname(spec_dir)
 
 a = Analysis(
-    ['../NIDRA/nidra_gui/launcher.py'],
-    pathex=['..', '../NIDRA/nidra_gui', '../NIDRA'],
+    [os.path.join(root_dir, 'NIDRA', 'nidra_gui', 'launcher.py')],
+    pathex=[root_dir, os.path.join(root_dir, 'NIDRA', 'nidra_gui'), os.path.join(root_dir, 'NIDRA')],
     binaries=[],
     datas=[
-        ('../NIDRA/nidra_gui/neutralino', 'neutralino'),
-        ('../docs', 'docs'),
-        ('../NIDRA/models', 'NIDRA/models')
+        (os.path.join(root_dir, 'NIDRA', 'nidra_gui', 'neutralino'), 'neutralino'),
+        (os.path.join(root_dir, 'docs'), 'docs'),
+        (os.path.join(root_dir, 'NIDRA', 'models'), 'NIDRA/models')
     ],
     hiddenimports=['decorator', 'scipy', 'scipy.io', 'webview', 'mne'],
     hookspath=['hooks'],
@@ -17,8 +23,8 @@ a = Analysis(
     excludes=['PyQt5', 'notebook', 'jupyter', 'IPython'],
     noarchive=False,
     optimize=0,
-    distpath='../build/dist',
-    workpath='../build/pyinstaller_build',
+    distpath=os.path.join(root_dir, 'build', 'dist'),
+    workpath=os.path.join(root_dir, 'build', 'pyinstaller_build'),
 )
 pyz = PYZ(a.pure)
 
