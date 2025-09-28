@@ -29,19 +29,23 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
 
-    - name: Install dependencies one-by-one for debugging
+- name: Install dependencies in batches
       run: |
         python -m pip install --upgrade pip
         pip install pyinstaller
-        # Read requirements.txt line by line and install each package individually
-        # This will show us exactly which package causes the crash.
-        while IFS= read -r package; do
-          if [[ -n "$package" && ! "$package" =~ ^# ]]; then
-            echo "Installing $package..."
-            pip install "$package"
-          fi
-        done < requirements.txt
-      # Use bash shell on all platforms for this script
+
+        # Batch 1: Install the heaviest core packages first
+        echo "Installing core scientific packages..."
+        pip install numpy scipy pandas matplotlib
+
+        # Batch 2: Install the package that was causing the failure
+        echo "Installing MNE..."
+        pip install mne
+
+        # Batch 3: Install the rest of the packages from the requirements file
+        # This will skip the already-installed packages.
+        echo "Installing remaining packages..."
+        pip install -r requirements.txt
       shell: bash
 
     - name: Build Executable (PyInstaller)
