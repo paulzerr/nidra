@@ -3,16 +3,14 @@ import threading
 import sys
 import os
 import socket
-import requests
 from pathlib import Path
 import webbrowser
 import time
 import multiprocessing
-from NIDRA.nidra_gui.app import app, check_ping
+from NIDRA.nidra_gui import app as nidra_app
 import time
 import importlib.resources
-import atexit
-import psutil
+from werkzeug.serving import make_server
 
 def get_resource_path(relative_path):
     # PyInstaller creates a temp folder and stores path in _MEIPASS
@@ -26,6 +24,7 @@ def get_resource_path(relative_path):
         return str(package_resources.joinpath(relative_path))
     except (ModuleNotFoundError, AttributeError):
         # Fallback for development mode
+        print("dev mode activate")
         base_path = os.path.abspath(Path(__file__).parent)
         return os.path.join(base_path, relative_path)
 
@@ -50,114 +49,99 @@ def find_free_port(preferred_ports=[5001, 5002, 5003, 62345, 62346, 62347, 62348
     except Exception as e:
         raise RuntimeError("Could not find any free port.") from e
 
-def run_flask(port):
-    """Runs the Flask app on a given port."""
-    cli = sys.modules['flask.cli']
-    cli.show_server_banner = lambda *x: None # don't show the Flask startup message
-    app.run(port=port)
+class ServerWrapper(threading.Thread):
+    """A Werkzeug server that can be stopped programmatically."""
+    def __init__(self, app, port):
+        super().__init__(daemon=True)
+        self.server = make_server('127.0.0.1', port, app, threaded=True)
+        self.ctx = app.app_context()
+        self.ctx.push()
 
+    def run(self):
+        print("Starting Flask server...")
+        self.server.serve_forever()
+
+    def shutdown(self):
+        print("Shutting down Flask server...")
+        self.server.shutdown()
+
+def check_ping(server_instance):
+    """
+    Periodically checks if the frontend is still alive and shuts down the server if not.
+    """
+    while True:
+        time.sleep(nidra_app.ping_interval)
+        if nidra_app.last_ping and time.time() - nidra_app.last_ping > nidra_app.ping_timeout:
+            print("Frontend timeout. Shutting down server...")
+            server_instance.shutdown()
+            break
 
 def main():
     """
-    Starts the Flask server in a background thread and then launches the Neutralino application.
+    Starts the Flask server in a background thread and then launches the browser.
     """
-
     multiprocessing.set_start_method('spawn', force=True)
+
+    # start the flask server in its own process
     port = find_free_port()
-    
-    # Start the ping check thread (used to keep app alive)
-    app.last_ping = time.time()
-    ping_thread = threading.Thread(target=check_ping, args=(port,), daemon=True)
+    server = ServerWrapper(nidra_app.app, port)
+    server.start()
+
+    # start the ping check thread (used to keep app alive)
+    nidra_app.last_ping = time.time()
+    ping_thread = threading.Thread(target=check_ping, args=(server,), daemon=True)
     ping_thread.start()
 
-    flask_thread = threading.Thread(target=run_flask, args=(port,), daemon=True)
-    flask_thread.start()
-
-
-    run_neutralino = False
+    run_neutralino = False  # use browser by default, TODO: fix neutralino madness
 
     if not run_neutralino:
+        # --- Browser-based GUI Logic ---
         url = f"http://127.0.0.1:{port}"
+        time.sleep(1)
+        webbrowser.open(url)
         try:
-            print("trying to run")
-            time.sleep(1)
-            webbrowser.open(url)
-            # Keep the main thread alive to allow the Flask server to run
-            while flask_thread.is_alive():
-                time.sleep(1)
-        except Exception as e:
-            print({e})
-            pass
-        finally:
-            print("Browser tab closed. Attempting to shut down Flask server...")
-            try:
-                requests.post(f"http://127.0.0.1:{port}/shutdown", timeout=2)
-            except requests.exceptions.RequestException:
-                # This is expected if the server is already down
-                pass
-
+            server.join()
+        except KeyboardInterrupt:
+            server.shutdown()
+            server.join()
     else:
-
-        # get platform-specific Neutralino binary path
-        # TODO: robustify platform recognition
         if sys.platform == "win32":
-            binary_name = "neutralino-win_x64.exex"
+            binary_name = "neutralino-win_x64.exe"
         elif sys.platform == "darwin":
-            binary_name = "neutralino-mac_10xxx" #workaround for macOS to force browser fallback
+            binary_name = "neutralino-mac_10"
         else:
-            binary_name = "neutralino-linux_x64x"
+            binary_name = "neutralino-linux_x64"
         binary_path = get_resource_path(f"neutralino/{binary_name}")
 
-        
-        time.sleep(1)
-        neutralino_process = None
-        
-        def cleanup():
-            """Ensure Neutralino and any of its children are terminated."""
-            if neutralino_process and neutralino_process.poll() is None:
-                print("Terminating Neutralino process...")
-                try:
-                    # Launch the Neutralino app (non-blocking)
-                    parent = psutil.Process(neutralino_process.pid)
-                    for child in parent.children(recursive=True):
-                        child.terminate()
-                    parent.terminate()
-                except psutil.NoSuchProcess:
-                    pass # Process already terminated
-
-        atexit.register(cleanup)
-
         url = f"http://127.0.0.1:{port}"
+        neutralino_process = None
         try:
+            time.sleep(1)
             with open(os.devnull, 'w') as devnull:
                 neutralino_process = subprocess.Popen(
-                    [binary_path, '--load-dir-res', f'--url={url}'],
+                    [binary_path, f'--url={url}'],
                     cwd=os.path.dirname(binary_path),
-                    stdout=devnull,
-                    stderr=devnull
+                    stdout=devnull, stderr=devnull
                 )
-            
-            # Wait for the Neutralino process to exit
-            neutralino_process.wait()
+            neutralino_process.wait() 
 
-        except Exception as e:
-            print(f"Could not launch Neutralino app: {e}")
+        except FileNotFoundError:
+            print(f"Neutralino binary not found at {binary_path}.")
             print("Falling back to opening in the default web browser.")
-
-            time.sleep(1)
             webbrowser.open(url)
+            server.join() 
 
-            # Keep the main thread alive to allow the Flask server to run
-            while flask_thread.is_alive():
-                time.sleep(1)
-
+        except KeyboardInterrupt:
+            print("\nCtrl+C detected. Shutting down Neutralino and server...")
+            if neutralino_process:
+                neutralino_process.terminate()
+        
         finally:
-            print("Neutralino window closed. Attempting to shut down Flask server...")
-            try:
-                requests.post(f"http://127.0.0.1:{port}/shutdown", timeout=2)
-            except requests.exceptions.RequestException:
-                # This is expected if the server is already down
-                pass
+            print("Shutting down server...")
+            server.shutdown()
+            server.join()
+
+    print("Server has shut down. Exiting.")
 
 
 if __name__ == '__main__':

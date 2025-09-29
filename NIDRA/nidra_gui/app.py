@@ -1,25 +1,18 @@
 import sys
+import time
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import threading
 import logging
 from pathlib import Path
 import importlib.resources
 import platform
-import os
-import psutil
 
-import time
 from NIDRA import scorer as scorer_factory
 from NIDRA.utils import setup_logging, compute_sleep_stats, download_models, download_example_data
-
 
 # --- Setup ---
 LOG_FILE, logger = setup_logging()
 
-
-
-
-# --- UI Text ---
 TEXTS = {
     "WINDOW_TITLE": "NIDRA", "INPUT_TITLE": "Input Folder", "MODEL_TITLE": "Model",
     "OPTIONS_TITLE": "Options", "OPTIONS_PROBS": "Generate probabilities", "OPTIONS_PLOT": "Generate graph",
@@ -53,7 +46,6 @@ is_scoring_running = False
 worker_thread = None
 _startup_check_done = False
 last_ping = None
-ping_thread = None
 ping_interval = 2  # seconds
 ping_timeout = 5  # seconds
 
@@ -64,8 +56,6 @@ def index():
     """Serves the main HTML page."""
     global _startup_check_done
 
-    # The JavaScript will now fetch the log content on page load,
-    # so we no longer need to construct a special initial message here.
     logger.info("-------------------------- System Information --------------------------")
     logger.info(f"OS: {platform.platform()}")
     logger.info(f"Python Version: {' '.join(sys.version.splitlines())}")
@@ -75,15 +65,18 @@ def index():
     logger.info(f"User Agent: {request.headers.get('User-Agent', 'N/A')}")
     logger.info("--------------------------------------------------------------------------\n")
 
-    if not _startup_check_done:
-        def startup_task():
-            """A wrapper to run startup tasks in the correct order."""
-            logger.info("Checking if autoscoring model files are available...")
-            download_models(logger=logger)
-            logger.info(TEXTS.get("CONSOLE_INIT_MESSAGE", "Welcome to NIDRA."))
+    logger.info("\nChecking if autoscoring model files are available...")
+    download_models(logger=logger)
+    logger.info(TEXTS.get("CONSOLE_INIT_MESSAGE", "Welcome to NIDRA."))
+    # if not _startup_check_done:
+    #     def startup_task():
+    #         """A wrapper to run startup tasks in the correct order."""
+    #         logger.info("Checking if autoscoring model files are available...")
+    #         download_models(logger=logger)
+    #         logger.info(TEXTS.get("CONSOLE_INIT_MESSAGE", "Welcome to NIDRA."))
 
-        threading.Thread(target=startup_task, daemon=True).start()
-        _startup_check_done = True
+    #     threading.Thread(target=startup_task, daemon=True).start()
+    #     _startup_check_done = True
 
     return render_template('index.html', texts=TEXTS)
 
@@ -396,49 +389,5 @@ def ping():
     return jsonify({'status': 'ok'})
 
 
-def check_ping(port):
-    """Periodically checks if the frontend is still alive."""
-    global last_ping
-    while True:
-        time.sleep(ping_interval)
-        if last_ping and time.time() - last_ping > ping_timeout:
-            logger.info("Frontend timeout. Shutting down server...")
-            import requests
-            try:
-                requests.post(f"http://127.0.0.1:{port}/shutdown")
-            except requests.exceptions.RequestException:
-                pass # Server might already be down
-            break
 
 
-def shutdown_server():
-    """Function to shut down the server."""
-    try:
-        parent = psutil.Process(os.getpid())
-        for child in parent.children(recursive=True):
-            child.terminate()
-        parent.terminate()
-    except psutil.NoSuchProcess:
-        pass
-
-@app.route('/shutdown', methods=['POST'])
-def shutdown():
-    """Shuts down the Flask server."""
-    global is_scoring_running, worker_thread
-
-    if is_scoring_running:
-        logger.warning("Shutdown requested, but scoring is in progress. Waiting for it to complete.")
-        if worker_thread:
-            worker_thread.join()  # Wait for the scoring thread to finish
-
-    logger.info("Server is shutting down...")
-    shutdown_server()
-    return 'Server shutting down...'
-
-
-if __name__ == '__main__':
-    last_ping = time.time()
-    ping_thread = threading.Thread(target=check_ping, daemon=True)
-    ping_thread.start()
-    # TODO: randomize port
-    app.run(host='127.0.0.1', port=5000)
