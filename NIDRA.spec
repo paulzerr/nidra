@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
@@ -59,6 +60,8 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
+is_macos = sys.platform == 'darwin'
+
 exe = EXE(
     pyz,
     a.scripts,
@@ -79,6 +82,14 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     manifest='NIDRA.manifest',
-    onefile=True,
+    onefile=not is_macos,
     icon='docs/logo.ico',
 )
+
+if is_macos:
+    app = BUNDLE(
+        exe,
+        name='NIDRA.app',
+        icon='docs/logo.ico',
+        bundle_identifier=None,
+    )
