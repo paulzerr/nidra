@@ -35,12 +35,13 @@ AppDir:
     - python3 -m pip install ./usr/src
     - cp $RECIPE_DIR/NIDRA/nidra_gui/neutralino/resources/icons/appIcon.png .
     - mv ./appIcon.png ./NIDRA.png
+    
   runtime:
     env:
       APPIMAGE_EXTRACT_AND_RUN: 1
-      PATH: ${APPDIR}/usr/bin:${PATH}
-      PYTHONHOME: ${APPDIR}/usr
-      PYTHONPATH: ${APPDIR}/usr/lib/python3.10/site-packages:${APPDIR}/usr/lib/python3.10:${APPDIR}/usr/src
+      PATH: usr/bin:${PATH}
+      PYTHONHOME: usr
+      PYTHONPATH: usr/lib/python3.11/site-packages:usr/lib/python3.11:usr/src
 
   test:
     fedora:
