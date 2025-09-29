@@ -8,7 +8,7 @@ import importlib.resources
 import platform
 
 from NIDRA import scorer as scorer_factory
-from NIDRA.utils import setup_logging, compute_sleep_stats, download_models, download_example_data
+from NIDRA.utils import setup_logging, compute_sleep_stats, download_models, download_example_data, batch_scorer
 
 # --- Setup ---
 LOG_FILE, logger = setup_logging()
@@ -218,53 +218,6 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
         logger.info("\n" + "="*80 + "\nScoring process finished.\n" + "="*80)
 
 
-def _find_files_to_score(input_dir, data_source, score_subdirs):
-    """Finds EDF files to be scored and returns a list of file paths."""
-    logger.info(f"Searching for recordings in '{input_dir}'...")
-    files_to_process = []
-    data_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
-
-    if score_subdirs:
-        for subdir in sorted(Path(input_dir).iterdir()):
-            if subdir.is_dir():
-                try:
-                    if data_type == 'psg':
-                        file = next(subdir.glob('*.edf'))
-                        files_to_process.append(file)
-                    else:  # forehead
-                        l_file = next(subdir.glob('*[lL].edf'))
-                        next(subdir.glob('*[rR].edf'))  # Verify R file exists
-                        files_to_process.append(l_file)
-                except StopIteration:
-                    logger.warning(f"Could not find a complete recording in subdirectory '{subdir.name}'. Skipping.")
-                    continue
-    else:  # single directory
-        try:
-            if data_type == 'psg':
-                input_file = next(Path(input_dir).glob('*.edf'))
-            else:  # forehead
-                input_file = next(Path(input_dir).glob('*[lL].edf'))
-            files_to_process.append(input_file)
-        except StopIteration:
-            pass  # Let the caller handle the empty list
-
-    if not files_to_process:
-        input_path = Path(input_dir)
-        # Check if we are in single-file mode but subdirectories exist.
-        if not score_subdirs and any(item.is_dir() for item in input_path.iterdir()):
-            raise ValueError(
-                f"No recordings found in '{input_dir}', but subdirectories were detected."
-                "\n\n"
-                "If your recordings are in separate subfolders, please select the 'Score all recordings (in subfolders)' option."
-            )
-        raise FileNotFoundError(f"Could not find any suitable recordings in '{input_dir}'. Please check the input directory and data source settings.")
-
-    logger.info(f"Found {len(files_to_process)} recording(s) to process.")
-    if score_subdirs and files_to_process:
-        logger.info("The following recordings will be processed:")
-        for file in files_to_process:
-            logger.info(f"  - {file}")
-    return files_to_process
 
 
 def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot):
@@ -310,33 +263,6 @@ def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plo
         return False
 
 
-def _run_batch_scoring(files_to_score, output_dir, data_source, model_name, gen_stats, plot):
-    """
-    Runs scoring for a batch of files.
-    """
-    batch_start_time = time.time()
-    batch_output_dir = Path(output_dir) / f"batch_run_{time.strftime('%Y%m%d_%H%M%S')}"
-    batch_output_dir.mkdir(parents=True, exist_ok=True)
-    logger.info("\n" + "-" * 80)
-    logger.info(f"Starting batch processing.")
-    logger.info(f"All results will be saved to: {batch_output_dir}")
-
-    processed_count = 0
-    for i, file in enumerate(files_to_score):
-        logger.info("\n" + "-" * 80)
-        logger.info(f"[{i+1}/{len(files_to_score)}] Processing: {file}")
-        logger.info("-" * 80)
-        if _run_scoring(file, str(batch_output_dir), data_source, model_name, gen_stats, plot):
-            processed_count += 1
-
-    total_execution_time = time.time() - batch_start_time
-    logger.info("\n" + "-" * 80)
-    logger.info("BATCH PROCESSING COMPLETE")
-    logger.info(f"Successfully processed {processed_count} of {len(files_to_score)} recordings.")
-    logger.info(f"Total execution time: {total_execution_time:.2f} seconds.")
-    logger.info(f"All results saved in: {batch_output_dir}")
-    logger.info("-" * 80)
-    return processed_count, len(files_to_score)
 
 def _run_scoring_worker(input_dir, output_dir, score_subdirs, cancel_event, data_source, model_name, plot, gen_stats):
     """
@@ -344,18 +270,41 @@ def _run_scoring_worker(input_dir, output_dir, score_subdirs, cancel_event, data
     Returns a tuple of (number_of_files_successfully_processed, total_files_found).
     """
     try:
-        files_to_score = _find_files_to_score(input_dir, data_source, score_subdirs)
+        scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
         if score_subdirs:
-            return _run_batch_scoring(files_to_score, output_dir, data_source, model_name, gen_stats, plot)
+            batch = batch_scorer(
+                input_dir=input_dir,
+                output_dir=output_dir,
+                scorer_type=scorer_type,
+                model_name=model_name
+            )
+            return batch.score(plot=plot, gen_stats=gen_stats)
         else:
-            if files_to_score:
-                logger.info("\n" + "-" * 80)
-                logger.info(f"Processing: {files_to_score[0]}")
-                logger.info("-" * 80)
-                success = _run_scoring(files_to_score[0], output_dir, data_source, model_name, gen_stats, plot)
-                return (1, 1) if success else (0, 1)
-            else:
-                return 0, 0
+            # Logic for single scoring.
+            logger.info(f"Searching for recordings in '{input_dir}'...")
+            input_path = Path(input_dir)
+            try:
+                if scorer_type == 'psg':
+                    input_file = next(input_path.glob('*.edf'))
+                else:  # forehead
+                    input_file = next(input_path.glob('*[lL].edf'))
+                    next(input_path.glob('*[rR].edf')) # Verify R file exists
+            except StopIteration:
+                # Check if we are in single-file mode but subdirectories exist.
+                if any(item.is_dir() for item in input_path.iterdir()):
+                    raise ValueError(
+                        f"No recordings found in '{input_dir}', but subdirectories were detected."
+                        "\n\n"
+                        "If your recordings are in separate subfolders, please select the 'Score all recordings (in subfolders)' option."
+                    )
+                raise FileNotFoundError(f"Could not find any suitable recordings in '{input_dir}'. Please check the input directory and data source settings.")
+
+            logger.info("\n" + "-" * 80)
+            logger.info(f"Processing: {input_file}")
+            logger.info("-" * 80)
+            success = _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot)
+            return (1, 1) if success else (0, 1)
+
     except (FileNotFoundError, ValueError) as e:
         logger.error(str(e))
         return 0, 0
