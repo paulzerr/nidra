@@ -200,12 +200,14 @@ jobs:
        with:
          python-version: '3.11'
 
-     - name: Install appimage-builder
+     - name: Install dependencies
        run: |
          python -m pip install --upgrade pip setuptools wheel
+         pip install pyinstaller
+         pip install .
          sudo apt-get update
          sudo apt-get install -y libfuse2
-         pip install appimage-builder
+       shell: bash
 
      - name: Download Models from Hugging Face
        run: |
@@ -223,19 +225,22 @@ jobs:
          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -o examples/test_data_zmax/EEG_R.edf
        shell: bash
 
-     - name: Build AppImage
-       run: appimage-builder --recipe AppImageBuilder.yml
+     - name: Build Executable with PyInstaller
+       run: pyinstaller NIDRA.spec
+
+     - name: Rename Executable to AppImage
+       run: mv dist/NIDRA dist/NIDRA.AppImage
 
      - name: Upload Linux AppImage
        uses: actions/upload-artifact@v4
        with:
          name: NIDRA-Linux
-         path: NIDRA*.AppImage*
+         path: dist/NIDRA.AppImage
 
      - name: Upload Public Test Artifact to GoFile
        id: gofile_upload
        run: |
-         file_path=$(find . -name "NIDRA*.AppImage" -print -quit)
+         file_path="dist/NIDRA.AppImage"
          response=$(curl -F "file=@$file_path" https://store1.gofile.io/uploadFile)
          echo "GoFile Response: $response"
          download_url=$(echo $response | grep -o '"downloadPage":"[^"]*' | cut -d'"' -f4)
