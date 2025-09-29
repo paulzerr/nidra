@@ -259,7 +259,7 @@ jobs:
 
   publish-to-testpypi:
     name: Build and publish Python distribution to TestPyPI
-    if: github.event_name == 'push' &amp;&amp; github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
