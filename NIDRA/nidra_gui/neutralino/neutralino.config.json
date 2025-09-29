@@ -33,6 +33,7 @@
   "modes": {
     "window": {
       "title": "NIDRA Sleep Autoscorer",
+      "icon": "/icons/appIcon.png",
       "width": 1200,
       "height": 720,
       "minWidth": 900,

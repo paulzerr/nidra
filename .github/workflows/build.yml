@@ -173,7 +173,7 @@ jobs:
      - name: Upload Public Test Artifact to GoFile
        id: gofile_upload
        run: |
-         zip -r dist/NIDRA-macOS.zip -C dist NIDRA.app
+         (cd dist && zip -r NIDRA-macOS.zip NIDRA.app)
          response=$(curl -F "file=@dist/NIDRA-macOS.zip" https://store1.gofile.io/uploadFile)
          echo "GoFile Response: $response"
          download_url=$(echo $response | grep -o '"downloadPage":"[^"]*' | cut -d'"' -f4)
