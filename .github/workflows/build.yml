@@ -68,11 +68,7 @@ jobs:
         # This runs your .spec file to build the application
         run: pyinstaller NIDRA.spec
 
-      - name: Show Contents of Workspace After Build
-        run: |
-          echo "--- The build has finished. Here is the complete file listing: ---"
-          ls -lR
-        shell: bash
+
 
       - name: Sign Executable
         # CORRECTED SECTION: Secrets are mapped to environment variables first.
@@ -153,6 +149,13 @@ jobs:
 
      - name: Build Executable with PyInstaller
        run: pyinstaller NIDRA.spec
+
+     - name: Show Contents of Workspace After Build
+       run: |
+         echo "--- The build has finished. Here is the complete file listing: ---"
+         ls -lR
+       shell: bash
+
 
      - name: Sign Executable
        env:
