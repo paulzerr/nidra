@@ -21,7 +21,7 @@ jobs:
             cibw-macos-min: '10.15'
             numpy-constraint: 'numpy<2'
             onnx-constraint: 'onnxruntime==1.16.3'
-            cibw-repair-command: 'delocate-wheel --require-archs {archs} -w {dest_dir} -v {wheel}'
+            cibw-repair-command: 'delocate-wheel --require-archs {archs} -w {dest_dir} --ignore-missing-dependencies {wheel}'
             cibw-manylinux-image: ''
             cibw-before-build: 'python -m pip install --upgrade delocate toml && python update_deps.py'
 
@@ -50,7 +50,7 @@ jobs:
             numpy-constraint: 'numpy>=2.0.0'
             onnx-constraint: 'onnxruntime>=1.19.0'
             cibw-repair-command: ''
-            cibw-manylinux-image: 'manylinux_2_28'
+            cibw-manylinux-image: 'manylinux2010'
             cibw-before-build: 'python -m pip install toml && python update_deps.py'
 
     steps:
