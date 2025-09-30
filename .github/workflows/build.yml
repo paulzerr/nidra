@@ -58,7 +58,7 @@ jobs:
             archs: 'auto'
             numpy-constraint: 'numpy>=2.0.0'
             onnx-constraint: 'onnxruntime>=1.19.0'
-            cibw-repair-command: ''
+            cibw-repair-command: 'python -m pip install wheel && wheel tags --plat-tag macosx_13_3_arm64 -w {dest_dir} {wheel}'
             cibw-manylinux-image: ''
             cibw-before-build: 'python -m pip install toml && python update_deps.py'
 
