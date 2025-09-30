@@ -44,7 +44,7 @@
 
         <section id="installation">
             <h2>Installation</h2>
-            <h4>Option 1: Standalone Executable (Recommended for non-technical users)</h4>
+            <h3>Option 1: Standalone Executable (Recommended for non-technical users)</h3>
             <p>The easiest way to use NIDRA on Windows is via the portable, ready-to-go executables which require no installation. Simply download the correct version for your operating system and run it.</p>
             <ul>
                 <h3><strong><a href="LINK">Download standalone exe for Windows 10+</a></strong></h3>
@@ -52,7 +52,7 @@
             </ul>
             <p><strong>Note:</strong> due to the restrictive environment of Windows, you may see a "Search on app store" popup window. Click "No". You may also see the blue Smartscreen warning. In that case click "run anyway". Should this fail, try installing via pip (see below).</p>
             <br>
-            <h4>Option 2: Install from PyPI</h4>
+            <h3>Option 2: Install from PyPI</h3>
             <p>First, make sure you have Python installed (3.10 or later recommended). We suggest installing via <a href="https://www.anaconda.com/download/success">Miniconda</a>.</p>
             <p>Before installing NIDRA, it is highly recommended to create and activate a new virtual environment. This prevents conflicts with other packages.</p>
             <p><strong>To create a virtual environment (choose one):</strong></p>
@@ -62,7 +62,7 @@ python3 -m venv nidra-env
 # Activate it
 # On Windows:
 nidra-env\Scripts\activate
-# On macOS/Linux:
+# On macOS/Linux
 source nidra-env/bin/activate</code></pre>
             <p>2. Using <code>conda</code>:</p>
             <pre><code># Create and activate the environment
@@ -74,7 +74,7 @@ conda activate nidra-env</code></pre>
             <pre><code>nidra</code></pre>
             <p><strong>Note:</strong> If you installed NIDRA via pip, the first time you run a scoring process, the necessary model files will be automatically downloaded from <a href="https://huggingface.co/pzerr/NIDRA_models/">https://huggingface.co/pzerr/NIDRA_models/</a> (~152MB). </p>
             <br>
-            <h4>Option 3: Install from source</h4>
+            <h3>Option 3: Install from source</h3>
             <p><strong>macOS and Linux:</strong></p>
             <pre><code>git clone https://codeberg.org/pzerr/NIDRA.git
 cd NIDRA

@@ -43,6 +43,7 @@ jobs:
           - os: windows-latest
             job-id: 'windows'
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
+            archs: 'auto'
             numpy-constraint: 'numpy>=2.0.0'
             onnx-constraint: 'onnxruntime>=1.19.0'
             cibw-repair-command: ''
@@ -53,6 +54,7 @@ jobs:
           - os: ubuntu-latest
             job-id: 'linux'
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
+            archs: 'auto'
             numpy-constraint: 'numpy>=2.0.0'
             onnx-constraint: 'onnxruntime>=1.19.0'
             cibw-repair-command: ''
