@@ -17,6 +17,7 @@ jobs:
         include:
           # Legacy macOS (x86_64) for Python 3.10-3.13, compatible with macOS 10.15+
           - os: macos-14
+            job-id: 'macos-legacy'
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
             cibw-macos-min: '10.15'
             numpy-constraint: 'numpy<2'
@@ -27,6 +28,7 @@ jobs:
 
           # Modern macOS (>=13.3) for Python 3.10
           - os: macos-14
+            job-id: 'macos-modern'
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
             cibw-macos-min: '13.3'
             numpy-constraint: 'numpy>=2.0.0'
@@ -37,6 +39,7 @@ jobs:
 
           # Windows for Python 3.10
           - os: windows-latest
+            job-id: 'windows'
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
             numpy-constraint: 'numpy>=2.0.0'
             onnx-constraint: 'onnxruntime>=1.19.0'
@@ -46,6 +49,7 @@ jobs:
 
           # Linux for Python 3.10 (builds sdist by default)
           - os: ubuntu-latest
+            job-id: 'linux'
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
             numpy-constraint: 'numpy>=2.0.0'
             onnx-constraint: 'onnxruntime>=1.19.0'
@@ -106,7 +110,7 @@ jobs:
       - name: Upload distribution package
         uses: actions/upload-artifact@v4
         with:
-          name: python-dist-${{ matrix.os }}
+          name: python-dist-${{ matrix.job-id }}
           path: wheelhouse/
 
   publish-to-pypi:
