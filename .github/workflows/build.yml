@@ -119,6 +119,7 @@ jobs:
             onnx-constraint: 'onnxruntime==1.16.3'
             cibw-repair-command: 'delocate-wheel --ignore-macosx-min-version --require-archs {archs} -w {dest_dir} -v {wheel}'
             cibw-manylinux-image: ''
+            cibw-before-build: 'python -m pip install --upgrade delocate toml && python update_deps.py'
 
           # Modern macOS (>=13.3) for Python 3.10
           - os: macos-14
@@ -128,6 +129,7 @@ jobs:
             onnx-constraint: 'onnxruntime>=1.19.0'
             cibw-repair-command: ''
             cibw-manylinux-image: ''
+            cibw-before-build: 'python -m pip install toml && python update_deps.py'
 
           # Windows for Python 3.10
           - os: windows-latest
@@ -136,6 +138,7 @@ jobs:
             onnx-constraint: 'onnxruntime>=1.19.0'
             cibw-repair-command: ''
             cibw-manylinux-image: ''
+            cibw-before-build: 'python -m pip install toml && python update_deps.py'
 
           # Linux for Python 3.10 (builds sdist by default)
           - os: ubuntu-latest
@@ -143,7 +146,8 @@ jobs:
             numpy-constraint: 'numpy>=2.0.0'
             onnx-constraint: 'onnxruntime>=1.19.0'
             cibw-repair-command: ''
-            cibw-manylinux-image: 'manylinux2014'
+            cibw-manylinux-image: 'manylinux_2_28'
+            cibw-before-build: 'python -m pip install toml && python update_deps.py'
 
     steps:
       - name: Check out repository
@@ -192,9 +196,8 @@ jobs:
           CIBW_MACOS_MIN: ${{ matrix.cibw-macos-min }}
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: ${{ matrix.cibw-repair-command }}
           CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.cibw-manylinux-image }}
-          CIBW_BEFORE_BUILD: 'python -m pip install toml && python update_deps.py'
+          CIBW_BEFORE_BUILD: ${{ matrix.cibw-before-build }}
           CIBW_ENVIRONMENT: 'NUMPY_CONSTRAINT="${{ matrix.numpy-constraint }}" ONNX_CONSTRAINT="${{ matrix.onnx-constraint }}" GITHUB_RUN_NUMBER="${{ github.run_number }}" GITHUB_REF="${{ github.ref }}"'
-          CIBW_ENVIRONMENT_LINUX: 'NUMPY_CONSTRAINT="${{ matrix.numpy-constraint }}" ONNX_CONSTRAINT="${{ matrix.onnx-constraint }}" GITHUB_RUN_NUMBER="${{ github.run_number }}" GITHUB_REF="${{ github.ref }}"'
 
       - name: Upload distribution package
         uses: actions/upload-artifact@v4
