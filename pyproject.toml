@@ -47,3 +47,6 @@ packages = {find = {}}
 [tool.setuptools.package-data]
 "NIDRA.nidra_gui" = ["neutralino/**"]
 "docs" = ["**"]
+
+[tool.setuptools.ext-modules]
+dummy = "NIDRA/dummy.c"
