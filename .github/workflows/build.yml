@@ -20,6 +20,7 @@ jobs:
             job-id: 'macos-legacy'
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
             cibw-macos-min: '10.15'
+            archs: 'x86_64'
             numpy-constraint: 'numpy<2'
             onnx-constraint: 'onnxruntime==1.16.3'
             cibw-repair-command: 'delocate-wheel --require-archs {archs} -w {dest_dir} -v {wheel}'
@@ -31,6 +32,7 @@ jobs:
             job-id: 'macos-modern'
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
             cibw-macos-min: '13.3'
+            archs: 'auto'
             numpy-constraint: 'numpy>=2.0.0'
             onnx-constraint: 'onnxruntime>=1.19.0'
             cibw-repair-command: ''
@@ -101,7 +103,8 @@ jobs:
         run: python -m cibuildwheel --output-dir wheelhouse
         env:
           CIBW_BUILD: ${{ matrix.cibw-build }}
-          CIBW_MACOS_MIN: ${{ matrix.cibw-macos-min }}
+          CIBW_ARCHS: ${{ matrix.archs }}
+          CIBW_MACOSX_DEPLOYMENT_TARGET: ${{ matrix.cibw-macos-min }}
           CIBW_REPAIR_WHEEL_COMMAND_MACOS: ${{ matrix.cibw-repair-command }}
           CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.cibw-manylinux-image }}
           CIBW_BEFORE_BUILD: ${{ matrix.cibw-before-build }}
@@ -115,16 +118,22 @@ jobs:
 
   publish-to-pypi:
     name: Publish Python distribution to PyPI
-    needs: [build_wheels] 
+    needs: [build_wheels]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
     steps:
       - name: Download all wheel packages
         uses: actions/download-artifact@v4
         with:
           pattern: python-dist-*
-          path: dist/
-          merge-multiple: true
+          path: dist_temp
+
+      - name: Move packages to dist directory
+        run: |
+          mkdir dist
+          find dist_temp -type f \( -name "*.whl" -o -name "*.tar.gz" \) -exec mv {} dist/ \;
 
       - name: List downloaded files
         run: ls -R dist
@@ -132,5 +141,4 @@ jobs:
       - name: Publish distribution to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-          repository_url: https://test.pypi.org/legacy/
+          repository-url: https://test.pypi.org/legacy/

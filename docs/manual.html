@@ -51,16 +51,42 @@
                 <br>
             </ul>
             <p><strong>Note:</strong> due to the restrictive environment of Windows, you may see a "Search on app store" popup window. Click "No". You may also see the blue Smartscreen warning. In that case click "run anyway". Should this fail, try installing via pip (see below).</p>
-            <br> 
+            <br>
             <h4>Option 2: Install from PyPI</h4>
-            <p>Alternatively, NIDRA can be installed as a Python package using pip (Python 3.10 or later recommended).</p>
+            <p>First, make sure you have Python installed (3.10 or later recommended). We suggest installing via <a href="https://www.anaconda.com/download/success">Miniconda</a>.</p>
+            <p>Before installing NIDRA, it is highly recommended to create and activate a new virtual environment. This prevents conflicts with other packages.</p>
+            <p><strong>To create a virtual environment (choose one):</strong></p>
+            <p>1. Using <code>venv</code> (built-in):</p>
+            <pre><code># Create the environment
+python3 -m venv nidra-env
+# Activate it
+# On Windows:
+nidra-env\Scripts\activate
+# On macOS/Linux:
+source nidra-env/bin/activate</code></pre>
+            <p>2. Using <code>conda</code>:</p>
+            <pre><code># Create and activate the environment
+conda create -n nidra-env python=3.10
+conda activate nidra-env</code></pre>
+            <p>Once your environment is activated, install NIDRA using pip:</p>
             <pre><code>pip install nidra</code></pre>
-            <p>Once installed, you can launch the graphical interface by running the command: </p> 
+            <p>Once installed, you can launch the graphical interface by running the command: </p>
             <pre><code>nidra</code></pre>
-            <p><strong>Note:</strong> If you installed NIDRA via pip, the first time you run a scoring process, the necessary model files will be automatically downloaded from (<a href="https://huggingface.co/pzerr/NIDRA_models/">https://huggingface.co/pzerr/NIDRA_models/</a> (~152MB)). </p>
-            <br>    
-            <strong>Option 3: Clone the github</strong>: please see <a href="#install-from-source">[Install from source]</a> section.
-            
+            <p><strong>Note:</strong> If you installed NIDRA via pip, the first time you run a scoring process, the necessary model files will be automatically downloaded from <a href="https://huggingface.co/pzerr/NIDRA_models/">https://huggingface.co/pzerr/NIDRA_models/</a> (~152MB). </p>
+            <br>
+            <h4>Option 3: Install from source</h4>
+            <p><strong>macOS and Linux:</strong></p>
+            <pre><code>git clone https://codeberg.org/pzerr/NIDRA.git
+cd NIDRA
+python3 -m venv .venv
+source .venv/bin/activate
+pip install .</code></pre>
+            <p><strong>Windows:</strong></p>
+            <pre><code>git clone https://codeberg.org/pzerr/NIDRA.git
+cd NIDRA
+python -m venv .venv
+.venv\Scripts\activate
+pip install .</code></pre>
         </section>
 
         <section id="gui-guide">
