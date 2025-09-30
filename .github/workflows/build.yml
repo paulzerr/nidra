@@ -8,102 +8,6 @@ on:
     branches: [ master ]
 
 jobs:
-  build-windows:
-    # Use the current, supported Windows runner. This is the standard for ensuring
-    # broad compatibility with both Windows 10 and Windows 11.
-    runs-on: windows-latest
-    timeout-minutes: 30 # A generous timeout for the entire job
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          # The cache key is based on the OS and the contents of requirements.txt
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-
-      # The proven robust installation strategy to prevent memory/resource failures
-      - name: Install dependencies strategically
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install pyinstaller
-
-          echo "--- Phase 1: Heavy Binaries ---"
-          pip install numpy scipy pandas matplotlib onnxruntime pillow
-
-          echo "--- Phase 2: Medium & Complex Dependencies ---"
-          pip install mne sympy
-
-          echo "--- Phase 3: All Remaining Dependencies & Project ---"
-          pip install .
-        shell: bash
-
-      - name: Download Models from Hugging Face
-        run: |
-          mkdir -p NIDRA/models
-          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6.onnx -o NIDRA/models/ez6.onnx
-          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6moe.onnx -o NIDRA/models/ez6moe.onnx
-          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024.onnx -o NIDRA/models/u-sleep-nsrr-2024.onnx
-          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024_eeg.onnx -o NIDRA/models/u-sleep-nsrr-2024_eeg.onnx
-        shell: bash
-
-      - name: Download Example Data from Hugging Face
-        run: |
-          mkdir -p examples/test_data_zmax
-          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_L.edf -o examples/test_data_zmax/EEG_L.edf
-          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -o examples/test_data_zmax/EEG_R.edf
-        shell: bash
-
-      - name: Build Executable with PyInstaller
-        # This runs your .spec file to build the application
-        run: pyinstaller NIDRA.spec
-
-
-
-      - name: Sign Executable
-        # CORRECTED SECTION: Secrets are mapped to environment variables first.
-        env:
-          CODE_SIGNING_CERTIFICATE_BASE64: ${{ secrets.CODE_SIGNING_CERTIFICATE_BASE64 }}
-          CODE_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.CODE_SIGNING_CERTIFICATE_PASSWORD }}
-        # The 'if' condition now correctly checks the environment variables.
-        if: env.CODE_SIGNING_CERTIFICATE_BASE64 != '' && env.CODE_SIGNING_CERTIFICATE_PASSWORD != ''
-        run: |
-          echo "${{ secrets.CODE_SIGNING_CERTIFICATE_BASE64 }}" > certificate.pfx.b64
-          certutil -decode certificate.pfx.b64 certificate.pfx
-          signtool sign /f certificate.pfx /p "${{ secrets.CODE_SIGNING_CERTIFICATE_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "dist/NIDRA.exe"
-        shell: bash
-
-      - name: Upload Windows Executable (Internal Artifact)
-        uses: actions/upload-artifact@v4
-        with:
-          # A descriptive name for the downloadable artifact
-          name: NIDRA-Windows
-          path: dist/
-
-      - name: Upload Public Test Artifact to GoFile
-        id: gofile_upload
-        run: |
-          # Upload the file and capture the JSON response
-          response=$(curl -F "file=@dist/NIDRA.exe" https://store1.gofile.io/uploadFile)
-          echo "GoFile Response: $response"
-          # Extract the download page URL from the JSON response
-          download_url=$(echo $response | grep -o '"downloadPage":"[^"]*' | cut -d'"' -f4)
-          echo "Public Download Link: $download_url"
-          # Make the URL available to subsequent steps if needed
-          echo "download_url=$download_url" >> $GITHUB_OUTPUT
-        shell: bash
-
-
   build_wheels:
     name: Build wheels for ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
@@ -117,7 +21,7 @@ jobs:
             cibw-macos-min: '10.15'
             numpy-constraint: 'numpy<2'
             onnx-constraint: 'onnxruntime==1.16.3'
-            cibw-repair-command: 'delocate-wheel --ignore-macosx-min-version --require-archs {archs} -w {dest_dir} -v {wheel}'
+            cibw-repair-command: 'delocate-wheel --require-archs {archs} -w {dest_dir} -v {wheel}'
             cibw-manylinux-image: ''
             cibw-before-build: 'python -m pip install --upgrade delocate toml && python update_deps.py'
 
@@ -207,7 +111,7 @@ jobs:
 
   publish-to-pypi:
     name: Publish Python distribution to PyPI
-    needs: [build_wheels, build-windows] # Depends on both wheels and the exe build
+    needs: [build_wheels] # Depends on both wheels and the exe build
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
