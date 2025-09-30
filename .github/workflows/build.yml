@@ -23,7 +23,7 @@ jobs:
             onnx-constraint: 'onnxruntime==1.16.3'
             cibw-repair-command: 'delocate-wheel --require-archs {archs} -w {dest_dir} -v {wheel}'
             cibw-manylinux-image: ''
-            cibw-before-build: 'install_name_tool -platform_version min 10.15 11.1 NIDRA/nidra_gui/neutralino/neutralino-mac_10 && python -m pip install --upgrade delocate toml && python update_deps.py'
+            cibw-before-build: 'install_name_tool -platform_version 10.15 11.1 NIDRA/nidra_gui/neutralino/neutralino-mac_10 && python -m pip install --upgrade delocate toml && python update_deps.py'
 
           # Modern macOS (>=13.3) for Python 3.10
           - os: macos-14
