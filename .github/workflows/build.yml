@@ -35,7 +35,20 @@ jobs:
             archs: 'arm64'
             numpy-constraint: 'numpy<2'
             onnx-constraint: 'onnxruntime==1.16.3'
-            cibw-repair-command: 'delocate-wheel --require-archs {archs} -w {dest_dir} -v {wheel}'
+            cibw-repair-command: ''
+            cibw-manylinux-image: ''
+            cibw-before-build: 'python -m pip install --upgrade delocate toml && python update_deps.py'
+
+
+          # Modern macOS (x86_64) for Intel Macs on macOS 13.3+
+          - os: macos-14
+            job-id: 'macos-modern-x86_64'
+            cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
+            cibw-macos-min: '13.3'
+            archs: 'x86_64'
+            numpy-constraint: 'numpy>=2.0.0'
+            onnx-constraint: 'onnxruntime>=1.19.0'
+            cibw-repair-command: 'delocate-wheel --plat-tag macosx_13_3_x86_64 -w {dest_dir} {wheel}'
             cibw-manylinux-image: ''
             cibw-before-build: 'python -m pip install --upgrade delocate toml && python update_deps.py'
 
@@ -47,9 +60,9 @@ jobs:
             archs: 'arm64'
             numpy-constraint: 'numpy>=2.0.0'
             onnx-constraint: 'onnxruntime>=1.19.0'
-            cibw-repair-command: ''
+            cibw-repair-command: 'delocate-wheel --plat-tag macosx_13_3_arm64 -w {dest_dir} {wheel}'
             cibw-manylinux-image: ''
-            cibw-before-build: 'python -m pip install toml && python update_deps.py'
+            cibw-before-build: 'python -m pip install --upgrade delocate toml && python update_deps.py'
 
           # Windows for Python 3.10
           - os: windows-latest
@@ -58,7 +71,7 @@ jobs:
             archs: 'auto'
             numpy-constraint: 'numpy>=2.0.0'
             onnx-constraint: 'onnxruntime>=1.19.0'
-            cibw-repair-command: 'python -m pip install delocate && delocate-wheel --plat-tag macosx_13_3_arm64 -w {dest_dir} {wheel}'
+            cibw-repair-command: ''
             cibw-manylinux-image: ''
             cibw-before-build: 'python -m pip install toml && python update_deps.py'
 
