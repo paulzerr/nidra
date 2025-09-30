@@ -42,7 +42,7 @@ nid = "NIDRA.cli:run_cli"
 nidra = "NIDRA.nidra_gui.launcher:main"
 
 [tool.setuptools]
-packages = {find = {}}
+packages = {find = {exclude = ["NIDRA.nidra_gui.neutralino*"]}}
 
 [tool.setuptools.package-data]
 "NIDRA.nidra_gui" = ["neutralino/**"]
