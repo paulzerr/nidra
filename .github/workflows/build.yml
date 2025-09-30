@@ -15,9 +15,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Legacy macOS (x86_64) for Python 3.10-3.13, compatible with macOS 10.15+
+          # Legacy macOS (x86_64) for all Intel Macs, macOS 10.15+
           - os: macos-14
-            job-id: 'macos-legacy'
+            job-id: 'macos-legacy-x86_64'
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
             cibw-macos-min: '10.15'
             archs: 'x86_64'
@@ -27,12 +27,24 @@ jobs:
             cibw-manylinux-image: ''
             cibw-before-build: 'python -m pip install --upgrade delocate toml && python update_deps.py'
 
-          # Modern macOS (>=13.3) for Python 3.10
+          # Legacy macOS (arm64) for Apple Silicon Macs on macOS 11.0-13.2
           - os: macos-14
-            job-id: 'macos-modern'
+            job-id: 'macos-legacy-arm64'
+            cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
+            cibw-macos-min: '11.0'
+            archs: 'arm64'
+            numpy-constraint: 'numpy<2'
+            onnx-constraint: 'onnxruntime==1.16.3'
+            cibw-repair-command: 'delocate-wheel --require-archs {archs} -w {dest_dir} -v {wheel}'
+            cibw-manylinux-image: ''
+            cibw-before-build: 'python -m pip install --upgrade delocate toml && python update_deps.py'
+
+          # Modern macOS (arm64) for Apple Silicon Macs on macOS 13.3+
+          - os: macos-14
+            job-id: 'macos-modern-arm64'
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
             cibw-macos-min: '13.3'
-            archs: 'auto'
+            archs: 'arm64'
             numpy-constraint: 'numpy>=2.0.0'
             onnx-constraint: 'onnxruntime>=1.19.0'
             cibw-repair-command: ''
@@ -143,4 +155,4 @@ jobs:
       - name: Publish distribution to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository_url: https://test.pypi.org/legacy/
+          repository-url: https://test.pypi.org/legacy/
