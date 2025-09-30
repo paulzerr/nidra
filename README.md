@@ -5,7 +5,7 @@
     <td width="200" valign="top"><img src="docs/logo.png" alt="NIDRA Logo" width="200"/></td>
     <td valign="top">
       <ul>
-        <li></li>
+        <li>Neural networks can perform highly accurate, automated sleep scoring, but these technologies are often difficult to implement.</li>  
         <li>NIDRA is a simple-to-use tool for scoring sleep recordings using the best currently available autoscoring machine learning algorithms. No programming required, but a CLI and python endpoints are available.</li>
         <li>NIDRA can accurately autoscore data from polysomnography (PSG) recordings, as well as from 2-channel EEG wearables (such as ZMax).</li>
         <li>NIDRA enables anyone, including researchers without any programming experience, to use cutting-edge sleep scoring models.</li>
