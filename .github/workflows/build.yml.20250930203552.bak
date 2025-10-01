@@ -198,7 +198,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
-      id-token: write  #trusted publishing
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
     steps:
       - name: Download all wheel packages
         uses: actions/download-artifact@v4

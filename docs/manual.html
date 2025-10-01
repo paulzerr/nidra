@@ -52,46 +52,44 @@
             <p><strong>Note:</strong> due to the restrictive environment of Windows, you may see a "Search on app store" popup window. Click "No". You may also see the blue Smartscreen warning. In that case click "run anyway". Should this fail, try installing via pip (see below).</p>
             <br>
             <h3>Option 2: Install from PyPI</h3>
-            <p>First, make sure you have Python installed (3.10 or later recommended). We suggest installing via <a href="https://www.anaconda.com/download/success">Miniconda</a>.</p>
-            <p>Before installing NIDRA, it is highly recommended to create and activate a new virtual environment. This prevents conflicts with other packages.</p>
-            <p><strong>To create a virtual environment (choose one):</strong></p>
-            <p>1. Using <code>venv</code> (built-in):</p>
-            <pre><code># Create the environment
-python3 -m venv nidra-env
-# Activate it
-# On Windows:
+            <p>First, make sure you have Python installed (3.10 or later recommended). 
+            <p>It is highly recommended to create a clean virtual environment to install NIDRA. This prevents conflicts with other packages.</p>
+            <p><strong>Windows:</strong></p>
+            <pre><code>python -m venv nidra-env
 nidra-env\Scripts\activate
-# On macOS/Linux
-source nidra-env/bin/activate</code></pre>
-            <p>2. Using <code>conda</code>:</p>
-            <pre><code># Create and activate the environment
-conda create -n nidra-env python=3.10
-conda activate nidra-env</code></pre>
-            <p>Once your environment is activated, install NIDRA using pip:</p>
-            <pre><code>pip install nidra</code></pre>
-            <p>Once installed, you can launch the graphical interface by running the command: </p>
+pip install nidra</code></pre>
+            <p><strong>Mac/Linux:</strong></p>
+            <pre><code>python -m venv nidra-env
+source nidra-env/bin/activate
+pip install nidra</code></pre>
+            <p><strong>Or install using Conda (Windows/Mac/Linux):</strong></p>
+            <a>First install <a href="https://www.anaconda.com/download/success">Miniconda</a>.</p>
+            <pre><code>conda create -n nidra-env
+conda activate nidra-env
+pip install nidra</code></pre>
+            <p>Launch the graphical interface:</p>
             <pre><code>nidra</code></pre>
-            <p><strong>Note:</strong> If you installed NIDRA via pip, the first time you run a scoring process, the necessary model files will be automatically downloaded from <a href="https://huggingface.co/pzerr/NIDRA_models/">https://huggingface.co/pzerr/NIDRA_models/</a> (~152MB). </p>
+            <p><strong>Note:</strong> If you installed via pip, the first time you run NIDRA, the necessary model files will be automatically downloaded from <a href="https://huggingface.co/pzerr/NIDRA_models/">https://huggingface.co/pzerr/NIDRA_models/</a> (~152MB). </p>
             <br>
             <h3>Option 3: Install from source</h3>
             <p><strong>macOS and Linux:</strong></p>
-            <pre><code>git clone https://codeberg.org/pzerr/NIDRA.git
+            <pre><code>git clone https://github.com/paulzerr/nidra.git
 cd NIDRA
-python3 -m venv .venv
-source .venv/bin/activate
+python -m venv nidra-env
+source nidra-env/bin/activate
 pip install .</code></pre>
             <p><strong>Windows:</strong></p>
-            <pre><code>git clone https://codeberg.org/pzerr/NIDRA.git
+            <pre><code>git clone https://github.com/paulzerr/nidra.git
 cd NIDRA
-python -m venv .venv
-.venv\Scripts\activate
+python -m venv nidra-env
+nidra-env\Scripts\activate
 pip install .</code></pre>
         </section>
 
         <section id="gui-guide">
             <h2>Graphical User Interface (GUI)</h2>
             <p>The GUI provides an intuitive, point-and-click way to score sleep recordings. The easiest way to launch the GUI is by running the standalone executable. If you installed NIDRA as a package, you can launch it by opening your terminal and running the command: <code>nidra</code></p>
-            <img src="gui.png" alt="Screenshot of the NIDRA GUI" style="width: 100%; max-width: 960px; display: block; margin: 20px 0;">
+            <img src="gui.png" alt="Screenshot of the NIDRA GUI" style="width: 90%; display: block; margin: 20px 0;">
             <p><b>Fig.1</b> - Screenshot of the GUI</p>
             <h3>Quick Guide</h3>
             <ol>
@@ -108,13 +106,13 @@ pip install .</code></pre>
 
         <section id="preparing-data">
             <h2>Preparing Your Data</h2>
-            <p>For NIDRA to process your recordings correctly, your files and folders must be organized in a specific way. Please follow these guidelines to avoid errors.</p>
-            <h3>General Requirements</h3>
+            <p>For NIDRA to process your recordings, your files and folders must be organized in a specific way.</p>
+
             <ul>
-                <li><strong>File Format:</strong> NIDRA exclusively works with European Data Format (.edf) files.</li>
-                <li><strong>Channel Labels:</strong> Ensure your EDF files have standard channel labels (e.g., 'EEG Fpz-Cz', 'EOG left', 'Fp1', 'O2-M1') for PSG data, as NIDRA uses these to identify channel types.</li>
+                <li><strong>File Format:</strong> Currently NIDRA exclusively works with European Data Format (.edf) files.</li>
+                <li><strong>Channel Labels:</strong> Ideally your EDF files have standard channel labels (e.g., 'EEG Fpz-Cz', 'EOG left', 'Fp1', 'O2-M1') for PSG data, as NIDRA uses these to identify channel types.</li>
             </ul>
-            <h3>Data Structure Guide</h3>
+
             <p>Whether you are scoring a single file or batch processing, NIDRA expects each recording session to be in its own folder. When using the "Score all subdirectories" mode, NIDRA will treat every subfolder in your input directory as a separate recording.</p>
             <p><strong>Structure for Forehead EEG (e.g., ZMax):</strong></p>
             <p>For two-channel forehead EEG data, the left and right channel files must be in the same directory. For ZMax data, these are typically named <code>EEG_L.edf</code> and <code>EEG_R.edf</code>.</p>
@@ -128,7 +126,7 @@ forehead_study/
 |   └── night01_R.edf
 </pre>
             <p><strong>Structure for PSG:</strong></p>
-            <p>For PSG data, each EDF file should be in its own directory. NIDRA can process multiple recordings in subdirectories, as shown in this example with three recordings:</p>
+            <p>Similarly, for PSG data, each EDF file should be in its own directory. NIDRA can process multiple recordings in subdirectories, as shown in this example with three recordings:</p>
             <pre>
 psg_study/
 ├── subject_02/
@@ -185,40 +183,38 @@ psg_study/
             <h3>The Output Files</h3>
             <p>For each recording, NIDRA generates up to four files:</p>
             <ul>
-                <li><strong>Hypnogram File (<code>..._hypnogram.csv</code>):</strong> This is the main output. It's a CSV file with a single column of numbers, where each number is the sleep stage for one 30-second epoch.</li>
-                <li><strong>Probabilities File (<code>..._probabilities.csv</code>):</strong> This file contains the raw probabilities for each sleep stage for every epoch. Each row corresponds to an epoch, and each column corresponds to a sleep stage (Wake, N1, N2, N3, REM, Artifact). This is useful for advanced analysis of model confidence.</li>
-                <li><strong>Dashboard Plot (<code>..._dashboard.png</code>):</strong> An image that visualizes the hypnogram and underlying data, showing the progression of sleep stages over the night.</li>
-                <li><strong>Sleep Statistics (<code>..._sleep_statistics.csv</code>):</strong> A CSV file with a detailed summary of sleep metrics like Total Sleep Time, Sleep Efficiency, and time spent in each stage.</li>
+                <li><strong>Hypnogram File (<code>..._hypnogram.csv</code>):</strong> A CSV file with a single column of numbers, where each number is the sleep stage for one 30-second epoch.</li>
+                <li><strong>Probabilities File (<code>..._probabilities.csv</code>):</strong> This file contains the raw classifier probabilities for each sleep stage for every epoch. Each row corresponds to an epoch, and each column corresponds to a sleep stage (Wake, N1, N2, N3, REM, Artifact).</li>
+                <li><strong>Dashboard Plot (<code>..._dashboard.png</code>):</strong> A graph with a hypnogram, a time-frequency representation, and a hypnodensity plot visualizing classifier probabilities.</li>
+                <li><strong>Sleep Statistics (<code>..._sleep_statistics.csv</code>):</strong> A summary of sleep metrics like Total Sleep Time, Sleep Efficiency, and time spent in each stage.</li>
             </ul>
             
             <h3>Sleep Stage Key</h3>
             <p>The hypnogram uses the following standard numeric codes for sleep stages:</p>
             <ul>
                 <li><strong>0:</strong> Wake</li>
-                <li><strong>1:</strong> NREM1</li>
-                <li><strong>2:</strong> NREM2</li>
-                <li><strong>3:</strong> NREM3</li>
+                <li><strong>1:</strong> N1</li>
+                <li><strong>2:</strong> N2</li>
+                <li><strong>3:</strong> N3</li>
                 <li><strong>5:</strong> REM</li>
                 <li><strong>6:</strong> Artifact</li>
             </ul>
         </section>
 
         <section id="cli-guide">
-            <h2>CLI Guide: Automating Scoring</h2>
-            <p>The Command-Line Interface (CLI) is a powerful feature for processing large datasets and integrating NIDRA into automated workflows.</p>
-            <h3>Basic Command Structure</h3>
-            <p>The fundamental command is <code>nidra score</code>. You must provide the input path, output directory, and the type of scorer.</p>
+            <h2>Commandline interface (CLI)</h2>
+            <p>The basic command is <code>nidra score</code>. You must provide the input path, output directory, and the type of scorer.</p>
             <pre><code>nidra score --input_path /path/to/data --output_dir /path/to/output --scorer_type forehead</code></pre>
             <h3>Example: Batch Processing a Full Study</h3>
             <p>Let's say you have a study with data structured as recommended in the "Preparing Your Data" section. You can process all subjects with a single command by pointing the <code>--input_path</code> to the main study directory.</p>
             <pre><code>nidra score --input_path /my_study_data/ --output_dir /my_study_results/ --scorer_type forehead --model_name ez6moe</code></pre>
-            <p>NIDRA will automatically find the subdirectories (subject_01, subject_02, etc.), process each one, and place the results in a correspondingly named folder inside <code>/my_study_results/</code>.</p>
+            <p>NIDRA will automatically find the subdirectories, process the recording in each one, and place the results in a correspondingly named folder inside <code>/my_study_results/</code>.</p>
         </section>
 
         <section id="python-package">
-            <h2>Python Package: Advanced Integration</h2>
-            <p>Using NIDRA as a Python package provides the ultimate flexibility, allowing you to integrate automated scoring directly into your data analysis pipelines.</p>
-            <h3>Core Concept: The Scorer Factory</h3>
+            <h2>Python Endpoints</h2>
+            <p>You can use NIDRA as a Python package to integrate automated scoring directly into your data analysis pipelines.</p>
+
             <p>The main entry point is the <code>NIDRA.scorer()</code> factory function. You call this function to create a scorer instance, providing it with the configuration for your scoring task. Then, you call the <code>.score()</code> method on the returned object to run the analysis.</p>
             
             <h4><code>NIDRA.scorer(...)</code> Parameters</h4>
@@ -240,7 +236,7 @@ psg_study/
             <h4><code>scorer.score(...)</code> Method</h4>
             <p>This method runs the scoring process. It takes one optional argument:</p>
             <ul>
-                <li><code>plot</code> (bool, optional): If <code>True</code>, a dashboard plot will be generated. Defaults to <code>False</code>.</li>
+                <li><code>plot</code> (bool, optional): If <code>True</code>, a graph will be generated. Defaults to <code>False</code>.</li>
             </ul>
             <p><strong>Returns:</strong></p>
             <p>The method returns a tuple containing two NumPy arrays:</p>
@@ -265,40 +261,34 @@ scorer = NIDRA.scorer(
 # Run scoring
 hypnogram, probabilities = scorer.score(plot=True)
 
-print("Scoring complete.")
-print("Hypnogram shape:", hypnogram.shape)
-print("Probabilities shape:", probabilities.shape)
 </pre>
 
             <h3>Example 2: Scoring In-Memory NumPy Data</h3>
-            <p>You can also score data that you already have in memory as a NumPy array, bypassing the need for file I/O. This is useful for real-time applications or custom data loading pipelines. When scoring PSG data from an array, you must provide the sampling frequency (<code>sfreq</code>). Providing channel names is recommended but optional; if not provided, they will be auto-generated.</p>
+            <p>You can also score data that you already have in memory as a NumPy array. This is useful for real-time applications or custom data loading pipelines. When scoring PSG data from an array, you must provide the sampling frequency (<code>sfreq</code>). Providing channel names is recommended but optional; if not provided, they will be auto-generated. All channels are then assumed to contain EEG data.</p>
             <pre>
 import NIDRA
 import numpy as np
 
-# --- Create some dummy PSG data ---
+# Create some dummy PSG data
 sfreq = 256
 ch_names = ['F3-A2', 'C4-A1', 'O2-A1', 'EOG-L']
 n_samples = sfreq * 60 * 60  # 1 hour of data
 dummy_data = np.random.randn(len(ch_names), n_samples)
 
-# --- Initialize and run the scorer ---
 scorer = NIDRA.scorer(
     scorer_type='psg',
     output_dir='/path/to/numpy_psg_output',
     data=dummy_data,
-    sfreq=sfreq,
-    ch_names=ch_names  # This parameter is optional
+    sfreq=sfreq
 )
 hypnogram, probabilities = scorer.score()
+
 </pre>
             <h3>Example 3: Batch Processing a Study</h3>
             <p>For batch processing, NIDRA provides a convenient <code>batch_scorer</code>. This function automatically discovers all valid recordings in the subdirectories of your input path, mirroring the behavior of the GUI. This is the recommended way to process a full study. Please see the <a href="#preparing-data">Preparing Your Data</a> section for details on how to structure your study directory.</p>
             <pre>
 import NIDRA
 
-# --- 1. Initialize the batch scorer ---
-# Provide the path to your main study directory and where the results should go.
 batch = NIDRA.batch_scorer(
     input_dir='/path/to/your/study_data',
     output_dir='/path/to/your/study_output',
@@ -306,53 +296,12 @@ batch = NIDRA.batch_scorer(
     model_name='ez6moe'
 )
 
-# --- 2. Run the scoring process ---
-# This will find and score all recordings.
-# The results for each recording will be saved in a subfolder within a timestamped batch_run_* directory.
-processed_count, total_found = batch.score(plot=True, gen_stats=True)
+batch.score(plot=True, gen_stats=True)
 
-print(f"Batch processing complete. Successfully scored {processed_count} out of {total_found} recordings.")
+
+
 </pre>
             <p>This simplified approach removes the need to manually loop through directories and handle file paths, making your analysis scripts cleaner and more reliable.</p>
-        </section>
-
-        <section id="install-from-source">
-            <h2>Install from Source Code</h2>
-            <p>For developers or users who need the latest (potentially unstable) version, NIDRA can be installed by cloning the git repository:</p>
-            <ol>
-                <li><strong>Clone the repository:</strong>
-                    <pre><code>git clone https://codeberg.org/pzerr/NIDRA.git
-cd NIDRA</code></pre>
-                </li>
-                <li><strong>Create and activate a virtual environment:</strong>
-                    <p>On macOS and Linux:</p>
-                    <pre><code>python3 -m venv .venv
-source .venv/bin/activate</code></pre>
-                    <p>On Windows:</p>
-                    <pre><code>python -m venv .venv
-.venv\Scripts\activate</code></pre>
-                </li>
-                <li><strong>Install the package:</strong>
-                    <pre><code>pip install .</code></pre>
-                </li>
-            </ol>
-            <h4>(Optional) Building the Executable</h4>
-            <p>After installing from source, you can also build the standalone executable yourself. This is useful for distributing your own modified version of NIDRA.</p>
-            <p>The repository includes build scripts for each operating system located in the <code>setup/</code> directory.</p>
-            <ol>
-                <li><strong>Navigate to the setup directory:</strong>
-                    <pre><code>cd setup</code></pre>
-                </li>
-                <li><strong>Run the build script for your OS:</strong>
-                    <p>On macOS and Linux:</p>
-                    <pre><code>./build.sh</code></pre>
-                    <p>On Windows:</p>
-                    <pre><code>build.bat</code></pre>
-                </li>
-                <li><strong>Find the executable:</strong>
-                    <p>Once the script finishes, the final executable will be located in the <code>dist</code> directory at the root of the project.</p>
-                </li>
-            </ol>
         </section>
 
         <section id="how-to-cite">
@@ -361,7 +310,7 @@ source .venv/bin/activate</code></pre>
             <h3>1. Citing the NIDRA Software</h3>
             <p>Please cite this repository to ensure reproducibility:</p>
             <pre>
-Zerr, P. (2025). NIDRA: Neural Inferencer for Deep Rest Analysis. Codeberg. https://codeberg.org/pzerr/NIDRA
+Zerr, P. (2025). NIDRA: super simple sleep scoring. GitHub. https://github.com/paulzerr/nidra
 </pre>
             <h3>2. Citing the Scoring Model</h3>
             <p><strong>If you used the ez6 or ez6moe models:</strong></p>
@@ -380,7 +329,14 @@ Rossi, A. D., et al. (2025). "SLEEPYLAND: trust begins with fair evaluation of a
             <h2>FAQ & Troubleshooting</h2>
             <h3>Installation Issues</h3>
             <p><strong>Q: I'm having trouble installing with pip. What can I do?</strong><br>
-            A: Ensure you are using a recent version of Python (3.10+) and pip. It is highly recommended to install NIDRA in a virtual environment to avoid conflicts. Try running <code>pip install --upgrade pip</code> before installing NIDRA.</p>
+            A: Installation problems can be frustrating, but they are often solvable. Here are a few common troubleshooting steps:
+            <ul>
+                <li><strong>1. Update Core Packages:</strong> Ensure you have the latest versions of pip, setuptools, and wheel, as outdated versions can cause issues. You can update them by running:
+                    <pre><code>pip install --upgrade pip setuptools wheel</code></pre>
+                </li>
+                <li><strong>2. Use a Clean Virtual Environment:</strong> Conflicts with other installed packages are a common source of errors. Creating a fresh virtual environment ensures that NIDRA's dependencies are installed in an isolated space. If you are still having issues, try creating a new environment from scratch.</li>
+                <li><strong>3. Try Installing with Conda:</strong> If pip continues to fail, installing NIDRA via a Conda environment can be a more reliable alternative. Conda's package management is often better at resolving complex dependencies. Follow the Conda installation instructions in the <a href="#installation">Installation</a> section.</li>
+            </ul></p>
             <h3>GUI Issues</h3>
             <p><strong>Q: The GUI window is not appearing when I run <code>nidra</code>.</strong><br>
             A: Check the terminal for any error messages. This could be due to a missing dependency. Try reinstalling NIDRA in a clean virtual environment.</p>
