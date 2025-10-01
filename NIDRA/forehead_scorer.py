@@ -59,11 +59,11 @@ class ForeheadScorer:
             filename=plot_filename,
             scorer_type='forehead'
         )
+        print(f"Dashboard plot saved to {self.output_dir / plot_filename}")
 
     def _load_model(self):
         model_filename = f"{self.model_name}.onnx"
         if utils.get_app_dir():
-            # Use importlib.resources to access model files within the package
             try:
                 with importlib.resources.path('NIDRA.models', model_filename) as model_file:
                     self.session = ort.InferenceSession(str(model_file))

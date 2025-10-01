@@ -9,8 +9,7 @@ def run_cli():
     """
     Run the scorer from the command line.
     """
-    # Download models on first run
-    download_models()
+    download_models() # download models on first run
     parser = argparse.ArgumentParser(description="NIDRA")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 

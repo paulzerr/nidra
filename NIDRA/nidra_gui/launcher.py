@@ -14,18 +14,13 @@ import importlib.resources
 from werkzeug.serving import make_server
 
 def get_resource_path(relative_path):
-    # PyInstaller creates a temp folder and stores path in _MEIPASS
     bundle_dir = utils.get_app_dir()
     if bundle_dir:
         return os.path.join(bundle_dir, relative_path)
-
-    # For installed packages
     try:
         package_resources = importlib.resources.files('NIDRA.nidra_gui')
         return str(package_resources.joinpath(relative_path))
     except (ModuleNotFoundError, AttributeError):
-        # Fallback for development mode
-        print("dev mode activate")
         base_path = os.path.abspath(Path(__file__).parent)
         return os.path.join(base_path, relative_path)
 
@@ -143,7 +138,6 @@ def main():
             server.join()
 
     print("Server has shut down. Exiting.")
-
 
 if __name__ == '__main__':
     main()

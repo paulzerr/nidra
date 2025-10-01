@@ -120,7 +120,7 @@ def plot_hypnodensity(hyp, ypred, raw, nclasses=6, figoutdir='./', filename='das
         The type of scorer ('forehead' or 'psg'), which determines the plot layout.
     """
     try:
-        logger.info(f"Starting dashboard plot generation for {scorer_type}")
+        logger.info(f"Scoring complete. Making graph...")
 
         # Set plot style
         sns.set_style("white")

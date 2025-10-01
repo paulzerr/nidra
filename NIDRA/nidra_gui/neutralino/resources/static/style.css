@@ -1,8 +1,8 @@
 /* --- CSS Variables and Reset --- */
 :root {
-    --ui-scale: 1rem;      /* For layout, padding, etc. */
-    --font-scale: 1rem;    /* For font sizes */
-    --border-radius: 0.5rem; /* Stays relative to UI scale */
+    --ui-scale: 1rem;     
+    --font-scale: 1rem;    
+    --border-radius: 0.5rem; 
     --text-color: #333;
     --primary-color: #1a6887;
     --light-gray: #f0f2f5;
@@ -15,9 +15,6 @@
     padding: 0;
 }
 
-/* html {
-} */
- 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--light-gray);
@@ -26,10 +23,9 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: var(--font-scale); /* Apply base font size */
+    font-size: var(--font-scale);
 }
 
-/* --- Main Layout --- */
 .container {
     display: flex;
     width: 95vw;
@@ -63,13 +59,12 @@ body {
     padding-left: calc(3 * var(--ui-scale));
 }
 
-/* --- Controls & Typography --- */
 .control-group {
     margin-bottom: calc(1.5 * var(--ui-scale));
 }
 
 .control-group h2 {
-    font-size: 1.2em; /* Relative to parent font size */
+    font-size: 1.2em;
     font-weight: 600;
     margin-bottom: calc(1 * var(--ui-scale));
     color: #1a1a1a;
@@ -87,7 +82,6 @@ label {
     color: var(--text-color);
 }
 
-/* --- Input Elements --- */
 .file-input-group {
     display: flex;
     align-items: center;
@@ -137,7 +131,7 @@ input[type="text"], select {
 
 input[type="radio"], input[type="checkbox"] {
     margin-right: var(--ui-scale);
-    width: calc(1.4 * var(--font-scale)); /* Scale with font size */
+    width: calc(1.4 * var(--font-scale));
     height: calc(1.4 * var(--font-scale));
     accent-color: var(--primary-color);
 }
@@ -178,15 +172,15 @@ input[type="radio"], input[type="checkbox"] {
 
 .help-btn {
     flex-shrink: 0;
-    width: 100%; /* Make buttons fill the container */
+    width: 100%; 
 }
 
 .help-button-stack {
     display: flex;
     flex-direction: column;
     gap: var(--ui-scale);
-    flex-shrink: 0; /* Prevent the stack from shrinking */
-    width: 35%; /* Adjust width as needed */
+    flex-shrink: 0; 
+    width: 35%;
 }
 
 /* --- Run Button --- */

@@ -224,10 +224,10 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
         is_scoring_running = False
         if total_count > 0:
             if success_count == total_count:
-                logger.info(f"Successfully processed all {total_count} recordings.")
+                logger.info(f"Successfully processed {total_count} recording(s).")
             elif 0 < success_count < total_count:
                 logger.info(f"Autoscoring completed with {total_count - success_count} failure(s): "
-                            f"Successfully processed {success_count} of {total_count} recordings.")
+                            f"Successfully processed {success_count} of {total_count} recording(s).")
             elif success_count == 0:
                 logger.info("Autoscoring failed for all recordings.")
 

@@ -1,7 +1,5 @@
 function initializeApp() {
     // --- Dynamic UI Scaling ---
-
-    // Adjust these constants to fine-tune the UI's appearance.
     const BASE_UI_SCALE = 1.4; // Overall size of UI elements (padding, margins, etc.)
     const BASE_FONT_SCALE = 2.4; // Overall font size
 
@@ -14,34 +12,21 @@ function initializeApp() {
         const root = document.documentElement;
 
         let scale;
-        // If the aspect ratio is within a certain threshold of the target,
-        // use a simpler scaling method to avoid distortion.
         if (Math.abs(current_ap - apect_ratio) < apect_ratio_threshold) {
-            // Scale based on width when close to the target aspect ratio
             scale = clientWidth / 100;
         } else {
-            // More robust scaling for other aspect ratios
             scale = Math.min(clientWidth / (100 * 1.6), clientHeight / (100 * 0.9));
         }
 
         // --- Cross-platform DPI Scaling ---
-        // Adjust scaling based on the device's pixel ratio. This is crucial for
-        // ensuring the UI looks consistent on high-DPI displays (like Apple's
-        // Retina screens), especially on macOS where this can be an issue.
         const dpi = window.devicePixelRatio || 1;
         const effective_scale = scale / dpi;
 
-
-        // Set the CSS variables for independent scaling
         root.style.setProperty('--ui-scale', `${effective_scale * BASE_UI_SCALE}px`);
         root.style.setProperty('--font-scale', `${effective_scale * BASE_FONT_SCALE}px`);
     }
 
-
-    // Initial scaling
     scaleUi();
-
-    // --- Event Listeners ---
 
     // Rescale UI on window resize
     window.addEventListener('resize', scaleUi);
@@ -58,13 +43,10 @@ function initializeApp() {
     let logInterval;
     let statusInterval;
 
-    // --- Event Listeners ---
-
     // Handle Data Source change to update model list
     dataSourceSelect.addEventListener('change', () => {
         const selectedSource = dataSourceSelect.value;
-        // Assuming config.TEXTS is available globally via the template
-        if (selectedSource.includes('PSG')) { // A bit brittle, but works with current text
+        if (selectedSource.includes('PSG')) { 
             modelNameSelect.innerHTML = '<option value="u-sleep-nsrr-2024" selected>u-sleep-nsrr-2024</option>';
         } else {
             modelNameSelect.innerHTML = `
@@ -124,10 +106,9 @@ function initializeApp() {
 
             if (response.ok && result.status === 'success') {
                 document.getElementById(targetInputId).value = result.path;
-                // Automatically set default output path when input is selected
                 if (targetInputId === 'input-dir') {
                     const outputDirInput = document.getElementById('output-dir');
-                    if (!outputDirInput.value) { // Only set if output is empty
+                    if (!outputDirInput.value) {
                         outputDirInput.value = result.path + '/autoscorer_output';
                     }
                 }
@@ -149,32 +130,26 @@ function initializeApp() {
     browseOutputDirBtn.addEventListener('click', () => handleBrowseClick('output-dir'));
 
     showExampleBtn.addEventListener('click', async () => {
-        // Immediately start polling for logs to show download progress
         startPolling();
-        // We don't set running state here, as the main scoring hasn't started yet.
-        // The backend will log progress which will appear in the console.
 
         try {
-            // This fetch will wait until the download on the backend is complete
             const response = await fetch('/show-example', { method: 'POST' });
             const result = await response.json();
 
             if (response.ok && result.status === 'success') {
-                // Once download is complete, fill paths and click run
                 document.getElementById('input-dir').value = result.path;
                 document.getElementById('output-dir').value = result.path + '/autoscorer_output';
                 document.querySelector('input[name="scoring-mode"][value="single"]').checked = true;
                 
-                // Now, click the run button to start the actual scoring process
                 runBtn.click();
             } else {
                 alert(`Error showing example: ${result.message}`);
-                stopPolling(); // Stop polling on error
+                stopPolling(); 
             }
         } catch (error) {
             console.error('Failed to run example:', error);
             alert('An error occurred while trying to run the example.');
-            stopPolling(); // Stop polling on error
+            stopPolling();
         }
     });
 
@@ -187,11 +162,9 @@ function initializeApp() {
     }
 
     function startPolling() {
-        // Clear any existing intervals
         if (logInterval) clearInterval(logInterval);
         if (statusInterval) clearInterval(statusInterval);
 
-        // Start new polling
         logInterval = setInterval(fetchLogs, 1000); // Poll logs every second
         statusInterval = setInterval(checkStatus, 2000); // Check status every 2 seconds
     }
@@ -214,7 +187,7 @@ function initializeApp() {
             return logText;
         } catch (error) {
             console.error('Error fetching logs:', error);
-            return ""; // Return empty string on error to prevent breaking checks
+            return ""; 
         }
     }
 
@@ -225,31 +198,22 @@ function initializeApp() {
             if (!data.is_running) {
                 setRunningState(false);
                 stopPolling();
-                // Final log fetch to ensure we have the latest output
                 setTimeout(fetchLogs, 500);
             }
         } catch (error) {
             console.error('Error checking status:', error);
-            // If status check fails, stop polling to avoid flooding with errors
             setRunningState(false);
             stopPolling();
         }
     }
 
-    // --- Initial Load ---
-    // Fetch the logs as soon as the page loads to display any startup messages
-    // from the server, such as system info or model download status.
-    // Poll for logs during startup to show model download progress.
     const startupLogInterval = setInterval(async () => {
         const logText = await fetchLogs();
-        // Stop polling once the welcome message is visible, indicating startup is complete.
         if (logText.includes('Welcome to NIDRA')) {
             clearInterval(startupLogInterval);
         }
-    }, 1000); // Poll every second
+    }, 1000);
 
-    // Also, check the status immediately in case a scoring task was somehow
-    // running before the GUI was opened.
     checkStatus();
 
     // --- Ping Server ---
