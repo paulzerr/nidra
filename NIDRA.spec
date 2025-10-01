@@ -3,31 +3,10 @@ import sys
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
-# Collect only the necessary MNE modules to reduce bundle size
-mne_modules_to_include = [
-    'mne.io',
-    'mne.filter',
-    'mne.utils',
-    'mne.channels',
-    'mne.annotations',
-    'mne.transforms',
-    'mne.surface',
-    'mne.bem',
-    'mne.externals',
-    'mne.cov',
-]
-
-# Collect hidden imports from these specific modules
-mne_hiddenimports = ['mne']  # Start with the top-level package
-for mod in mne_modules_to_include:
-    mne_hiddenimports.extend(collect_submodules(mod))
-
-# Collect data files from modules that are likely to have them
-mne_datas = []
-mne_datas.extend(collect_data_files('mne.io'))
-mne_datas.extend(collect_data_files('mne.channels'))
-mne_datas.extend(collect_data_files('mne.filter'))
-mne_datas.extend(collect_data_files('mne', subdir='data', include_py_files=False))
+# Collect MNE data files and hidden imports to ensure all necessary files are included,
+# especially .pyi stubs for lazy_loader, which was causing build failures.
+mne_datas = collect_data_files('mne', include_py_files=True)
+mne_hiddenimports = collect_submodules('mne')
 
 a = Analysis(
     ['NIDRA/nidra_gui/launcher.py'],
@@ -41,13 +20,13 @@ a = Analysis(
     ] + mne_datas,  # merge mne datas into your project datas
     hiddenimports=[
         'decorator',
-        # Only include the scipy modules that are actually used to reduce bundle size.
-        # scipy.signal is used for signal processing (e.g., resample_poly).
-        # scipy.io is a dependency for mne.io.
-        'scipy.signal',
-        'scipy.io',
         'webview',
-    ] + mne_hiddenimports,  # merge mne hiddenimports
+        'scipy',
+        'pandas',
+    ]
+    + collect_submodules('scipy')
+    + collect_submodules('pandas')
+    + mne_hiddenimports,  # merge mne hiddenimports
     hookspath=[],  # no external hook files needed
     hooksconfig={},
     runtime_hooks=[],
