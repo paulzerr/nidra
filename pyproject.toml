@@ -30,10 +30,10 @@ dependencies = [
     "requests",
     "pywebview",
     "psutil",
-    "numpy<2 ; sys_platform == 'darwin'",
-    "onnxruntime==1.16.3 ; sys_platform == 'darwin'",
-    "numpy>=2.0.0 ; sys_platform != 'darwin'",
-    "onnxruntime>=1.19.0 ; sys_platform != 'darwin'",
+    "numpy<2 ; sys_platform == 'darwin' and platform_release < '23.0.0'",
+    "onnxruntime==1.16.3 ; sys_platform == 'darwin' and platform_release < '23.0.0'",
+    "numpy>=2.0.0 ; sys_platform != 'darwin' or (sys_platform == 'darwin' and platform_release >= '23.0.0')",
+    "onnxruntime>=1.19.0 ; sys_platform != 'darwin' or (sys_platform == 'darwin' and platform_release >= '23.0.0')",
 ]
 
 [project.urls]

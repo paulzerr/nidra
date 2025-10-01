@@ -8,56 +8,11 @@ on:
     branches: [ master ]
 
 jobs:
-  build_wheels:
-    name: Build wheels for ${{ matrix.job-id }} on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        job-id: ['macos-x86_64', 'macos-arm64', 'windows', 'linux']
-        include:
-          # Legacy macOS (x86_64) for all Intel Macs, macOS 10.15+
-          - job-id: 'macos-x86_64'
-            os: macos-14
-            cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
-            cibw-macos-min: '10.15'
-            archs: 'x86_64'
-            cibw-repair-command: 'delocate-wheel --require-archs {archs} -w {dest_dir} -v {wheel}'
-            cibw-manylinux-image: ''
-            cibw-before-build: 'python -m pip install --upgrade delocate toml && python update_version.py'
-
-          # Legacy macOS (arm64) for Apple Silicon Macs on macOS 11.0-13.2
-          - job-id: 'macos-arm64'
-            os: macos-14
-            cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
-            cibw-macos-min: '11.0'
-            archs: 'arm64'
-            cibw-repair-command: ''
-            cibw-manylinux-image: ''
-            cibw-before-build: 'python -m pip install --upgrade delocate toml && python update_version.py'
-
-
-
-          # Windows for Python 3.10
-          - job-id: 'windows'
-            os: windows-latest
-            cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
-            archs: 'auto'
-            cibw-repair-command: ''
-            cibw-manylinux-image: ''
-            cibw-macos-min: ''
-            cibw-before-build: 'python -m pip install toml && python update_version.py'
-
-          # Linux for Python 3.10 (builds sdist by default)
-          - job-id: 'linux'
-            os: ubuntu-latest
-            cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
-            archs: 'auto'
-            cibw-repair-command: ''
-            cibw-manylinux-image: 'manylinux_2_28'
-            cibw-macos-min: ''
-            cibw-before-build: 'python -m pip install toml && python update_version.py'
-
+  build_and_publish_sdist:
+    name: Build and publish sdist
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # Trusted publishing
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -68,9 +23,9 @@ jobs:
           python-version: '3.12'
 
       - name: Install build dependencies
-        run: python -m pip install --upgrade pip cibuildwheel toml
+        run: python -m pip install --upgrade pip build toml
 
-      - name: Create pre-build script to update version
+      - name: Create script to update version
         run: |
           cat << 'EOF' > update_version.py
           import toml
@@ -94,85 +49,17 @@ jobs:
           EOF
         shell: bash
 
-      - name: Build wheels
-        run: python -m cibuildwheel --output-dir wheelhouse
+      - name: Update version in pyproject.toml
+        run: python update_version.py
         env:
-          CIBW_BUILD: ${{ matrix.cibw-build }}
-          CIBW_ARCHS: ${{ matrix.archs }}
-          CIBW_MACOSX_DEPLOYMENT_TARGET: ${{ matrix.cibw-macos-min }}
-          CIBW_REPAIR_WHEEL_COMMAND_MACOS: ${{ matrix.cibw-repair-command }}
-          CIBW_MANYLINUX_X86_64_IMAGE: ${{ matrix.cibw-manylinux-image }}
-          CIBW_BEFORE_BUILD: ${{ matrix.cibw-before-build }}
-          CIBW_ENVIRONMENT: 'MACOSX_DEPLOYMENT_TARGET=${{ matrix.cibw-macos-min }} GITHUB_RUN_NUMBER="${{ github.run_number }}" GITHUB_REF="${{ github.ref }}"'
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_REF: ${{ github.ref }}
 
-      - name: Upload distribution package
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-dist-${{ matrix.job-id }}
-          path: wheelhouse/
-
-  test_wheels:
-    name: Test wheels for ${{ matrix.job-id }} on ${{ matrix.os }}
-    needs: [build_wheels]
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        job-id: ['macos-x86_64', 'macos-arm64', 'windows', 'linux']
-        include:
-          # Replicate the build matrix for testing
-          - job-id: 'macos-x86_64'
-            os: macos-14
-          - job-id: 'macos-arm64'
-            os: macos-14
-          - job-id: 'windows'
-            os: windows-latest
-          - job-id: 'linux'
-            os: ubuntu-latest
-
-    steps:
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Download wheel package
-        uses: actions/download-artifact@v4
-        with:
-          name: python-dist-${{ matrix.job-id }}
-          path: dist
-
-      - name: Install package
-        run: |
-          pip install --upgrade pip
-          pip install dist/*.whl
-
-      - name: Test package
-        run: |
-          python -c "import NIDRA; print(NIDRA.__version__)"
-  publish-to-pypi:
-    name: Publish Python distribution to PyPI
-    needs: [test_wheels]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    permissions:
-      id-token: write  #trusted publishing
-    steps:
-      - name: Download all wheel packages
-        uses: actions/download-artifact@v4
-        with:
-          pattern: python-dist-*
-          path: dist_temp
-
-      - name: Move packages to dist directory
-        run: |
-          mkdir dist
-          find dist_temp -type f \( -name "*.whl" -o -name "*.tar.gz" \) -exec mv {} dist/ \;
-
-      - name: List downloaded files
-        run: ls -R dist
+      - name: Build sdist
+        run: python -m build --sdist
 
       - name: Publish distribution to TestPyPI
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
