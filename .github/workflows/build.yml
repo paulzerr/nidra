@@ -35,6 +35,8 @@ jobs:
             cibw-manylinux-image: ''
             cibw-before-build: 'python -m pip install --upgrade delocate toml && python update_version.py'
 
+
+
           # Windows for Python 3.10
           - os: windows-latest
             job-id: 'windows'
