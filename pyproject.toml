@@ -28,8 +28,6 @@ nidra = "NIDRA.nidra_gui.launcher:main"
 [tool.setuptools]
 packages = {find = {}}
 
-[tool.setuptools.dynamic]
-dependencies = {file = ["setup.py"]}
 
 [tool.setuptools.package-data]
 "docs" = ["**"]
