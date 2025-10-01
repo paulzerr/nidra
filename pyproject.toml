@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "NIDRA"
-version = "0.1.1"
+version = "0.1.0"
 authors = [
-  { name="Paul Zerr", email="zerr.paul@gmail.com" },
+  { name="pzerr", email="zerr.paul@gmail.com" },
 ]
 description = "A tool for scoring sleep data from PSG and forehead EEG recordings."
 readme = "README.md"
@@ -19,7 +19,7 @@ classifiers = [
 dynamic = ["dependencies"]
 
 [project.urls]
-"Homepage" = "https://github.com/p-zerr/NIDRA"
+"Homepage" = "https://github.com/paulzerr/NIDRA"
 
 [project.scripts]
 nid = "NIDRA.cli:run_cli"

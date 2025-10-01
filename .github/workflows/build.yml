@@ -3,6 +3,8 @@ name: NIDRA Build
 on:
   push:
     branches: [ master ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ master ]
 
@@ -11,7 +13,7 @@ jobs:
     name: Build and publish sdist
     runs-on: ubuntu-latest
     permissions:
-      id-token: write  # Trusted publishing
+      id-token: write  # Trusted publishing on PyPI
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -19,12 +21,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.10'
 
       - name: Install build dependencies
         run: python -m pip install --upgrade pip build toml
 
       - name: Create script to update version
+        if: github.ref == 'refs/heads/master'
         run: |
           cat << 'EOF' > update_version.py
           import toml
@@ -49,6 +52,7 @@ jobs:
         shell: bash
 
       - name: Update version in pyproject.toml
+        if: github.ref == 'refs/heads/master'
         run: python update_version.py
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
@@ -65,7 +69,14 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+      - name: Publish distribution to PyPI
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # This uses trusted publishing, which is configured at the job level
+        # with the `id-token: write` permission.
   build-windows:
+    permissions:
+      contents: write
     runs-on: windows-latest
     timeout-minutes: 20 
 
@@ -83,7 +94,7 @@ jobs:
         with:
           path: ~/.cache/pip
           # The cache key is based on the OS and the contents of requirements.txt
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-
 
@@ -135,21 +146,8 @@ jobs:
           signtool sign /f certificate.pfx /p "${{ secrets.CODE_SIGNING_CERTIFICATE_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "dist/NIDRA.exe"
         shell: bash
 
-      - name: Upload Windows Executable (Internal Artifact)
-        uses: actions/upload-artifact@v4
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
         with:
-          name: NIDRA-Windows
-          path: dist/
-
-      - name: Upload Public Test Artifact to GoFile
-        id: gofile_upload
-        run: |
-          # Upload the file and capture the JSON response
-          response=$(curl -F "file=@dist/NIDRA.exe" https://store1.gofile.io/uploadFile)
-          echo "GoFile Response: $response"
-          # Extract the download page URL from the JSON response
-          download_url=$(echo $response | grep -o '"downloadPage":"[^"]*' | cut -d'"' -f4)
-          echo "Public Download Link: $download_url"
-          # Make the URL available to subsequent steps if needed
-          echo "download_url=$download_url" >> $GITHUB_OUTPUT
-        shell: bash
+          files: dist/NIDRA.exe
