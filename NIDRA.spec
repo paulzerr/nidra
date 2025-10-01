@@ -53,7 +53,7 @@ a = Analysis(
     runtime_hooks=[],
     excludes=['PyQt5', 'notebook', 'jupyter', 'IPython'],
     noarchive=False,
-    optimize=2,
+    optimize=1,
     distpath='dist',
     workpath='build',
 )
@@ -72,7 +72,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=True,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,

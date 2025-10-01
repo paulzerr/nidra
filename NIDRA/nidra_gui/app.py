@@ -10,7 +10,6 @@ import platform
 from NIDRA import scorer as scorer_factory
 from NIDRA import utils
 
-# --- Setup ---
 LOG_FILE, logger = utils.setup_logging()
 
 TEXTS = {
@@ -24,18 +23,18 @@ TEXTS = {
     "CONSOLE_INIT_MESSAGE": "\n\nWelcome to NIDRA, the easy to use sleep autoscorer.\n\nSpecify input folder (location of your sleep recordings) to begin.\n\nTo shutdown NIDRA, simply close this window or tab.",
 }
 
-# Determine the base path for resources, accommodating PyInstaller and standard installs
-bundle_dir = utils.get_app_dir()
-if bundle_dir:
+base_path = utils.get_app_dir()
+if base_path:
     # Running as a PyInstaller bundle
-    template_folder = str(bundle_dir / 'neutralino' / 'resources' / 'templates')
-    static_folder = str(bundle_dir / 'neutralino' / 'resources' / 'static')
-    app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
+    app = Flask(__name__)
+    app.docs_path = base_path / 'docs'
 else:
     # Running as a standard Python package
+    base_path = Path(__file__).parent
     app = Flask(__name__, instance_relative_config=True)
-    app.template_folder = str(Path(__file__).parent / 'neutralino' / 'resources' / 'templates')
-    app.static_folder = str(Path(__file__).parent / 'neutralino' / 'resources' / 'static')
+    app.docs_path = importlib.resources.files('docs')
+app.template_folder = str(base_path / 'neutralino' / 'resources' / 'templates')
+app.static_folder = str(base_path / 'neutralino' / 'resources' / 'static')
 
 # Suppress noisy HTTP request logging
 log = logging.getLogger('werkzeug')
@@ -68,31 +67,13 @@ def index():
     logger.info("\nChecking if autoscoring model files are available...")
     utils.download_models(logger=logger)
     logger.info(TEXTS.get("CONSOLE_INIT_MESSAGE", "Welcome to NIDRA."))
-    # if not _startup_check_done:
-    #     def startup_task():
-    #         """A wrapper to run startup tasks in the correct order."""
-    #         logger.info("Checking if autoscoring model files are available...")
-    #         download_models(logger=logger)
-    #         logger.info(TEXTS.get("CONSOLE_INIT_MESSAGE", "Welcome to NIDRA."))
-
-    #     threading.Thread(target=startup_task, daemon=True).start()
-    #     _startup_check_done = True
 
     return render_template('index.html', texts=TEXTS)
 
 @app.route('/docs/<path:filename>')
 def serve_docs(filename):
     """Serves files from the docs directory."""
-    bundle_dir = utils.get_app_dir()
-    if bundle_dir:
-        # Running as a PyInstaller bundle
-        docs_path = bundle_dir / 'docs'
-    else:
-        # For a standard package, 'docs' is a resource within the 'docs' package
-        # Note: This requires Python 3.9+ for `files()`
-        docs_path = importlib.resources.files('docs')
-
-    return send_from_directory(docs_path, filename)
+    return send_from_directory(app.docs_path, filename)
 
 @app.route('/select-directory')
 def select_directory():
@@ -112,15 +93,10 @@ def select_directory():
             if path:
                 result['path'] = path
         except Exception as e:
-            # On some systems (like Linux without a display server), tkinter can fail.
             logger.error(f"An error occurred in the tkinter dialog thread: {e}", exc_info=True)
             result['error'] = "Could not open the file dialog. Please ensure you have a graphical environment configured."
         finally:
-            try:
-                # This ensures the tkinter root window is always destroyed.
-                root.destroy()
-            except:
-                pass
+            root.destroy()
 
     dialog_thread = threading.Thread(target=open_dialog)
     dialog_thread.start()
@@ -149,7 +125,7 @@ def start_scoring():
     is_scoring_running = True
     logger.info("\n" + "="*80 + "\nStarting new scoring process on python backend...\n" + "="*80)
 
-    # --- Direct Call to the Original Worker Function ---
+    # call scorer
     worker_thread = threading.Thread(
         target=scoring_thread_wrapper,
         args=(
@@ -196,31 +172,66 @@ def show_example():
         logger.error(f"An error occurred while preparing the example: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+# this enables reporting on successful/failed scorings
 def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, model_name, plot, gen_stats):
-    """A wrapper to manage the global running state around the original function."""
+    """
+    Manages the global running state and executes the scoring process.
+    This function is intended to be run in a separate thread.
+    """
     global is_scoring_running
-    success_count, total_count = -1, -1
+    success_count, total_count = 0, 0
     try:
-        success_count, total_count = _run_scoring_worker(
-            input_dir, output_dir, score_subdirs, None, data_source, model_name, plot, gen_stats
-        )
+        scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
+        if score_subdirs:
+            batch = utils.batch_scorer(
+                input_dir=input_dir,
+                output_dir=output_dir,
+                scorer_type=scorer_type,
+                model_name=model_name
+            )
+            success_count, total_count = batch.score(plot=plot, gen_stats=gen_stats)
+        else:
+            # Logic for single scoring.
+            logger.info(f"Searching for recordings in '{input_dir}'...")
+            input_path = Path(input_dir)
+            try:
+                if scorer_type == 'psg':
+                    input_file = next(input_path.glob('*.edf'))
+                else:  # for zmax recordings
+                    input_file = next(input_path.glob('*[lL].edf'))
+                    next(input_path.glob('*[rR].edf')) # Verify zmax EEG_R file exists
+            except StopIteration:
+                if any(item.is_dir() for item in input_path.iterdir()):
+                    raise ValueError(
+                        f"No recordings found in '{input_dir}', but subdirectories were detected."
+                        "\n\n"
+                        "If your recordings are in separate subfolders, please select the 'Score all recordings (in subfolders)' option."
+                    )
+                raise FileNotFoundError(f"Could not find any suitable recordings in '{input_dir}'. Please check the input directory and data source settings.")
+
+            logger.info("\n" + "-" * 80)
+            logger.info(f"Processing: {input_file}")
+            logger.info("-" * 80)
+            total_count = 1
+            if _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot):
+                success_count = 1
+
+    except (FileNotFoundError, ValueError) as e:
+        logger.error(str(e))
     except Exception as e:
         logger.error(f"A critical error occurred in the scoring thread: {e}", exc_info=True)
-        success_count, total_count = 0, 0  # Assume failure
     finally:
         is_scoring_running = False
-        if 0 < success_count < total_count:
-            logger.info(f"Autoscoring completed with {total_count - success_count} failure(s): "
-                        f"Successfully processed {success_count} of {total_count} recordings.")
-        elif success_count == 0:
-            logger.info("Autoscoring failed for all recordings.")
-
-        # A total_count of -1 indicates an unexpected error before the worker could return.
+        if total_count > 0:
+            if success_count == total_count:
+                logger.info(f"Successfully processed all {total_count} recordings.")
+            elif 0 < success_count < total_count:
+                logger.info(f"Autoscoring completed with {total_count - success_count} failure(s): "
+                            f"Successfully processed {success_count} of {total_count} recordings.")
+            elif success_count == 0:
+                logger.info("Autoscoring failed for all recordings.")
 
         logger.info("\n" + "="*80 + "\nScoring process finished.\n" + "="*80)
-
-
-
 
 def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot):
     """
@@ -238,8 +249,6 @@ def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plo
         
         hypnogram, probabilities = scorer.score(plot=plot)
 
-        logger.info("Autoscoring completed.")
-
         if gen_stats:
             logger.info("Calculating sleep statistics...")
             try:
@@ -255,64 +264,16 @@ def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plo
                 logger.info(f"Sleep statistics saved.")
             except Exception as e:
                 logger.error(f"Could not generate sleep statistics for {input_file.name}: {e}", exc_info=True)
+        
+        logger.info("Autoscoring process completed.")
 
         execution_time = time.time() - start_time
-        logger.info(f">> SUCCESS: Finished processing {input_file} in {execution_time:.2f} seconds.")
+        logger.info(f">> SUCCESS: Finished processing {input_file.name} in {execution_time:.2f} seconds.")
         logger.info(f"  Results saved to: {output_dir}")
         return True
     except Exception as e:
-        logger.error(f">> FAILED to process {input_file}: {e}", exc_info=True)
+        logger.error(f">> FAILED to process {input_file.name}: {e}", exc_info=True)
         return False
-
-
-
-def _run_scoring_worker(input_dir, output_dir, score_subdirs, cancel_event, data_source, model_name, plot, gen_stats):
-    """
-    Main worker function to find and score files.
-    Returns a tuple of (number_of_files_successfully_processed, total_files_found).
-    """
-    try:
-        scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
-        if score_subdirs:
-            batch = utils.batch_scorer(
-                input_dir=input_dir,
-                output_dir=output_dir,
-                scorer_type=scorer_type,
-                model_name=model_name
-            )
-            return batch.score(plot=plot, gen_stats=gen_stats)
-        else:
-            # Logic for single scoring.
-            logger.info(f"Searching for recordings in '{input_dir}'...")
-            input_path = Path(input_dir)
-            try:
-                if scorer_type == 'psg':
-                    input_file = next(input_path.glob('*.edf'))
-                else:  # forehead
-                    input_file = next(input_path.glob('*[lL].edf'))
-                    next(input_path.glob('*[rR].edf')) # Verify R file exists
-            except StopIteration:
-                # Check if we are in single-file mode but subdirectories exist.
-                if any(item.is_dir() for item in input_path.iterdir()):
-                    raise ValueError(
-                        f"No recordings found in '{input_dir}', but subdirectories were detected."
-                        "\n\n"
-                        "If your recordings are in separate subfolders, please select the 'Score all recordings (in subfolders)' option."
-                    )
-                raise FileNotFoundError(f"Could not find any suitable recordings in '{input_dir}'. Please check the input directory and data source settings.")
-
-            logger.info("\n" + "-" * 80)
-            logger.info(f"Processing: {input_file}")
-            logger.info("-" * 80)
-            success = _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot)
-            return (1, 1) if success else (0, 1)
-
-    except (FileNotFoundError, ValueError) as e:
-        logger.error(str(e))
-        return 0, 0
-    except Exception as e:
-        logger.error(f"An unexpected error occurred during scoring: {e}", exc_info=True)
-        return 0, 0
 
 
 @app.route('/status')
@@ -331,7 +292,7 @@ def log_stream():
     except Exception as e:
         return f"Error reading log file: {e}"
 
-
+# heartbeat to ensure NIDRA is shutdown when tab is closed (ping disappears).
 @app.route('/ping', methods=['POST'])
 def ping():
     """Resets the ping timer."""
