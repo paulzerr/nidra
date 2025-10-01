@@ -14,10 +14,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        job-id: ['macos-x86_64', 'macos-arm64', 'windows', 'linux']
         include:
           # Legacy macOS (x86_64) for all Intel Macs, macOS 10.15+
-          - os: macos-14
-            job-id: 'macos-x86_64'
+          - job-id: 'macos-x86_64'
+            os: macos-14
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
             cibw-macos-min: '10.15'
             archs: 'x86_64'
@@ -26,8 +27,8 @@ jobs:
             cibw-before-build: 'python -m pip install --upgrade delocate toml && python update_version.py'
 
           # Legacy macOS (arm64) for Apple Silicon Macs on macOS 11.0-13.2
-          - os: macos-14
-            job-id: 'macos-arm64'
+          - job-id: 'macos-arm64'
+            os: macos-14
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
             cibw-macos-min: '11.0'
             archs: 'arm64'
@@ -38,8 +39,8 @@ jobs:
 
 
           # Windows for Python 3.10
-          - os: windows-latest
-            job-id: 'windows'
+          - job-id: 'windows'
+            os: windows-latest
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
             archs: 'auto'
             cibw-repair-command: ''
@@ -48,8 +49,8 @@ jobs:
             cibw-before-build: 'python -m pip install toml && python update_version.py'
 
           # Linux for Python 3.10 (builds sdist by default)
-          - os: ubuntu-latest
-            job-id: 'linux'
+          - job-id: 'linux'
+            os: ubuntu-latest
             cibw-build: 'cp310-* cp311-* cp312-* cp313-*'
             archs: 'auto'
             cibw-repair-command: ''
@@ -117,16 +118,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        job-id: ['macos-x86_64', 'macos-arm64', 'windows', 'linux']
         include:
           # Replicate the build matrix for testing
-          - os: macos-14
-            job-id: 'macos-x86_64'
-          - os: macos-14
-            job-id: 'macos-arm64'
-          - os: windows-latest
-            job-id: 'windows'
-          - os: ubuntu-latest
-            job-id: 'linux'
+          - job-id: 'macos-x86_64'
+            os: macos-14
+          - job-id: 'macos-arm64'
+            os: macos-14
+          - job-id: 'windows'
+            os: windows-latest
+          - job-id: 'linux'
+            os: ubuntu-latest
 
     steps:
       - name: Set up Python
