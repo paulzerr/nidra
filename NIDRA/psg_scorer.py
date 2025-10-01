@@ -10,7 +10,7 @@ from itertools import product
 from typing import List, Tuple, Dict, Any
 from NIDRA.plotting import plot_hypnodensity
 import importlib.resources
-from NIDRA.utils import get_model_path, is_running_in_pyinstaller_bundle
+from NIDRA import utils
 
 
 # --- Channel Definitions ---
@@ -89,7 +89,7 @@ class PSGScorer:
     def _load_model(self):
         model_filename = f"{self.model_name}.onnx"
         print(f"Loading model {model_filename}...")
-        if is_running_in_pyinstaller_bundle():
+        if utils.get_app_dir():
             try:
                 with importlib.resources.path('NIDRA.models', model_filename) as model_file:
                     self.session = ort.InferenceSession(str(model_file))
@@ -99,7 +99,7 @@ class PSGScorer:
                 print(f"Error: Model file not found at NIDRA/models/{model_filename}")
                 raise
         else:
-            model_path = get_model_path(model_filename)
+            model_path = utils.get_model_path(model_filename)
             self.session = ort.InferenceSession(model_path)
             self.input_name = self.session.get_inputs()[0].name
             self.output_name = self.session.get_outputs()[0].name
@@ -170,7 +170,7 @@ class PSGScorer:
         model_name = self.model_name
         if not self.has_eog:
             print("No EOG channels detected. Attempting to use EEG-only model.")
-            if is_running_in_pyinstaller_bundle():
+            if utils.get_app_dir():
                 # Check if the EEG-only model exists using importlib.resources
                 try:
                     with importlib.resources.path('NIDRA.models', model_name + "_eeg.onnx"):
@@ -179,7 +179,7 @@ class PSGScorer:
                 except FileNotFoundError:
                     print(f"Warning: EEG-only model not found. Using standard model.")
             else:
-                model_path = get_model_path(model_name + "_eeg.onnx")
+                model_path = utils.get_model_path(model_name + "_eeg.onnx")
                 if os.path.exists(model_path):
                     model_name += "_eeg"
                     print(f"Using EEG-only model: {model_name}")
