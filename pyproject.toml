@@ -17,12 +17,10 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "numpy",
     "scipy",
     "mne",
     "seaborn",
     "pandas",
-    "onnxruntime",
     "matplotlib",
     "Flask",
     "pyinstaller",
@@ -32,6 +30,10 @@ dependencies = [
     "requests",
     "pywebview",
     "psutil",
+    "numpy<2 ; sys_platform == 'darwin'",
+    "onnxruntime==1.16.3 ; sys_platform == 'darwin'",
+    "numpy>=2.0.0 ; sys_platform != 'darwin'",
+    "onnxruntime>=1.19.0 ; sys_platform != 'darwin'",
 ]
 
 [project.urls]
