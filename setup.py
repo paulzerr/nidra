@@ -1,11 +1,6 @@
-from setuptools import setup, Extension
+from setuptools import setup
 import sys
 import platform
-
-# This is a dummy extension to force the creation of platform-specific wheels.
-# It is required for cibuildwheel to work correctly when a project has platform-specific
-# dependencies but no compiled code of its own.
-dummy_extension = Extension('NIDRA.dummy', sources=['NIDRA/dummy.c'])
 
 # Base dependencies from pyproject.toml
 install_requires = [
@@ -47,6 +42,5 @@ else:
     ])
 
 setup(
-    ext_modules=[dummy_extension],
     install_requires=install_requires,
 )
