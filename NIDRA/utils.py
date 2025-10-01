@@ -440,10 +440,10 @@ def get_model_path(model_name: str) -> str:
     Returns:
         str: The absolute path to the model file.
     """
-    if is_running_in_pyinstaller_bundle():
+    bundle_dir = get_app_dir()
+    if bundle_dir:
         # In a PyInstaller bundle, models are in a 'models' subdirectory of the base path
-        base_path = Path(sys._MEIPASS)
-        return str(base_path / 'models' / model_name)
+        return str(bundle_dir / 'models' / model_name)
     else:
         # In a standard install, models are in the user's data directory
         app_name = "NIDRA"
@@ -458,7 +458,7 @@ def download_models(logger):
     Logs progress to the provided logger instance.
     Returns True if a download was attempted, False otherwise.
     """
-    if is_running_in_pyinstaller_bundle():
+    if get_app_dir():
         logger.info("Running in a PyInstaller bundle, models should be included. Skipping download check.")
         return False
 
@@ -516,11 +516,14 @@ def download_models(logger):
     logger.info("--- Model download complete ---")
     return True
 
-def is_running_in_pyinstaller_bundle():
+def get_app_dir():
     """
-    Check if the script is running in a PyInstaller bundle.
+    Returns the base path for the application when running as a PyInstaller bundle.
+    Returns None otherwise.
     """
-    return getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        return Path(sys._MEIPASS)
+    return None
 
 
 def download_example_data(logger):

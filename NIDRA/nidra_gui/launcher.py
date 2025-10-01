@@ -8,15 +8,16 @@ import webbrowser
 import time
 import multiprocessing
 from NIDRA.nidra_gui import app as nidra_app
+from NIDRA import utils
 import time
 import importlib.resources
 from werkzeug.serving import make_server
 
 def get_resource_path(relative_path):
     # PyInstaller creates a temp folder and stores path in _MEIPASS
-    if hasattr(sys, '_MEIPASS'):
-        base_path = sys._MEIPASS
-        return os.path.join(base_path, relative_path)
+    bundle_dir = utils.get_app_dir()
+    if bundle_dir:
+        return os.path.join(bundle_dir, relative_path)
 
     # For installed packages
     try:

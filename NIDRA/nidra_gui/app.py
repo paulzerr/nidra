@@ -8,10 +8,10 @@ import importlib.resources
 import platform
 
 from NIDRA import scorer as scorer_factory
-from NIDRA.utils import setup_logging, compute_sleep_stats, download_models, download_example_data, batch_scorer
+from NIDRA import utils
 
 # --- Setup ---
-LOG_FILE, logger = setup_logging()
+LOG_FILE, logger = utils.setup_logging()
 
 TEXTS = {
     "WINDOW_TITLE": "NIDRA", "INPUT_TITLE": "Input Folder", "MODEL_TITLE": "Model",
@@ -25,11 +25,11 @@ TEXTS = {
 }
 
 # Determine the base path for resources, accommodating PyInstaller and standard installs
-if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+bundle_dir = utils.get_app_dir()
+if bundle_dir:
     # Running as a PyInstaller bundle
-    base_path = Path(sys._MEIPASS)
-    template_folder = str(base_path / 'neutralino' / 'resources' / 'templates')
-    static_folder = str(base_path / 'neutralino' / 'resources' / 'static')
+    template_folder = str(bundle_dir / 'neutralino' / 'resources' / 'templates')
+    static_folder = str(bundle_dir / 'neutralino' / 'resources' / 'static')
     app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
 else:
     # Running as a standard Python package
@@ -66,7 +66,7 @@ def index():
     logger.info("--------------------------------------------------------------------------\n")
 
     logger.info("\nChecking if autoscoring model files are available...")
-    download_models(logger=logger)
+    utils.download_models(logger=logger)
     logger.info(TEXTS.get("CONSOLE_INIT_MESSAGE", "Welcome to NIDRA."))
     # if not _startup_check_done:
     #     def startup_task():
@@ -83,9 +83,10 @@ def index():
 @app.route('/docs/<path:filename>')
 def serve_docs(filename):
     """Serves files from the docs directory."""
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    bundle_dir = utils.get_app_dir()
+    if bundle_dir:
         # Running as a PyInstaller bundle
-        docs_path = Path(sys._MEIPASS) / 'docs'
+        docs_path = bundle_dir / 'docs'
     else:
         # For a standard package, 'docs' is a resource within the 'docs' package
         # Note: This requires Python 3.9+ for `files()`
@@ -172,8 +173,9 @@ def show_example():
         logger.info("\n--- Preparing scoring of example data ---")
 
         # If running as a PyInstaller bundle, use local examples
-        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-            example_data_path = Path(sys._MEIPASS) / 'examples' / 'test_data_zmax'
+        bundle_dir = utils.get_app_dir()
+        if bundle_dir:
+            example_data_path = bundle_dir / 'examples' / 'test_data_zmax'
             if example_data_path.exists():
                 logger.info(f"Using local example data from: {example_data_path}")
                 return jsonify({'status': 'success', 'path': str(example_data_path)})
@@ -182,7 +184,7 @@ def show_example():
                 return jsonify({'status': 'error', 'message': 'Could not find local example data.'}), 500
         else:
             # Otherwise, download it
-            example_data_path = download_example_data(logger=logger)
+            example_data_path = utils.download_example_data(logger=logger)
             if example_data_path:
                 logger.info(f"Example data is ready at: {example_data_path}")
                 return jsonify({'status': 'success', 'path': example_data_path})
@@ -241,7 +243,7 @@ def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plo
         if gen_stats:
             logger.info("Calculating sleep statistics...")
             try:
-                stats = compute_sleep_stats(hypnogram.tolist())
+                stats = utils.compute_sleep_stats(hypnogram.tolist())
                 stats_output_path = Path(output_dir) / f"{input_file.parent.name}_{input_file.stem}_sleep_statistics.csv"
                 with open(stats_output_path, 'w') as f:
                     f.write("Metric,Value\n")
@@ -272,7 +274,7 @@ def _run_scoring_worker(input_dir, output_dir, score_subdirs, cancel_event, data
     try:
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
         if score_subdirs:
-            batch = batch_scorer(
+            batch = utils.batch_scorer(
                 input_dir=input_dir,
                 output_dir=output_dir,
                 scorer_type=scorer_type,
