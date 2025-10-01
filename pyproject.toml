@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "NIDRA"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
   { name="Paul Zerr", email="zerr.paul@gmail.com" },
 ]
@@ -30,4 +30,5 @@ packages = {find = {}}
 
 
 [tool.setuptools.package-data]
+"NIDRA" = ["nidra_gui/neutralino/resources/**"]
 "docs" = ["**"]

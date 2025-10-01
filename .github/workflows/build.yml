@@ -55,6 +55,9 @@ jobs:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
           GITHUB_REF: ${{ github.ref }}
 
+      - name: Clean dist directory
+        run: rm -rf dist/
+
       - name: Build sdist
         run: python -m build --sdist
 
