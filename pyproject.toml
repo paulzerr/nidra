@@ -16,25 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
 ]
-dependencies = [
-    "scipy",
-    "mne",
-    "seaborn",
-    "pandas",
-    "matplotlib",
-    "Flask",
-    "pyinstaller",
-    "huggingface_hub",
-    "hf_xet",
-    "appdirs",
-    "requests",
-    "pywebview",
-    "psutil",
-    "numpy<2 ; sys_platform == 'darwin' and platform_release < '23.0.0'",
-    "onnxruntime==1.16.3 ; sys_platform == 'darwin' and platform_release < '23.0.0'",
-    "numpy>=2.0.0 ; sys_platform != 'darwin' or (sys_platform == 'darwin' and platform_release >= '23.0.0')",
-    "onnxruntime>=1.19.0 ; sys_platform != 'darwin' or (sys_platform == 'darwin' and platform_release >= '23.0.0')",
-]
+dynamic = ["dependencies"]
 
 [project.urls]
 "Homepage" = "https://github.com/p-zerr/NIDRA"
@@ -45,6 +27,9 @@ nidra = "NIDRA.nidra_gui.launcher:main"
 
 [tool.setuptools]
 packages = {find = {}}
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["setup.py"]}
 
 [tool.setuptools.package-data]
 "docs" = ["**"]
