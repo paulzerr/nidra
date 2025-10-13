@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 import sys
+import glob
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
@@ -8,10 +9,13 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 mne_datas = collect_data_files('mne', include_py_files=True)
 mne_hiddenimports = collect_submodules('mne')
 
+# Collect VC Redist DLLs
+vc_redist_binaries = [(f, '.') for f in glob.glob('NIDRA/dll/*.dll')]
+
 a = Analysis(
     ['NIDRA/nidra_gui/launcher.py'],
     pathex=['.', 'NIDRA'],
-    binaries=[],
+    binaries=vc_redist_binaries,
     datas=[
         ('NIDRA/nidra_gui/neutralino', 'neutralino'),
         ('docs', 'docs'),

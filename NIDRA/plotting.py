@@ -15,7 +15,7 @@ class StderrFilter:
 
 # Temporarily replace stderr with the filter
 original_stderr = sys.stderr
-filter_string = "NotoColorEmoji.ttf: Can not load face"
+filter_string = "NotoColorEmoji"
 sys.stderr = StderrFilter(original_stderr, filter_string)
 
 import matplotlib
