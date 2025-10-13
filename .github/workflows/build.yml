@@ -102,7 +102,7 @@ jobs:
       - name: Install dependencies strategically
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install pyinstaller
+          pip install nuitka zstandard
 
           echo "--- Phase 1: Heavy Binaries ---"
           pip install numpy scipy pandas matplotlib onnxruntime pillow
@@ -130,8 +130,16 @@ jobs:
           curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -o examples/test_data_zmax/EEG_R.edf
         shell: bash
 
-      - name: Build Executable with PyInstaller
-        run: pyinstaller NIDRA.spec
+      - name: Build Executable with Nuitka
+        run: |
+          python -m nuitka --standalone --onefile --follow-imports \
+            --windows-disable-console \
+            --windows-icon-from-ico=NIDRA/docs/logo.ico \
+            --windows-uac-admin \
+            --output-filename=NIDRA.exe \
+            --user-package-configuration-file=nidra.nuitka-package.config.yml \
+            NIDRA/nidra_gui/launcher.py
+        shell: bash
 
 
 
