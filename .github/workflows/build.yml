@@ -50,7 +50,6 @@ jobs:
           pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org mne sympy
           echo "--- Phase 3: All Remaining Dependencies & Project ---"
           pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org .
-        shell: bash
 
       - name: Create script to update version
         if: github.ref == 'refs/heads/development'
