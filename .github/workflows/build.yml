@@ -38,8 +38,26 @@ jobs:
         run: choco install 7zip.install
         shell: powershell
 
-      - name: Install Python dependencies
-        run: python -m pip install toml pyinstaller
+      - name: Setup Python Environment
+        run: |
+          python -m venv venv
+          echo "${GITHUB_WORKSPACE}/venv/Scripts" >> $GITHUB_PATH
+          python -m pip install --upgrade pip
+
+      - name: Install dependencies strategically
+        run: |
+          python -m pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip setuptools wheel
+          pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org toml pyinstaller
+
+          echo "--- Phase 1: Heavy Binaries ---"
+          pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org numpy scipy pandas matplotlib onnxruntime pillow
+
+          echo "--- Phase 2: Medium & Complex Dependencies ---"
+          pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org mne sympy
+
+          echo "--- Phase 3: All Remaining Dependencies & Project ---"
+          pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org .
+        shell: bash
 
       - name: Create script to update version
         if: github.ref == 'refs/heads/development'
@@ -71,11 +89,6 @@ jobs:
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
           GITHUB_REF: ${{ github.ref }}
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install .
 
       - name: Download Models from Hugging Face
         run: |
