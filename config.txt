@@ -1,0 +1,6 @@
+;!@Install@!UTF-8!
+Title="NIDRA Application Extractor"
+BeginPrompt="This will extract the NIDRA application files to a folder on your computer.\n\nPlease choose a destination folder to continue."
+InstallPath="NIDRA"
+FinishMessage="The NIDRA application files have been successfully extracted. You can now open the folder you selected and run NIDRA.exe."
+;!@InstallEnd@!

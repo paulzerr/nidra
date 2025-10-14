@@ -36,7 +36,7 @@ a = Analysis(
     runtime_hooks=[],
     excludes=['PyQt5', 'notebook', 'jupyter', 'IPython'],
     noarchive=False,
-    optimize=1,
+    optimize=0,
     distpath='dist',
     workpath='build',
 )
