@@ -120,7 +120,7 @@ input[type="text"], select {
     margin-top: calc(1.5 * var(--ui-scale));
     display: flex;
     flex-direction: column;
-    gap: var(--ui-scale);
+    gap: calc(0.5 * var(--ui-scale));
 }
 
 .radio-group label {
@@ -134,6 +134,13 @@ input[type="radio"], input[type="checkbox"] {
     width: calc(1.4 * var(--font-scale));
     height: calc(1.4 * var(--font-scale));
     accent-color: var(--primary-color);
+}
+
+.flex-label {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: calc(2.5 * var(--ui-scale));
+    align-items: center;
 }
 
 .horizontal-group {
@@ -225,4 +232,68 @@ input[type="radio"], input[type="checkbox"] {
     padding: var(--ui-scale);
     white-space: pre-wrap;
     word-wrap: break-word;
+}
+/* --- Select Channels Button --- */
+#select-channels-btn {
+    margin-left: var(--ui-scale);
+    height: auto;
+    padding: calc(0.5 * var(--ui-scale)) var(--ui-scale);
+    font-size: 0.9em;
+    visibility: hidden; /* Reserve space, but hide */
+}
+
+#select-channels-btn.visible {
+    visibility: visible;
+}
+
+/* --- Channel Selection Modal --- */
+.modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: #fff;
+    padding: calc(2.5 * var(--ui-scale));
+    border-radius: var(--border-radius);
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2);
+    width: 90%;
+    max-width: calc(50 * var(--ui-scale));
+    max-height: 80vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    color: var(--text-color);
+}
+
+.modal-content h2 {
+    font-size: 1.2em;
+    margin-bottom: calc(1.5 * var(--ui-scale));
+    color: #1a1a1a;
+}
+
+.modal-content form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-scale);
+    margin-bottom: calc(2 * var(--ui-scale));
+}
+
+.modal-content label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.modal-content .run-btn {
+    margin-top: auto; /* Pushes button to the bottom */
+    width: 100%;
 }

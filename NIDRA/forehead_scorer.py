@@ -11,7 +11,9 @@ class ForeheadScorer:
     """
     Scores sleep stages from forehead EEG data.
     """
-    def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None, model_name: str = "u-sleep-forehead-2024"):
+    def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None,
+                 model_name: str = "ez6", device_type: str = 'zmax',
+                 zmax_mode: str = 'two_files', zmax_ch_names: list = None):
         if input_file is None and data is None:
             raise ValueError("Either 'input_file' or 'data' must be provided.")
 
@@ -25,6 +27,9 @@ class ForeheadScorer:
             self.base_filename = "numpy_input"
 
         self.model_name = model_name
+        self.device_type = device_type
+        self.zmax_mode = zmax_mode
+        self.zmax_ch_names = zmax_ch_names
         self.session = None
         self.input_name = None
         self.output_name = None
@@ -86,14 +91,44 @@ class ForeheadScorer:
             info = mne.create_info(['eegl', 'eegr'], sfreq=fs, ch_types=['eeg', 'eeg'], verbose=False)
             self.raw = mne.io.RawArray(self.input_data, info, verbose=False)
             self.raw.filter(l_freq=0.5, h_freq=None, verbose=False)
-        else:
-            rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False).resample(fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
-            rawR_path = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', str(self.input_file)))
-            rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False).resample(fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
-            dataL = rawL.get_data().flatten()
-            dataR = rawR.get_data().flatten()
-            info = mne.create_info(['eegl', 'eegr'], sfreq=fs, ch_types=['eeg', 'eeg'], verbose=False)
-            self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
+            return
+
+        if self.device_type == 'zmax':
+            if self.zmax_mode == 'two_files':
+                # Assumes the input_file is the path to the LEFT channel EDF,
+                # and the RIGHT channel is in the same folder with a similar name.
+                rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
+                rawR_path = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', str(self.input_file)))
+                if not rawR_path.exists():
+                    raise FileNotFoundError(f"Could not find corresponding RIGHT channel file at {rawR_path}")
+                rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False)
+                
+                # Resample and filter
+                rawL.resample(fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+                rawR.resample(fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+
+                dataL = rawL.get_data().flatten()
+                dataR = rawR.get_data().flatten()
+                info = mne.create_info(['eegl', 'eegr'], sfreq=fs, ch_types=['eeg', 'eeg'], verbose=False)
+                self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
+
+            elif self.zmax_mode == 'one_file':
+                raw = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
+                
+                if self.zmax_ch_names and len(self.zmax_ch_names) == 2:
+                    ch_names = self.zmax_ch_names
+                else:
+                    if len(raw.ch_names) < 2:
+                        raise ValueError("EDF file must have at least two channels for 'one_file' mode when no channels are selected.")
+                    ch_names = raw.ch_names[:2]
+                
+                raw.pick(ch_names)
+                raw.rename_channels({ch_names[0]: 'eegl', ch_names[1]: 'eegr'})
+                raw.reorder_channels(['eegl', 'eegr'])
+                
+                # Resample and filter
+                raw.resample(fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+                self.raw = raw
 
     def _predict(self):
         seq_length = 100

@@ -39,25 +39,75 @@ function initializeApp() {
     const browseOutputDirBtn = document.getElementById('browse-output-btn');
     const helpBtn = document.getElementById('help-btn');
     const showExampleBtn = document.getElementById('show-example-btn');
+    const zmaxOptions = document.getElementById('zmax-options');
+    const selectChannelsBtn = document.getElementById('select-channels-btn');
+    const zmaxModeRadios = document.querySelectorAll('input[name="zmax-mode"]');
 
     let logInterval;
     let statusInterval;
 
-    // Handle Data Source change to update model list
+    // Handle Data Source change to update model list and show/hide ZMax options
     dataSourceSelect.addEventListener('change', () => {
         const selectedSource = dataSourceSelect.value;
-        if (selectedSource.includes('PSG')) { 
+        if (selectedSource.includes('PSG')) {
             modelNameSelect.innerHTML = '<option value="u-sleep-nsrr-2024" selected>u-sleep-nsrr-2024</option>';
+            zmaxOptions.style.display = 'none';
         } else {
             modelNameSelect.innerHTML = `
                 <option value="ez6" selected>ez6</option>
                 <option value="ez6moe">ez6moe</option>
             `;
+            zmaxOptions.style.display = 'block';
+        }
+    });
+
+    // Trigger the change event on load to set the initial state
+    dataSourceSelect.dispatchEvent(new Event('change'));
+
+    // Handle ZMax mode change to show/hide the "Select Channels" button
+    zmaxModeRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.value === 'one_file' && radio.checked) {
+                selectChannelsBtn.classList.add('visible');
+                // Automatically pre-select channels when this option is chosen
+                preselectDefaultChannels();
+            } else {
+                selectChannelsBtn.classList.remove('visible');
+            }
+        });
+    });
+
+    // Handle "Select Channels" button click
+    selectChannelsBtn.addEventListener('click', async () => {
+        const inputDir = document.getElementById('input-dir').value;
+        if (!inputDir) {
+            alert('Please select an input directory first.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/get-channels', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ input_dir: inputDir })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                openChannelSelectionModal(result.channels);
+            } else {
+                alert(`Error: ${result.message}`);
+            }
+        } catch (error) {
+            console.error('Failed to get channels:', error);
+            alert('An error occurred while fetching the channel list.');
         }
     });
 
     // Handle Run Button click
     runBtn.addEventListener('click', async () => {
+        const zmaxMode = document.querySelector('input[name="zmax-mode"]:checked').value;
         const payload = {
             input_dir: document.getElementById('input-dir').value,
             output_dir: document.getElementById('output-dir').value,
@@ -65,7 +115,9 @@ function initializeApp() {
             model_name: modelNameSelect.value,
             plot: document.getElementById('gen-plot').checked,
             gen_stats: document.getElementById('gen-stats').checked,
-            score_subdirs: document.querySelector('input[name="scoring-mode"]:checked').value === 'subdirs'
+            score_subdirs: document.querySelector('input[name="scoring-mode"]:checked').value === 'subdirs',
+            zmax_mode: zmaxMode,
+            zmax_channels: zmaxMode === 'one_file' ? window.selectedChannels : null
         };
 
         if (!payload.input_dir || !payload.output_dir) {
@@ -231,3 +283,110 @@ function initializeApp() {
 }
 
 document.addEventListener('DOMContentLoaded', initializeApp);
+
+function openChannelSelectionModal(channels) {
+    // --- Create Modal Structure ---
+    const modalBackdrop = document.createElement('div');
+    modalBackdrop.className = 'modal-backdrop';
+
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+
+    const h2 = document.createElement('h2');
+    h2.textContent = 'Select Two Channels';
+    modalContent.appendChild(h2);
+
+    const form = document.createElement('form');
+    const eegChannels = channels.filter(c => c.toLowerCase().includes('eeg'));
+    let defaultSelected = 0;
+
+    channels.forEach(channel => {
+        const label = document.createElement('label');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.name = 'channel';
+        checkbox.value = channel;
+
+        // Pre-select up to two EEG channels
+        if (eegChannels.includes(channel) && defaultSelected < 2) {
+            checkbox.checked = true;
+            defaultSelected++;
+        }
+
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(` ${channel}`));
+        form.appendChild(label);
+    });
+    modalContent.appendChild(form);
+
+    const okBtn = document.createElement('button');
+    okBtn.textContent = 'OK';
+    okBtn.className = 'run-btn';
+    modalContent.appendChild(okBtn);
+
+    modalBackdrop.appendChild(modalContent);
+    document.body.appendChild(modalBackdrop);
+
+    // --- Event Handlers ---
+    const closeModal = () => {
+        document.body.removeChild(modalBackdrop);
+    };
+
+    okBtn.addEventListener('click', () => {
+        const selectedChannels = Array.from(form.querySelectorAll('input[name="channel"]:checked'))
+                                      .map(cb => cb.value);
+        if (selectedChannels.length !== 2) {
+            alert('Please select exactly two channels.');
+        } else {
+            window.selectedChannels = selectedChannels;
+            console.log('Selected channels:', selectedChannels);
+            closeModal();
+        }
+    });
+
+    // Close modal if backdrop is clicked
+    modalBackdrop.addEventListener('click', (e) => {
+        if (e.target === modalBackdrop) {
+            closeModal();
+        }
+    });
+}
+
+async function preselectDefaultChannels() {
+    const inputDir = document.getElementById('input-dir').value;
+    if (!inputDir) {
+        // No input directory selected, so we can't get channels.
+        // We'll handle this when the user clicks "Select Channels".
+        return;
+    }
+
+    try {
+        const response = await fetch('/get-channels', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ input_dir: inputDir })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            const eegChannels = result.channels
+                .filter(c => c.toLowerCase().includes('eeg'))
+                .slice(0, 2);
+            
+            if (eegChannels.length === 2) {
+                window.selectedChannels = eegChannels;
+                console.log('Pre-selected channels:', eegChannels);
+            } else {
+                // Could not find two EEG channels, clear selection
+                window.selectedChannels = null;
+            }
+        } else {
+            console.error(`Error getting channels for pre-selection: ${result.message}`);
+            window.selectedChannels = null;
+        }
+    } catch (error) {
+        console.error('Failed to pre-select channels:', error);
+        window.selectedChannels = null;
+    }
+}

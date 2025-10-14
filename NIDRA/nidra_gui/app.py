@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 import importlib.resources
 import platform
+import mne
 
 from NIDRA import scorer as scorer_factory
 from NIDRA import utils
@@ -21,6 +22,11 @@ TEXTS = {
     "OUTPUT_TITLE": "Output Folder", "RUN_BUTTON": "Run autoscoring", "BROWSE_BUTTON": "Browse files...",
     "HELP_TITLE": "Help & Info (opens in browser)",
     "CONSOLE_INIT_MESSAGE": "\n\nWelcome to NIDRA, the easy to use sleep autoscorer.\n\nSpecify input folder (location of your sleep recordings) to begin.\n\nTo shutdown NIDRA, simply close this window or tab.",
+    "ZMAX_OPTIONS_TITLE": "Source file configuration",
+    "ZMAX_OPTIONS_2_FILES": "2 files per recording (e.g. EEG R.edf & EEG L.edf)",
+    "ZMAX_OPTIONS_1_FILE_2_CHANNELS": "1 file with 2 channels per recording",
+    "ZMAX_OPTIONS_1_FILE_N_CHANNELS": "1 file with 3+ channels per recording",
+    "ZMAX_OPTIONS_SELECT_CHANNELS": "Select channels (optional)"
 }
 
 base_path = utils.get_app_dir()
@@ -135,7 +141,9 @@ def start_scoring():
             data['data_source'],
             data['model_name'],
             data.get('plot', False),
-            data.get('gen_stats', False)
+            data.get('gen_stats', False),
+            data.get('zmax_mode'),
+            data.get('zmax_channels')
         )
     )
     worker_thread.start()
@@ -172,8 +180,36 @@ def show_example():
         logger.error(f"An error occurred while preparing the example: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+
+@app.route('/get-channels', methods=['POST'])
+def get_channels():
+    """Reads and returns the channel names from the first EDF file found in a directory."""
+    data = request.json
+    input_dir = data.get('input_dir')
+
+    if not input_dir:
+        return jsonify({'status': 'error', 'message': 'Input directory not provided.'}), 400
+
+    try:
+        input_path = Path(input_dir)
+        # Search for .edf files case-insensitively
+        edf_files = list(input_path.glob('*.edf')) + list(input_path.glob('*.EDF'))
+        if not edf_files:
+            return jsonify({'status': 'error', 'message': f'No EDF files found in {input_dir}.'}), 404
+
+        # Read the first EDF file found
+        raw = mne.io.read_raw_edf(edf_files[0], preload=False, verbose=False)
+        channels = raw.ch_names
+        
+        return jsonify({'status': 'success', 'channels': channels})
+
+    except Exception as e:
+        logger.error(f"Error reading channels from EDF file: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 # this enables reporting on successful/failed scorings
-def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, model_name, plot, gen_stats):
+def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, model_name, plot, gen_stats, zmax_mode=None, zmax_channels=None):
     """
     Manages the global running state and executes the scoring process.
     This function is intended to be run in a separate thread.
@@ -213,7 +249,7 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
             logger.info(f"Processing: {input_file}")
             logger.info("-" * 80)
             total_count = 1
-            if _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot):
+            if _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot, zmax_mode, zmax_channels):
                 success_count = 1
 
     except (FileNotFoundError, ValueError) as e:
@@ -233,19 +269,24 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
 
         logger.info("\n" + "="*80 + "\nScoring process finished.\n" + "="*80)
 
-def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot):
+def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot, zmax_mode=None, zmax_channels=None):
     """
     Performs scoring on a single recording file.
     """
     try:
         start_time = time.time()
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
-        scorer = scorer_factory(
-            scorer_type=scorer_type,
-            input_file=str(input_file),
-            output_dir=output_dir,
-            model_name=model_name
-        )
+        
+        scorer_kwargs = {
+            'input_file': str(input_file),
+            'output_dir': output_dir,
+            'model_name': model_name
+        }
+        if scorer_type == 'forehead':
+            scorer_kwargs['zmax_mode'] = zmax_mode
+            scorer_kwargs['zmax_channels'] = zmax_channels
+
+        scorer = scorer_factory(scorer_type=scorer_type, **scorer_kwargs)
         
         hypnogram, probabilities = scorer.score(plot=plot)
 
