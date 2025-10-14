@@ -101,22 +101,11 @@ jobs:
         run: |
           python -m nuitka --standalone --onefile --follow-imports \
             --windows-disable-console \
-            --windows-icon-from-ico=NIDRA/docs/logo.ico \
+            --windows-icon-from-ico=docs/logo.ico \
             --windows-uac-admin \
             --output-filename=NIDRA.exe \
             --user-package-configuration-file=nidra.nuitka-package.config.yml \
-            NIDRA/nidra_gui/launcher.py
-        shell: bash
-
-      - name: Sign Executable
-        env:
-          CODE_SIGNING_CERTIFICATE_BASE64: ${{ secrets.CODE_SIGNING_CERTIFICATE_BASE64 }}
-          CODE_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.CODE_SIGNING_CERTIFICATE_PASSWORD }}
-        if: env.CODE_SIGNING_CERTIFICATE_BASE64 != '' && env.CODE_SIGNING_CERTIFICATE_PASSWORD != ''
-        run: |
-          echo "${{ secrets.CODE_SIGNING_CERTIFICATE_BASE64 }}" > certificate.pfx.b64
-          certutil -decode certificate.pfx.b64 certificate.pfx
-          signtool sign /f certificate.pfx /p "${{ secrets.CODE_SIGNING_CERTIFICATE_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "dist/NIDRA.exe"
+            nidra_gui/launcher.py
         shell: bash
 
       - name: Upload Windows Executable
