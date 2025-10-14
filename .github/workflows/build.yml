@@ -41,6 +41,7 @@ jobs:
             mingw-w64-x86_64-python-matplotlib
             mingw-w64-x86_64-python-pillow
             mingw-w64-x86_64-python-psutil
+            mingw-w64-x86_64-pyinstaller
             
       - name: Install 7-Zip
         run: choco install 7zip.install
