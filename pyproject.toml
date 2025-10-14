@@ -10,7 +10,7 @@ authors = [
 ]
 description = "A tool for scoring sleep data from PSG and forehead EEG recordings."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 license = "MIT"
 classifiers = [
     "Programming Language :: Python :: 3",
