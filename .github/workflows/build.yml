@@ -34,6 +34,7 @@ jobs:
             mingw-w64-x86_64-python-pip
             mingw-w64-x86_64-python-numpy
             mingw-w64-x86_64-python-scipy
+            mingw-w64-x86_64-python-pandas
 
       - name: Install 7-Zip
         run: choco install 7zip.install
@@ -43,7 +44,7 @@ jobs:
         run: |
           python -m venv --system-site-packages venv
           venv/bin/python -m pip install .
-          
+
       - name: Create script to update version
         if: github.ref == 'refs/heads/development'
         run: |
