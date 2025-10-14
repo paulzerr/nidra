@@ -41,14 +41,14 @@ jobs:
       - name: Setup Python Environment and Install Dependencies
         run: |
           python -m venv --system-site-packages venv
-          venv/Scripts/python.exe -m pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip setuptools wheel
-          venv/Scripts/python.exe -m pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org toml pyinstaller
+          venv/bin/python -m pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org --upgrade pip setuptools wheel
+          venv/bin/python -m pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org toml pyinstaller
           echo "--- Phase 1: Heavy Binaries ---"
-          venv/Scripts/python.exe -m pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org pandas matplotlib onnxruntime pillow
+          venv/bin/python -m pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org pandas matplotlib onnxruntime pillow
           echo "--- Phase 2: Medium & Complex Dependencies ---"
-          venv/Scripts/python.exe -m pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org mne sympy
+          venv/bin/python -m pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org mne sympy
           echo "--- Phase 3: All Remaining Dependencies & Project ---"
-          venv/Scripts/python.exe -m pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org .
+          venv/bin/python -m pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org .
 
       - name: Create script to update version
         if: github.ref == 'refs/heads/development'
@@ -76,7 +76,7 @@ jobs:
 
       - name: Update version in pyproject.toml
         if: github.ref == 'refs/heads/development'
-        run: venv/Scripts/python.exe update_version.py
+        run: venv/bin/python update_version.py
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
           GITHUB_REF: ${{ github.ref }}
@@ -96,7 +96,7 @@ jobs:
           curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -o examples/test_data_zmax/EEG_R.edf
 
       - name: Build Executable with PyInstaller
-        run: venv/Scripts/python.exe -m pyinstaller NIDRA.spec
+        run: venv/bin/python -m pyinstaller NIDRA.spec
 
       - name: Bundle VC++ DLLs
         run: |
