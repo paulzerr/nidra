@@ -18,6 +18,9 @@ jobs:
       run:
         shell: msys2 {0}
 
+    env:
+      SSL_CERT_FILE: /mingw64/ssl/certs/ca-bundle.crt
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -38,7 +41,6 @@ jobs:
             mingw-w64-x86_64-python-matplotlib
             mingw-w64-x86_64-python-pillow
             mingw-w64-x86_64-python-psutil
-            mingw-w64-x86_64-python-pyinstaller
             
       - name: Install 7-Zip
         run: choco install 7zip.install
