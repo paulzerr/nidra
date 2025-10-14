@@ -105,7 +105,7 @@ jobs:
             --windows-uac-admin \
             --output-filename=NIDRA.exe \
             --user-package-configuration-file=nidra.nuitka-package.config.yml \
-            nidra_gui/launcher.py
+            NIDRA/nidra_gui/launcher.py
         shell: bash
 
       - name: Upload Windows Executable
