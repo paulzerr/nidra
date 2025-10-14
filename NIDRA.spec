@@ -31,7 +31,7 @@ a = Analysis(
     + collect_submodules('scipy')
     + collect_submodules('pandas')
     + mne_hiddenimports,  # merge mne hiddenimports
-    hookspath=[],  # no external hook files needed
+    hookspath=[], 
     hooksconfig={},
     runtime_hooks=[],
     excludes=['PyQt5', 'notebook', 'jupyter', 'IPython'],
@@ -65,7 +65,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     manifest='NIDRA.manifest',
-    onefile=not is_macos,
+    onefile=False,#not is_macos,
     icon='docs/logo.ico',
 )
 
