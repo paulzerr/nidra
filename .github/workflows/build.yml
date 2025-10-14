@@ -9,72 +9,7 @@ on:
     branches: [ master ]
 
 jobs:
-  build_and_publish_sdist:
-    name: Build and publish sdist
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write  # Trusted publishing on PyPI
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Install build dependencies
-        run: python -m pip install --upgrade pip build toml
-
-      - name: Create script to update version
-        if: github.ref == 'refs/heads/master'
-        run: |
-          cat << 'EOF' > update_version.py
-          import toml
-          import os
-          import sys
-          pyproject_path = 'pyproject.toml'
-          github_run_number = os.environ.get('GITHUB_RUN_NUMBER')
-          github_ref = os.environ.get('GITHUB_REF')
-          with open(pyproject_path, 'r') as f:
-              data = toml.load(f)
-          if github_ref == 'refs/heads/master' and github_run_number:
-              base_version = str(data['project']['version'])
-              if '.dev' in base_version:
-                  base_version = base_version.split('.dev')[0]
-              new_version = f"{base_version}.dev{github_run_number}"
-              data['project']['version'] = new_version
-              print(f"Set version to {new_version}", file=sys.stderr)
-              with open(pyproject_path, 'w') as f:
-                  toml.dump(data, f)
-              print("Updated pyproject.toml with dev version", file=sys.stderr)
-          EOF
-        shell: bash
-
-      - name: Update version in pyproject.toml
-        if: github.ref == 'refs/heads/master'
-        run: python update_version.py
-        env:
-          GITHUB_RUN_NUMBER: ${{ github.run_number }}
-          GITHUB_REF: ${{ github.ref }}
-
-      - name: Clean dist directory
-        run: rm -rf dist/
-
-      - name: Build sdist
-        run: python -m build --sdist
-
-      - name: Publish distribution to TestPyPI
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-      - name: Publish distribution to PyPI
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-        uses: pypa/gh-action-pypi-publish@release/v1
-        # This uses trusted publishing, which is configured at the job level
-        # with the `id-token: write` permission.
-  build-windows:
+  build:
     permissions:
       contents: write
     runs-on: windows-latest
@@ -88,6 +23,41 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+
+      - name: Install toml
+        run: python -m pip install toml
+
+      - name: Create script to update version
+        if: github.ref == 'refs/heads/development'
+        run: |
+          cat << 'EOF' > update_version.py
+          import toml
+          import os
+          import sys
+          pyproject_path = 'pyproject.toml'
+          github_run_number = os.environ.get('GITHUB_RUN_NUMBER')
+          github_ref = os.environ.get('GITHUB_REF')
+          with open(pyproject_path, 'r') as f:
+              data = toml.load(f)
+          if github_ref == 'refs/heads/development' and github_run_number:
+              base_version = str(data['project']['version'])
+              if '.dev' in base_version:
+                  base_version = base_version.split('.dev')[0]
+              new_version = f"{base_version}.dev{github_run_number}"
+              data['project']['version'] = new_version
+              print(f"Set version to {new_version}", file=sys.stderr)
+              with open(pyproject_path, 'w') as f:
+                  toml.dump(data, f)
+              print("Updated pyproject.toml with dev version", file=sys.stderr)
+          EOF
+        shell: bash
+
+      - name: Update version in pyproject.toml
+        if: github.ref == 'refs/heads/development'
+        run: python update_version.py
+        env:
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+          GITHUB_REF: ${{ github.ref }}
 
       - name: Cache pip packages
         uses: actions/cache@v4
@@ -103,13 +73,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           pip install nuitka zstandard
-
           echo "--- Phase 1: Heavy Binaries ---"
           pip install numpy scipy pandas matplotlib onnxruntime pillow
-
           echo "--- Phase 2: Medium & Complex Dependencies ---"
           pip install mne sympy
-
           echo "--- Phase 3: All Remaining Dependencies & Project ---"
           pip install .
         shell: bash
@@ -140,8 +107,6 @@ jobs:
             --user-package-configuration-file=nidra.nuitka-package.config.yml \
             NIDRA/nidra_gui/launcher.py
         shell: bash
-
-
 
       - name: Sign Executable
         env:
