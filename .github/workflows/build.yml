@@ -28,11 +28,12 @@ jobs:
           msystem: MINGW64
           update: true
           install: >-
+            mingw-w64-x86_64-toolchain
+            ca-certificates
             mingw-w64-x86_64-python
             mingw-w64-x86_64-python-pip
             mingw-w64-x86_64-python-numpy
             mingw-w64-x86_64-python-scipy
-            mingw-w64-x86_64-toolchain
 
       - name: Install 7-Zip
         run: choco install 7zip.install
