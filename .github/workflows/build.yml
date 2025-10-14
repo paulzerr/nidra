@@ -34,7 +34,7 @@ jobs:
             mingw-w64-x86_64-toolchain
 
       - name: Set up 7-Zip
-        uses: jimmy-c/install-7-zip-action@v2
+        uses: iza-mx/setup-7-zip@v1
 
       - name: Install Python dependencies
         run: python -m pip install toml pyinstaller
@@ -128,7 +128,7 @@ jobs:
           ;!@InstallEnd@!
           EOF
           7z a NIDRA_archive.7z NIDRA_app
-          cat "/c/Program Files/7-Zip/7zS.sfx" sfx_config.txt NIDRA_archive.7z > NIDRA_installer.exe
+          cat "$SevenZip_ROOT/7zS.sfx" sfx_config.txt NIDRA_archive.7z > NIDRA_installer.exe
 
       - name: Upload Windows Installer
         if: github.ref == 'refs/heads/development'
