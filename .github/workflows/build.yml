@@ -108,7 +108,7 @@ jobs:
           curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -o examples/test_data_zmax/EEG_R.edf
 
       - name: Build Executable with PyInstaller
-        run: pyinstaller NIDRA.spec
+        run: python -m pyinstaller NIDRA.spec
 
       - name: Bundle VC++ DLLs
         run: |
@@ -145,7 +145,7 @@ jobs:
           RunProgram="NIDRA_app\\NIDRA_launcher.exe"
           ;!@InstallEnd@!
           EOF
-          7z a NIDRA_archive.7z NIDRA_app
+          "/c/Program Files/7-Zip/7z.exe" a NIDRA_archive.7z NIDRA_app
           cat "/c/Program Files/7-Zip/7zS.sfx" sfx_config.txt NIDRA_archive.7z > NIDRA_installer.exe
 
       - name: Upload Windows Installer
