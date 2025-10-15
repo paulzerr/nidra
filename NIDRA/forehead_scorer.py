@@ -13,7 +13,7 @@ class ForeheadScorer:
     """
     def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None,
                  sfreq: float = None, model_name: str = "ez6", device_type: str = 'zmax',
-                 forehead_mode: str = 'two_files', forehead_ch_names: list = None,
+                 zmax_mode: str = 'two_files', zmax_channels: list = None,
                  create_output_files: bool = None):
         if input_file is None and data is None:
             raise ValueError("Either 'input_file' or 'data' must be provided.")
@@ -37,8 +37,8 @@ class ForeheadScorer:
 
         self.model_name = model_name
         self.device_type = device_type
-        self.forehead_mode = forehead_mode
-        self.forehead_ch_names = forehead_ch_names
+        self.zmax_mode = zmax_mode
+        self.zmax_channels = zmax_channels
         self.session = None
         self.input_name = None
         self.output_name = None
@@ -106,7 +106,7 @@ class ForeheadScorer:
             return
 
         if self.device_type == 'zmax':
-            if self.forehead_mode == 'two_files':
+            if self.zmax_mode == 'two_files':
                 # Assumes the input_file is the path to the LEFT channel EDF,
                 # and the RIGHT channel is in the same folder with a similar name.
                 rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
@@ -124,11 +124,11 @@ class ForeheadScorer:
                 info = mne.create_info(['eegl', 'eegr'], sfreq=self.target_fs, ch_types=['eeg', 'eeg'], verbose=False)
                 self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
 
-            elif self.forehead_mode == 'one_file':
+            elif self.zmax_mode == 'one_file':
                 raw = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
                 
-                if self.forehead_ch_names and len(self.forehead_ch_names) == 2:
-                    ch_names = self.forehead_ch_names
+                if self.zmax_channels and len(self.zmax_channels) == 2:
+                    ch_names = self.zmax_channels
                 else:
                     if len(raw.ch_names) < 2:
                         raise ValueError("EDF file must have at least two channels for 'one_file' mode when no channels are selected.")

@@ -39,6 +39,7 @@ function initializeApp() {
     const browseOutputDirBtn = document.getElementById('browse-output-btn');
     const helpBtn = document.getElementById('help-btn');
     const showExampleBtn = document.getElementById('show-example-btn');
+    const openRecentBtn = document.getElementById('open-recent-btn');
     const zmaxOptions = document.getElementById('zmax-options');
     const selectChannelsBtn = document.getElementById('select-channels-btn');
     const zmaxModeRadios = document.querySelectorAll('input[name="zmax-mode"]');
@@ -224,6 +225,22 @@ function initializeApp() {
             console.error('Failed to run example:', error);
             alert('An error occurred while trying to run the example.');
             stopPolling();
+        }
+    });
+
+    openRecentBtn.addEventListener('click', async () => {
+        try {
+            const response = await fetch('/open-recent-results', { method: 'POST' });
+            const result = await response.json();
+
+            if (response.ok) {
+                console.log(result.message);
+            } else {
+                alert(`Error: ${result.message}`);
+            }
+        } catch (error) {
+            console.error('Failed to open recent results folder:', error);
+            alert('An error occurred while trying to open the recent results folder.');
         }
     });
 

@@ -6,6 +6,8 @@ import logging
 from pathlib import Path
 import importlib.resources
 import platform
+import os
+import subprocess
 import mne
 
 from NIDRA import scorer as scorer_factory
@@ -114,6 +116,41 @@ def select_directory():
         return jsonify({'status': 'success', 'path': result['path']})
     else:
         return jsonify({'status': 'cancelled'})
+
+@app.route('/open-recent-results', methods=['POST'])
+def open_recent_results():
+    """Finds the most recent output folder from the log and opens it."""
+    try:
+        if not LOG_FILE.exists():
+            return jsonify({'status': 'error', 'message': 'Log file not found.'}), 404
+
+        last_output_dir = None
+        with open(LOG_FILE, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if "Results saved to:" in line:
+                    # Extract the path after the colon and strip whitespace
+                    path_str = line.split("Results saved to:", 1)[1].strip()
+                    last_output_dir = Path(path_str)
+
+        if last_output_dir and last_output_dir.exists():
+            logger.info(f"Opening recent results folder: {last_output_dir}")
+            if platform.system() == "Windows":
+                os.startfile(last_output_dir)
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", last_output_dir])
+            else:  # Linux and other UNIX-like systems
+                subprocess.run(["xdg-open", last_output_dir])
+            return jsonify({'status': 'success', 'message': f'Opened folder: {last_output_dir}'})
+        elif last_output_dir:
+            logger.error(f"Could not open recent results folder because it does not exist: {last_output_dir}")
+            return jsonify({'status': 'error', 'message': f'The most recent results folder does not exist:\n{last_output_dir}'}), 404
+        else:
+            logger.warning("Could not find a recent results folder in the log file.")
+            return jsonify({'status': 'error', 'message': 'No recent results folder found in the log.'}), 404
+
+    except Exception as e:
+        logger.error(f"An error occurred while trying to open the recent results folder: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': 'An unexpected error occurred.'}), 500
 
 @app.route('/start-scoring', methods=['POST'])
 def start_scoring():
