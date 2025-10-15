@@ -1,3 +1,69 @@
+# Uniform UI Scaling - Implementation Guide
+
+## Goal
+Create a UI that scales uniformly (like zooming an image) when the browser window resizes, with easy adjustment via one or two control values. All elements maintain their proportions and nothing disappears off-screen.
+
+## The Problem with Current Implementation
+
+Your current code has **two critical bugs**:
+
+1. **Line 18: Wrong DPI math**
+   ```javascript
+   const effective_scale = scale / dpi;  // ❌ DIVIDING by DPI
+   ```
+   Should be:
+   ```javascript
+   const effective_scale = scale;  // ✅ DON'T adjust for DPI at all
+   ```
+   The browser already handles DPI scaling. When you divide by devicePixelRatio, you're making elements *smaller* on high-DPI displays (MacBook Retina, high-res Windows, etc.).
+
+2. **BASE_FONT_SCALE = 2.4 is way too large**
+   This makes text 2.4x bigger than your base scale unit. Combined with viewport scaling, this creates massive elements.
+
+## The Correct Implementation
+
+### JavaScript: Simple, Robust Scaling Function
+
+Replace your entire `scaleUi()` function with this:
+
+```javascript
+function initializeApp() {
+    // ============================================
+    // MASTER SCALING CONTROLS
+    // Adjust these two values to resize entire UI
+    // ============================================
+    const MASTER_SCALE = 1.0;      // Overall size multiplier (1.0 = default)
+    const DESIGN_WIDTH = 1920;     // Reference width for your design
+    
+    function scaleUi() {
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        // Calculate scale based on how much smaller/larger than design width
+        const baseScale = viewportWidth / DESIGN_WIDTH;
+        
+        // Apply master scale multiplier
+        const finalScale = baseScale * MASTER_SCALE;
+        
+        // Set CSS variable that everything uses
+        document.documentElement.style.setProperty('--scale', finalScale);
+    }
+
+    // Initial scale
+    scaleUi();
+    
+    // Re-scale on window resize
+    window.addEventListener('resize', scaleUi);
+    
+    // ... rest of your code
+}
+```
+
+### CSS: Everything References One Scale Variable
+
+Replace your CSS `:root` section:
+
+```css
 :root {
     /* Computed by JavaScript */
     --scale: 1;
@@ -18,12 +84,6 @@
     --border-color: #d9d9d9;
 }
 
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
-
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
     background-color: var(--light-gray);
@@ -35,7 +95,13 @@ body {
     font-size: var(--font-size);
     line-height: 1.5;
 }
+```
 
+### CSS: Update All Sizing to Use --unit
+
+Replace your current sizing with consistent unit-based values:
+
+```css
 .container {
     display: flex;
     width: 95vw;
@@ -304,3 +370,77 @@ input[type="radio"], input[type="checkbox"] {
     margin-top: auto;
     width: 100%;
 }
+```
+
+## How to Adjust the UI Size
+
+You now have **two master controls** at the top of your JavaScript:
+
+### 1. `MASTER_SCALE` - Overall Size Multiplier
+```javascript
+const MASTER_SCALE = 1.0;   // Default size
+const MASTER_SCALE = 0.8;   // 20% smaller
+const MASTER_SCALE = 1.2;   // 20% larger
+```
+This uniformly scales everything - fonts, spacing, buttons, everything.
+
+### 2. `DESIGN_WIDTH` - Reference Resolution
+```javascript
+const DESIGN_WIDTH = 1920;  // Designed for 1920px width
+const DESIGN_WIDTH = 1600;  // Designed for 1600px width
+```
+This determines what screen width shows the UI at "native" size. On a 1920px window with DESIGN_WIDTH=1920, scale=1.0. On a 1600px window, scale=0.83.
+
+### Fine-Tuning Individual Elements
+
+If you need to adjust just fonts or just spacing:
+
+```css
+:root {
+    --base-unit: 16px;   /* Increase to make spacing larger */
+    --base-font: 14px;   /* Increase to make text larger */
+}
+```
+
+## Why This Works Universally
+
+1. **No DPI Math**: The browser handles devicePixelRatio automatically. CSS pixels are already device-independent.
+
+2. **Single Source of Truth**: Everything scales from `--scale` variable. Change one number, everything scales proportionally.
+
+3. **Viewport-Based**: Uses actual window dimensions, not aspect ratios or complex formulas.
+
+4. **Predictable**: Linear relationship between window size and UI size. 50% smaller window = 50% smaller UI.
+
+5. **No Browser Differences**: Pure CSS calc() and viewport units work identically across all browsers.
+
+## Testing & Calibration Process
+
+1. **Set DESIGN_WIDTH to your current monitor's width** (e.g., 1920)
+2. **Set MASTER_SCALE = 1.0**
+3. **Resize browser window** - everything should scale proportionally
+4. **If too large at default size**: Decrease MASTER_SCALE to 0.9 or 0.8
+5. **If too small at default size**: Increase MASTER_SCALE to 1.1 or 1.2
+6. **Test on different displays**: The ratio should remain consistent
+
+## Expected Results
+
+- ✅ UI scales uniformly like zooming an image
+- ✅ Same proportions on all displays, DPI settings, and browsers
+- ✅ Change 1-2 values to adjust entire UI
+- ✅ No elements disappear off-screen
+- ✅ Works on Windows 100%, 125%, 150% scaling
+- ✅ Works on macOS Retina displays
+- ✅ Smooth, predictable resizing behavior
+
+## Migration Steps
+
+1. Replace `scaleUi()` function with the new version
+2. Update CSS `:root` variables
+3. Find/replace all `var(--ui-scale)` with `var(--unit)` in CSS
+4. Find/replace all `var(--font-scale)` with `var(--font-size)` in CSS
+5. Test at multiple window sizes
+6. Adjust MASTER_SCALE until it looks right
+7. Test on different displays/browsers
+
+The key insight: **Don't fight DPI scaling, ignore it.** The browser already knows how to display CSS pixels correctly on every device.

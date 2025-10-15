@@ -1,35 +1,45 @@
 function initializeApp() {
-    // --- Dynamic UI Scaling ---
-    const BASE_UI_SCALE = 1.4; // Overall size of UI elements (padding, margins, etc.)
-    const BASE_FONT_SCALE = 2.4; // Overall font size
-
-    const apect_ratio = 16 / 9;
-    const apect_ratio_threshold = 0.1;
-
+    // ============================================
+    // MASTER SCALING CONTROLS
+    // ============================================
+    const MASTER_SCALE = 1.0;      // Overall size multiplier
+    const DESIGN_WIDTH = 1920;     // Screen width where UI looks "native"
+    const DESIGN_HEIGHT = 1080;    // Screen height where UI looks "native"
+    
     function scaleUi() {
-        const { clientWidth, clientHeight } = document.documentElement;
-        const current_ap = clientWidth / clientHeight;
-        const root = document.documentElement;
-
-        let scale;
-        if (Math.abs(current_ap - apect_ratio) < apect_ratio_threshold) {
-            scale = clientWidth / 100;
-        } else {
-            scale = Math.min(clientWidth / (100 * 1.6), clientHeight / (100 * 0.9));
-        }
-
-        // --- Cross-platform DPI Scaling ---
-        const dpi = window.devicePixelRatio || 1;
-        const effective_scale = scale / dpi;
-
-        root.style.setProperty('--ui-scale', `${effective_scale * BASE_UI_SCALE}px`);
-        root.style.setProperty('--font-scale', `${effective_scale * BASE_FONT_SCALE}px`);
+        const container = document.querySelector('.container');
+        if (!container) return;
+        
+        // Get actual visible content area (excludes browser toolbars)
+        const containerWidth = container.offsetWidth;
+        const containerHeight = container.offsetHeight;
+        
+        // Calculate scale for both dimensions
+        const widthScale = containerWidth / DESIGN_WIDTH;
+        const heightScale = containerHeight / DESIGN_HEIGHT;
+        
+        // Use smaller scale to ensure everything fits
+        const baseScale = Math.min(widthScale, heightScale);
+        
+        // Apply master multiplier
+        const finalScale = baseScale * MASTER_SCALE;
+        
+        // Set CSS variable
+        document.documentElement.style.setProperty('--scale', finalScale);
     }
 
+    // Initial scale
     scaleUi();
-
-    // Rescale UI on window resize
+    
+    // Re-scale on window resize
     window.addEventListener('resize', scaleUi);
+    
+    // Observe container size changes (handles browser zoom, dev tools)
+    const container = document.querySelector('.container');
+    if (container && window.ResizeObserver) {
+        const resizeObserver = new ResizeObserver(scaleUi);
+        resizeObserver.observe(container);
+    }
 
     const runBtn = document.getElementById('run-btn');
     const consoleOutput = document.getElementById('console');
