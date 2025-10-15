@@ -24,11 +24,16 @@ class PSGScorer:
     """
     Scores sleep stages from PSG data.
     """
-    def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None, ch_names: List[str] = None, sfreq: float = None, model_name: str = "u-sleep-nsrr-2024_eeg", epoch_sec: int = 30):
+    def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None, ch_names: List[str] = None, sfreq: float = None, model_name: str = "u-sleep-nsrr-2024_eeg", epoch_sec: int = 30, create_output_files: bool = None):
         if input_file is None and data is None:
             raise ValueError("Either 'input_file' or 'data' must be provided.")
         if data is not None and sfreq is None:
             raise ValueError("'sfreq' must be provided when 'data' is given.")
+
+        if create_output_files is None:
+            self.create_output_files = True if input_file else False
+        else:
+            self.create_output_files = create_output_files
 
         self.output_dir = Path(output_dir)
         self.input_data = data
@@ -56,7 +61,8 @@ class PSGScorer:
         self.hypnogram = None
         self.probabilities = None
         
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        if self.create_output_files:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def score(self, plot: bool = False):
         self._load_recording()
@@ -64,9 +70,10 @@ class PSGScorer:
         self._initialize_model()
         self._predict()
         self._postprocess()
-        self._save_results()
-        if plot:
-            self.plot()
+        if self.create_output_files:
+            self._save_results()
+            if plot:
+                self.plot()
         return self.hypnogram, self.probabilities
 
     def plot(self):

@@ -12,13 +12,22 @@ class ForeheadScorer:
     Scores sleep stages from forehead EEG data.
     """
     def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None,
-                 model_name: str = "ez6", device_type: str = 'zmax',
-                 zmax_mode: str = 'two_files', zmax_ch_names: list = None):
+                 sfreq: float = None, model_name: str = "ez6", device_type: str = 'zmax',
+                 forehead_mode: str = 'two_files', forehead_ch_names: list = None,
+                 create_output_files: bool = None):
         if input_file is None and data is None:
             raise ValueError("Either 'input_file' or 'data' must be provided.")
+        if data is not None and sfreq is None:
+            raise ValueError("'sfreq' must be provided when 'data' is given.")
+
+        if create_output_files is None:
+            self.create_output_files = True if input_file else False
+        else:
+            self.create_output_files = create_output_files
 
         self.output_dir = Path(output_dir)
         self.input_data = data
+        self.sfreq = sfreq
         if input_file:
             self.input_file = Path(input_file)
             self.base_filename = f"{self.input_file.parent.name}_{self.input_file.stem}"
@@ -28,8 +37,8 @@ class ForeheadScorer:
 
         self.model_name = model_name
         self.device_type = device_type
-        self.zmax_mode = zmax_mode
-        self.zmax_ch_names = zmax_ch_names
+        self.forehead_mode = forehead_mode
+        self.forehead_ch_names = forehead_ch_names
         self.session = None
         self.input_name = None
         self.output_name = None
@@ -39,8 +48,11 @@ class ForeheadScorer:
         self.processed_data = None
         self.num_full_seqs = None
         self.raw_predictions = None
+        self.target_fs = 64
+        self.epoch_size = 30
 
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        if self.create_output_files:
+            self.output_dir.mkdir(parents=True, exist_ok=True)
 
     def score(self, plot: bool = False):
         self._load_model()
@@ -48,9 +60,10 @@ class ForeheadScorer:
         self._preprocess()
         self._predict()
         self._postprocess()
-        self._save_results()
-        if plot:
-            self.plot()
+        if self.create_output_files:
+            self._save_results()
+            if plot:
+                self.plot()
         return self.hypnogram, self.probabilities
 
     def plot(self):
@@ -84,17 +97,16 @@ class ForeheadScorer:
             self.output_name = self.session.get_outputs()[0].name
 
     def _load_recording(self):
-        fs = 64
         if self.input_data is not None:
             if self.input_data.ndim != 2 or self.input_data.shape[0] != 2:
                 raise ValueError("Input data must be a 2D array with 2 channels.")
-            info = mne.create_info(['eegl', 'eegr'], sfreq=fs, ch_types=['eeg', 'eeg'], verbose=False)
+            info = mne.create_info(['eegl', 'eegr'], sfreq=self.sfreq, ch_types=['eeg', 'eeg'], verbose=False)
             self.raw = mne.io.RawArray(self.input_data, info, verbose=False)
-            self.raw.filter(l_freq=0.5, h_freq=None, verbose=False)
+            self.raw.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
             return
 
         if self.device_type == 'zmax':
-            if self.zmax_mode == 'two_files':
+            if self.forehead_mode == 'two_files':
                 # Assumes the input_file is the path to the LEFT channel EDF,
                 # and the RIGHT channel is in the same folder with a similar name.
                 rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
@@ -104,19 +116,19 @@ class ForeheadScorer:
                 rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False)
                 
                 # Resample and filter
-                rawL.resample(fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
-                rawR.resample(fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+                rawL.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+                rawR.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
 
                 dataL = rawL.get_data().flatten()
                 dataR = rawR.get_data().flatten()
-                info = mne.create_info(['eegl', 'eegr'], sfreq=fs, ch_types=['eeg', 'eeg'], verbose=False)
+                info = mne.create_info(['eegl', 'eegr'], sfreq=self.target_fs, ch_types=['eeg', 'eeg'], verbose=False)
                 self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
 
-            elif self.zmax_mode == 'one_file':
+            elif self.forehead_mode == 'one_file':
                 raw = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
                 
-                if self.zmax_ch_names and len(self.zmax_ch_names) == 2:
-                    ch_names = self.zmax_ch_names
+                if self.forehead_ch_names and len(self.forehead_ch_names) == 2:
+                    ch_names = self.forehead_ch_names
                 else:
                     if len(raw.ch_names) < 2:
                         raise ValueError("EDF file must have at least two channels for 'one_file' mode when no channels are selected.")
@@ -127,7 +139,7 @@ class ForeheadScorer:
                 raw.reorder_channels(['eegl', 'eegr'])
                 
                 # Resample and filter
-                raw.resample(fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+                raw.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
                 self.raw = raw
 
     def _predict(self):
@@ -161,8 +173,6 @@ class ForeheadScorer:
 
     def _preprocess(self):
         seq_length = 100
-        fs = 64
-        epoch_size = 30
         sdata = self.raw.get_data()
         for ch in range(sdata.shape[0]):
             sig = sdata[ch]
@@ -182,7 +192,7 @@ class ForeheadScorer:
         if data_as_array.shape[0] > data_as_array.shape[1]:
             data_as_array = data_as_array.T
 
-        num_channels, epoch_length = data_as_array.shape[0], epoch_size * fs
+        num_channels, epoch_length = data_as_array.shape[0], self.epoch_size * self.target_fs
         num_epochs = int(np.floor(data_as_array.shape[1] / epoch_length))
 
         epoched_data = np.full((num_channels, num_epochs, epoch_length), np.nan)
@@ -205,10 +215,8 @@ class ForeheadScorer:
         self.processed_data, self.num_full_seqs = seqdat, num_full_seqs
 
     def _postprocess(self):
-        fs = 64
-        epoch_size = 30
         # get number of complete 30-second epochs that exist in the raw EEG recording
-        num_epochs = int(np.floor(self.raw.get_data().shape[1] / (epoch_size * fs)))
+        num_epochs = int(np.floor(self.raw.get_data().shape[1] / (self.epoch_size * self.target_fs)))
         # truncate predictions to match number of full epochs in recording
         ypred_raw = self.raw_predictions[:num_epochs, :]
         # reorder model output to fit standard sleep stage order
