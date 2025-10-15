@@ -237,7 +237,7 @@ input[type="radio"], input[type="checkbox"] {
 #select-channels-btn {
     margin-left: var(--ui-scale);
     height: auto;
-    padding: calc(0.5 * var(--ui-scale)) var(--ui-scale);
+    padding: calc(0.75 * var(--ui-scale)) var(--ui-scale);
     font-size: 0.9em;
     visibility: hidden; /* Reserve space, but hide */
 }

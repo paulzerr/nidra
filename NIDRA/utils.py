@@ -23,33 +23,45 @@ class BatchScorer:
     A class to handle batch scoring of a study directory.
     It finds all valid recordings in subdirectories and scores them in a single run.
     """
-    def __init__(self, input_dir, output_dir, scorer_type, model_name=None):
-        self.input_dir = Path(input_dir)
+    def __init__(self, input_dir, output_dir, scorer_type, model_name=None, dir_list=None):
+        self.input_dir = Path(input_dir) if input_dir else None
         self.output_dir = Path(output_dir)
         self.scorer_type = scorer_type
         self.model_name = model_name
+        self.dir_list = dir_list
         self.files_to_process = self._find_files()
 
     def _find_files(self):
         """Finds all valid recording files in the input directory."""
-        logger.info(f"Searching for recordings in '{self.input_dir}'...")
+        if self.dir_list:
+            logger.info(f"Searching for recordings in {len(self.dir_list)} specified directories...")
+            dirs_to_search = [Path(d) for d in self.dir_list]
+        else:
+            logger.info(f"Searching for recordings in '{self.input_dir}'...")
+            dirs_to_search = [subdir for subdir in sorted(self.input_dir.iterdir()) if subdir.is_dir()]
+
         files = []
-        for subdir in sorted(self.input_dir.iterdir()):
-            if subdir.is_dir():
-                try:
-                    if self.scorer_type == 'psg':
-                        file = next(subdir.glob('*.edf'))
-                        files.append(file)
-                    else:  # 'forehead'
-                        l_file = next(subdir.glob('*[lL].edf'))
-                        next(subdir.glob('*[rR].edf'))  # Verify R file exists
-                        files.append(l_file)
-                except StopIteration:
-                    logger.warning(f"Could not find a complete recording in subdirectory '{subdir.name}'. Skipping.")
-                    continue
+        for subdir in dirs_to_search:
+            if not subdir.is_dir():
+                logger.warning(f"'{subdir}' is not a directory. Skipping.")
+                continue
+            try:
+                if self.scorer_type == 'psg':
+                    file = next(subdir.glob('*.edf'))
+                    files.append(file)
+                else:  # 'forehead'
+                    l_file = next(subdir.glob('*[lL].edf'))
+                    next(subdir.glob('*[rR].edf'))  # Verify R file exists
+                    files.append(l_file)
+            except StopIteration:
+                logger.warning(f"Could not find a complete recording in subdirectory '{subdir.name}'. Skipping.")
+                continue
         
         if not files:
-            logger.warning(f"Could not find any suitable recordings in subdirectories of '{self.input_dir}'.")
+            if self.dir_list:
+                logger.warning(f"Could not find any suitable recordings in the provided list of directories.")
+            else:
+                logger.warning(f"Could not find any suitable recordings in subdirectories of '{self.input_dir}'.")
         else:
             logger.info(f"Found {len(files)} recording(s) to process.")
             logger.info("The following recordings will be processed:")
@@ -122,7 +134,7 @@ class BatchScorer:
         
         return processed_count, len(self.files_to_process)
 
-def batch_scorer(input_dir, output_dir, scorer_type, model_name=None):
+def batch_scorer(input_dir, output_dir, scorer_type, model_name=None, dir_list=None):
     """
     Factory function to create a BatchScorer instance.
     This is the recommended entry point for batch processing.
@@ -131,10 +143,11 @@ def batch_scorer(input_dir, output_dir, scorer_type, model_name=None):
         output_dir (str): Path where results will be saved.
         scorer_type (str): Type of data, either 'forehead' or 'psg'.
         model_name (str, optional): Name of the model to use.
+        dir_list (list, optional): A list of directories to process.
     Returns:
         BatchScorer: An instance of the BatchScorer class.
     """
-    return BatchScorer(input_dir, output_dir, scorer_type, model_name)
+    return BatchScorer(input_dir, output_dir, scorer_type, model_name, dir_list=dir_list)
 
 def calculate_font_size(screen_height, percentage, min_size, max_size):
     """Calculates font size as a percentage of screen height with min/max caps."""

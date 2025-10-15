@@ -20,6 +20,7 @@
                 <div class="radio-group">
                     <label><input type="radio" name="scoring-mode" value="single" checked> {{ texts["OPTIONS_SCORE_SINGLE"] }}</label>
                     <label><input type="radio" name="scoring-mode" value="subdirs"> {{ texts["OPTIONS_SCORE_SUBDIRS"] }}</label>
+                    <label><input type="radio" name="scoring-mode" value="from_file" id="score-from-file"> Score all recordings (paths in .txt file)</label>
                 </div>
             </div>
 
@@ -60,8 +61,8 @@
                         <span class="placeholder"></span>
                     </label>
                     <label class="flex-label">
-                        <span><input type="radio" name="zmax-mode" value="one_file"> 1 file per recording</span>
-                        <button id="select-channels-btn" class="browse-btn">Select Channels (optional)</button>
+                        <span><input type="radio" name="zmax-mode" value="one_file"> 1 file per recording (multi-channel .edf)</span>
+                        <button id="select-channels-btn" class="browse-btn">Select channels (optional)</button>
                     </label>
                 </div>
             </div>

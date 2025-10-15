@@ -108,6 +108,7 @@ function initializeApp() {
     // Handle Run Button click
     runBtn.addEventListener('click', async () => {
         const zmaxMode = document.querySelector('input[name="zmax-mode"]:checked').value;
+        const scoringMode = document.querySelector('input[name="scoring-mode"]:checked').value;
         const payload = {
             input_dir: document.getElementById('input-dir').value,
             output_dir: document.getElementById('output-dir').value,
@@ -115,7 +116,8 @@ function initializeApp() {
             model_name: modelNameSelect.value,
             plot: document.getElementById('gen-plot').checked,
             gen_stats: document.getElementById('gen-stats').checked,
-            score_subdirs: document.querySelector('input[name="scoring-mode"]:checked').value === 'subdirs',
+            score_subdirs: scoringMode === 'subdirs',
+            score_from_file: scoringMode === 'from_file',
             zmax_mode: zmaxMode,
             zmax_channels: zmaxMode === 'one_file' ? window.selectedChannels : null
         };
@@ -152,26 +154,46 @@ function initializeApp() {
 
     // "Browse" button functionality
     const handleBrowseClick = async (targetInputId) => {
-        try {
-            const response = await fetch('/select-directory');
-            const result = await response.json();
+        const scoringMode = document.querySelector('input[name="scoring-mode"]:checked').value;
 
-            if (response.ok && result.status === 'success') {
-                document.getElementById(targetInputId).value = result.path;
-                if (targetInputId === 'input-dir') {
-                    const outputDirInput = document.getElementById('output-dir');
-                    if (!outputDirInput.value) {
-                        outputDirInput.value = result.path + '/autoscorer_output';
-                    }
+        if (scoringMode === 'from_file') {
+            try {
+                const response = await fetch('/select-file');
+                const result = await response.json();
+
+                if (response.ok && result.status === 'success') {
+                    document.getElementById(targetInputId).value = result.path;
+                } else if (result.status === 'cancelled') {
+                    console.log('File selection was cancelled.');
+                } else {
+                    alert(`Error selecting file: ${result.message}`);
                 }
-            } else if (result.status === 'cancelled') {
-                console.log('Directory selection was cancelled.');
-            } else {
-                alert(`Error selecting directory: ${result.message}`);
+            } catch (error) {
+                console.error('Failed to open file dialog:', error);
+                alert('An error occurred while trying to open the file dialog.');
             }
-        } catch (error) {
-            console.error('Failed to open directory dialog:', error);
-            alert('An error occurred while trying to open the directory dialog.');
+        } else {
+            try {
+                const response = await fetch('/select-directory');
+                const result = await response.json();
+
+                if (response.ok && result.status === 'success') {
+                    document.getElementById(targetInputId).value = result.path;
+                    if (targetInputId === 'input-dir') {
+                        const outputDirInput = document.getElementById('output-dir');
+                        if (!outputDirInput.value) {
+                            outputDirInput.value = result.path + '/autoscorer_output';
+                        }
+                    }
+                } else if (result.status === 'cancelled') {
+                    console.log('Directory selection was cancelled.');
+                } else {
+                    alert(`Error selecting directory: ${result.message}`);
+                }
+            } catch (error) {
+                console.error('Failed to open directory dialog:', error);
+                alert('An error occurred while trying to open the directory dialog.');
+            }
         }
     };
 

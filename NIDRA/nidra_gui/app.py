@@ -219,11 +219,24 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
     try:
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
         if score_subdirs:
+            dir_list = None
+            # If the input is a text file, read the directories from it
+            if Path(input_dir).suffix.lower() == '.txt':
+                try:
+                    with open(input_dir, 'r') as f:
+                        dir_list = [line.strip() for line in f if line.strip()]
+                    logger.info(f"Found {len(dir_list)} directories to process from {input_dir}.")
+                except Exception as e:
+                    logger.error(f"Error reading directory list from {input_dir}: {e}", exc_info=True)
+                    is_scoring_running = False
+                    return
+
             batch = utils.batch_scorer(
                 input_dir=input_dir,
                 output_dir=output_dir,
                 scorer_type=scorer_type,
-                model_name=model_name
+                model_name=model_name,
+                dir_list=dir_list
             )
             success_count, total_count = batch.score(plot=plot, gen_stats=gen_stats)
         else:
