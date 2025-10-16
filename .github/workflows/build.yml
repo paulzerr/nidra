@@ -135,7 +135,7 @@ jobs:
           ;!@InstallEnd@!
           "@ | Set-Content -Path sfx_config.txt
           & "C:\Program Files\7-Zip\7z.exe" a NIDRA_archive.7z NIDRA_app NIDRA_launcher.exe
-          cmd /c "copy /b \"C:\Program Files\7-Zip\7zS.sfx\" + sfx_config.txt + NIDRA_archive.7z NIDRA_installer.exe"
+          cmd.exe --% /c copy /b "C:\Program Files\7-Zip\7zS.sfx" + sfx_config.txt + NIDRA_archive.7z NIDRA_installer.exe
 
       - name: Upload Windows Installer
         if: github.ref == 'refs/heads/development'
