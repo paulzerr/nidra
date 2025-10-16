@@ -122,9 +122,6 @@ jobs:
           "@ | Set-Content -Path launcher.c
           cl.exe launcher.c /Fe:NIDRA_launcher.exe /link /SUBSystem:windows Shell32.lib
 
-      - name: Debug 7-Zip installation
-        run: Get-ChildItem -Path "C:\Program Files\7-Zip" -Recurse
-
       - name: Create Self-Extracting Archive
         run: |
           @"
@@ -136,7 +133,7 @@ jobs:
           ;!@InstallEnd@!
           "@ | Set-Content -Path sfx_config.txt
           & "C:\Program Files\7-Zip\7z.exe" a NIDRA_archive.7z NIDRA_app NIDRA_launcher.exe
-          cmd.exe --% /c copy /b "C:\Program Files\7-Zip\7zS.sfx" + sfx_config.txt + NIDRA_archive.7z NIDRA_installer.exe
+          cmd.exe --% /c copy /b "C:\Program Files\7-Zip\7z.sfx" + sfx_config.txt + NIDRA_archive.7z NIDRA_installer.exe
 
       - name: Upload Windows Installer
         if: github.ref == 'refs/heads/development'
