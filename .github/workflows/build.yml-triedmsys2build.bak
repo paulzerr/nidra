@@ -16,37 +16,46 @@ jobs:
     timeout-minutes: 999
     defaults:
       run:
-        shell: powershell
+        shell: msys2 {0}
+
+    env:
+      SSL_CERT_FILE: /mingw64/ssl/certs/ca-bundle.crt
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
         with:
-          python-version: '3.9'
-
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-toolchain
+            ca-certificates
+            mingw-w64-x86_64-python
+            mingw-w64-x86_64-python-pip
+            mingw-w64-x86_64-python-numpy
+            mingw-w64-x86_64-python-scipy
+            mingw-w64-x86_64-python-pandas
+            mingw-w64-x86_64-python-matplotlib
+            mingw-w64-x86_64-python-pillow
+            mingw-w64-x86_64-python-psutil
+            mingw-w64-x86_64-pyinstaller
+            
       - name: Install 7-Zip
         run: choco install 7zip.install
+        shell: powershell
 
       - name: Setup Python Environment and Install Dependencies
         run: |
-          python -m venv venv
-          .\venv\Scripts\activate
-          python -m pip install --upgrade pip setuptools wheel
-          pip install pyinstaller toml
-          echo "--- Phase 1: Heavy Binaries ---"
-          pip install numpy scipy pandas matplotlib onnxruntime pillow
-          echo "--- Phase 2: Medium & Complex Dependencies ---"
-          pip install mne sympy
-          echo "--- Phase 3: All Remaining Dependencies & Project ---"
-          pip install .
+          python -m venv --system-site-packages venv
+          venv/bin/python -m pip install .
 
       - name: Create script to update version
         if: github.ref == 'refs/heads/development'
         run: |
-          @"
+          cat << 'EOF' > update_version.py
           import toml
           import os
           import sys
@@ -65,40 +74,41 @@ jobs:
               with open(pyproject_path, 'w') as f:
                   toml.dump(data, f)
               print("Updated pyproject.toml with dev version", file=sys.stderr)
-          "@ | Set-Content -Path update_version.py
+          EOF
 
       - name: Update version in pyproject.toml
         if: github.ref == 'refs/heads/development'
-        run: .\venv\Scripts\python update_version.py
+        run: venv/bin/python update_version.py
         env:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
           GITHUB_REF: ${{ github.ref }}
 
       - name: Download Models from Hugging Face
         run: |
-          New-Item -ItemType Directory -Force -Path NIDRA/models
-          Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6.onnx -OutFile NIDRA/models/ez6.onnx
-          Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6moe.onnx -OutFile NIDRA/models/ez6moe.onnx
-          Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024.onnx -OutFile NIDRA/models/u-sleep-nsrr-2024.onnx
-          Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024_eeg.onnx -OutFile NIDRA/models/u-sleep-nsrr-2024_eeg.onnx
+          mkdir -p NIDRA/models
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6.onnx -o NIDRA/models/ez6.onnx
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6moe.onnx -o NIDRA/models/ez6moe.onnx
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024.onnx -o NIDRA/models/u-sleep-nsrr-2024.onnx
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024_eeg.onnx -o NIDRA/models/u-sleep-nsrr-2024_eeg.onnx
 
       - name: Download Example Data from Hugging Face
         run: |
-          New-Item -ItemType Directory -Force -Path examples/test_data_zmax
-          Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_L.edf -OutFile examples/test_data_zmax/EEG_L.edf
-          Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -OutFile examples/test_data_zmax/EEG_R.edf
+          mkdir -p examples/test_data_zmax
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_L.edf -o examples/test_data_zmax/EEG_L.edf
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -o examples/test_data_zmax/EEG_R.edf
 
       - name: Build Executable with PyInstaller
-        run: .\venv\Scripts\python -m PyInstaller NIDRA.spec
+        run: venv/bin/python -m pyinstaller NIDRA.spec
 
-      - name: Setup MSVC Developer Command Prompt
-        uses: ilammy/msvc-dev-cmd@v1
+      - name: Bundle VC++ DLLs
+        run: |
+          find NIDRA/dll -type f ! -name 'ucrtbase.dll' -exec cp {} dist/NIDRA/ \;
 
       - name: Prepare release structure
         run: |
-          New-Item -ItemType Directory -Force -Path NIDRA_app
-          Move-Item -Path dist\NIDRA -Destination NIDRA_app\
-          @"
+          mkdir -p NIDRA_app
+          mv dist/NIDRA NIDRA_app/
+          cat << 'EOF' > launcher.c
           #include <windows.h>
           #include <string.h>
           int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
@@ -112,21 +122,21 @@ jobs:
               ShellExecute(NULL, "open", path, NULL, NULL, SW_SHOWNORMAL);
               return 0;
           }
-          "@ | Set-Content -Path launcher.c
-          cl.exe launcher.c /Fe:NIDRA_app/NIDRA_launcher.exe /link /SUBSYSTEM:WINDOWS
+          EOF
+          gcc launcher.c -o NIDRA_app/NIDRA_launcher.exe -mwindows
 
       - name: Create Self-Extracting Archive
         run: |
-          @"
+          cat << 'EOF' > sfx_config.txt
           ;!@Install@!UTF-8!
           Title="NIDRA Installer"
           BeginPrompt="This will install NIDRA. Do you want to continue?"
           Progress="yes"
           RunProgram="NIDRA_app\\NIDRA_launcher.exe"
           ;!@InstallEnd@!
-          "@ | Set-Content -Path sfx_config.txt
-          & "C:\Program Files\7-Zip\7z.exe" a NIDRA_archive.7z NIDRA_app
-          cmd /c "copy /b \"C:\Program Files\7-Zip\7zS.sfx\" + sfx_config.txt + NIDRA_archive.7z NIDRA_installer.exe"
+          EOF
+          "/c/Program Files/7-Zip/7z.exe" a NIDRA_archive.7z NIDRA_app
+          cat "/c/Program Files/7-Zip/7zS.sfx" sfx_config.txt NIDRA_archive.7z > NIDRA_installer.exe
 
       - name: Upload Windows Installer
         if: github.ref == 'refs/heads/development'
