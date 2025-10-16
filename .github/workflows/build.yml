@@ -89,7 +89,15 @@ jobs:
           Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -OutFile examples/test_data_zmax/EEG_R.edf
 
       - name: Build Executable with PyInstaller
-        run: .\venv\Scripts\python -m PyInstaller NIDRA.spec --name NIDRA
+        run: .\venv\Scripts\python -m PyInstaller NIDRA.spec
+
+      - name: Show dist directory contents
+        run: |
+          if (Test-Path -Path dist) {
+            Get-ChildItem -Path dist -Recurse
+          } else {
+            Write-Host "dist directory not found."
+          }
 
       - name: Setup MSVC Developer Command Prompt
         uses: ilammy/msvc-dev-cmd@v1
@@ -97,7 +105,8 @@ jobs:
       - name: Prepare release structure
         run: |
           New-Item -ItemType Directory -Force -Path NIDRA_app
-          Move-Item -Path dist\NIDRA -Destination NIDRA_app\
+          $buildDir = (Get-ChildItem -Path dist -Directory).Name
+          Move-Item -Path "dist\$buildDir" -Destination "NIDRA_app\NIDRA"
           @"
           #include <windows.h>
           #include <string.h>
@@ -108,12 +117,12 @@ jobs:
               if (last_slash) {
                   *(last_slash + 1) = '\0';
               }
-              strcat(path, "NIDRA\\NIDRA.exe");
+              strcat(path, "NIDRA_app\\NIDRA\\NIDRA.exe");
               ShellExecute(NULL, "open", path, NULL, NULL, SW_SHOWNORMAL);
               return 0;
           }
           "@ | Set-Content -Path launcher.c
-          cl.exe launcher.c /Fe:NIDRA_app/NIDRA_launcher.exe /link /SUBSYSTEM:WINDOWS
+          cl.exe launcher.c /Fe:NIDRA_launcher.exe /link /SUBSystem:windows
 
       - name: Create Self-Extracting Archive
         run: |
@@ -122,10 +131,10 @@ jobs:
           Title="NIDRA Installer"
           BeginPrompt="This will install NIDRA. Do you want to continue?"
           Progress="yes"
-          RunProgram="NIDRA_app\\NIDRA_launcher.exe"
+          RunProgram="NIDRA_launcher.exe"
           ;!@InstallEnd@!
           "@ | Set-Content -Path sfx_config.txt
-          & "C:\Program Files\7-Zip\7z.exe" a NIDRA_archive.7z NIDRA_app
+          & "C:\Program Files\7-Zip\7z.exe" a NIDRA_archive.7z NIDRA_app NIDRA_launcher.exe
           cmd /c "copy /b \"C:\Program Files\7-Zip\7zS.sfx\" + sfx_config.txt + NIDRA_archive.7z NIDRA_installer.exe"
 
       - name: Upload Windows Installer
