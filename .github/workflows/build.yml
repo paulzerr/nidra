@@ -89,7 +89,7 @@ jobs:
           Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -OutFile examples/test_data_zmax/EEG_R.edf
 
       - name: Build Executable with PyInstaller
-        run: .\venv\Scripts\python -m PyInstaller NIDRA.spec
+        run: .\venv\Scripts\python -m PyInstaller NIDRA.spec --name NIDRA
 
       - name: Setup MSVC Developer Command Prompt
         uses: ilammy/msvc-dev-cmd@v1

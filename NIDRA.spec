@@ -27,11 +27,13 @@ a = Analysis(
         'webview',
         'scipy',
         'pandas',
+        'werkzeug',
     ]
     + collect_submodules('scipy')
     + collect_submodules('pandas')
+    + collect_submodules('werkzeug')
     + mne_hiddenimports,  # merge mne hiddenimports
-    hookspath=[], 
+    hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
     excludes=['PyQt5', 'notebook', 'jupyter', 'IPython'],
