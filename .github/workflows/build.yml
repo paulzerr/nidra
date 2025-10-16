@@ -87,9 +87,22 @@ jobs:
           Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -OutFile examples/test_data_zmax/EEG_R.edf
 
       - name: Build Executable with PyInstaller
+        run: Get-ChildItem -Path NIDRA/dll #debugging attempt
+
+      - name: Build Executable with PyInstaller
         run: .\venv\Scripts\python -m PyInstaller NIDRA.spec
 
-      - name: Show dist directory contents
+      - name: Show build directory contents #debugging attempt
+        if: always()
+        run: |
+          if (Test-Path -Path build) {
+            Get-ChildItem -Path build -Recurse
+          } else {
+            Write-Host "build directory not found."
+          }
+
+      - name: Show dist directory contents #debugging attempt
+        if: always()
         run: |
           if (Test-Path -Path dist) {
             Get-ChildItem -Path dist -Recurse
@@ -121,6 +134,19 @@ jobs:
           }
           "@ | Set-Content -Path launcher.c
           cl.exe launcher.c /Fe:NIDRA_launcher.exe /link /SUBSystem:windows Shell32.lib
+
+      - name: Show NIDRA_app directory contents #debugging attempt
+        if: always()
+        run: |
+          if (Test-Path -Path NIDRA_app) {
+            Get-ChildItem -Path NIDRA_app -Recurse
+          } else {
+            Write-Host "NIDRA_app directory not found."
+          }
+
+      - name: List files before creating archive #debugging attempt
+        if: always()
+        run: Get-ChildItem -Path .
 
       - name: Create Self-Extracting Archive
         run: |
