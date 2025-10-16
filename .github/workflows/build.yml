@@ -124,6 +124,9 @@ jobs:
           "@ | Set-Content -Path launcher.c
           cl.exe launcher.c /Fe:NIDRA_launcher.exe /link /SUBSystem:windows Shell32.lib
 
+      - name: Debug 7-Zip installation
+        run: Get-ChildItem -Path "C:\Program Files\7-Zip" -Recurse
+
       - name: Create Self-Extracting Archive
         run: |
           @"
