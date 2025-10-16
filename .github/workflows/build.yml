@@ -26,9 +26,7 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-
-      - name: Install 7-Zip
-        run: choco install 7zip.install
+          cache: 'pip'
 
       - name: Setup Python Environment and Install Dependencies
         run: |
