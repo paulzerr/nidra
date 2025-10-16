@@ -122,7 +122,7 @@ jobs:
               return 0;
           }
           "@ | Set-Content -Path launcher.c
-          cl.exe launcher.c /Fe:NIDRA_launcher.exe /link /SUBSystem:windows
+          cl.exe launcher.c /Fe:NIDRA_launcher.exe /link /SUBSystem:windows Shell32.lib
 
       - name: Create Self-Extracting Archive
         run: |
