@@ -114,3 +114,12 @@ pre code {
     padding: 0;
     font-size: 100%;
 }
+@media (max-width: 768px) {
+    .sidebar {
+        display: none;
+    }
+    .content {
+        margin-left: 0;
+        padding: 2rem 1.5rem;
+    }
+}
