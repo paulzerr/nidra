@@ -67,7 +67,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     manifest='NIDRA.manifest',
-    onefile=False,#not is_macos,
+    onefile=False,
     icon='docs/logo.ico',
 )
 
