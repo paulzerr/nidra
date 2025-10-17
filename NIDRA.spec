@@ -50,8 +50,6 @@ is_macos = sys.platform == 'darwin'
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
     name='NIDRA',
     debug=False,
