@@ -45,9 +45,13 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
+is_macos = sys.platform == 'darwin'
+
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.datas,
     [],
     name='NIDRA',
     debug=False,
@@ -70,7 +74,15 @@ coll = COLLECT(
     exe,
     a.binaries,
     a.datas,
-    strip=True,
+    strip=False,
     upx=False,
     name='NIDRA'
 )
+
+if is_macos:
+    app = BUNDLE(
+        coll,
+        name='NIDRA.app',
+        icon='docs/logo.ico',
+        bundle_identifier=None,
+    )
