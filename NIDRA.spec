@@ -67,13 +67,21 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     manifest='NIDRA.manifest',
-    onefile=False,
     icon='docs/logo.ico',
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=False,
+    name='NIDRA'
 )
 
 if is_macos:
     app = BUNDLE(
-        exe,
+        coll,
         name='NIDRA.app',
         icon='docs/logo.ico',
         bundle_identifier=None,
