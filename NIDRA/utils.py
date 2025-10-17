@@ -23,12 +23,13 @@ class BatchScorer:
     A class to handle batch scoring of a study directory.
     It finds all valid recordings in subdirectories and scores them in a single run.
     """
-    def __init__(self, input_dir, output_dir, scorer_type, model_name=None, dir_list=None):
+    def __init__(self, input_dir, output_dir, scorer_type, model_name=None, dir_list=None, zmax_mode=None):
         self.input_dir = Path(input_dir) if input_dir else None
         self.output_dir = Path(output_dir)
         self.scorer_type = scorer_type
         self.model_name = model_name
         self.dir_list = dir_list
+        self.zmax_mode = zmax_mode
         self.files_to_process = self._find_files()
 
     def _find_files(self):
@@ -50,11 +51,16 @@ class BatchScorer:
                     file = next(subdir.glob('*.edf'))
                     files.append(file)
                 else:  # 'forehead'
-                    l_file = next(subdir.glob('*[lL].edf'))
-                    next(subdir.glob('*[rR].edf'))  # Verify R file exists
-                    files.append(l_file)
+                    # Default to 'two_files' if zmax_mode is not provided, to maintain old behavior
+                    if self.zmax_mode in [None, 'two_files']:
+                        l_file = next(subdir.glob('*[lL].edf'))
+                        next(subdir.glob('*[rR].edf'))  # Verify R file exists
+                        files.append(l_file)
+                    else:  # 'one_file'
+                        file = next(subdir.glob('*.edf'))
+                        files.append(file)
             except StopIteration:
-                logger.warning(f"Could not find a complete recording in subdirectory '{subdir.name}'. Skipping.")
+                logger.warning(f"Could not find a complete recording in subdirectory '{subdir}'. Skipping.")
                 continue
         
         if not files:
@@ -102,7 +108,8 @@ class BatchScorer:
                     scorer_type=self.scorer_type,
                     input_file=str(file),
                     output_dir=str(recording_output_dir),
-                    model_name=self.model_name
+                    model_name=self.model_name,
+                    zmax_mode=self.zmax_mode
                 )
                 hypnogram, _ = scorer.score(plot=plot)
                 logger.info("Autoscoring completed.")
@@ -134,7 +141,7 @@ class BatchScorer:
         
         return processed_count, len(self.files_to_process)
 
-def batch_scorer(input_dir, output_dir, scorer_type, model_name=None, dir_list=None):
+def batch_scorer(input_dir, output_dir, scorer_type, model_name=None, dir_list=None, zmax_mode=None):
     """
     Factory function to create a BatchScorer instance.
     This is the recommended entry point for batch processing.
@@ -144,10 +151,11 @@ def batch_scorer(input_dir, output_dir, scorer_type, model_name=None, dir_list=N
         scorer_type (str): Type of data, either 'forehead' or 'psg'.
         model_name (str, optional): Name of the model to use.
         dir_list (list, optional): A list of directories to process.
+        zmax_mode (str, optional): The ZMax mode ('one_file' or 'two_files').
     Returns:
         BatchScorer: An instance of the BatchScorer class.
     """
-    return BatchScorer(input_dir, output_dir, scorer_type, model_name, dir_list=dir_list)
+    return BatchScorer(input_dir, output_dir, scorer_type, model_name, dir_list=dir_list, zmax_mode=zmax_mode)
 
 def calculate_font_size(screen_height, percentage, min_size, max_size):
     """Calculates font size as a percentage of screen height with min/max caps."""

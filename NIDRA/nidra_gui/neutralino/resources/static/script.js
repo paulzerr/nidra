@@ -1,4 +1,11 @@
 function initializeApp() {
+    const stoppedPageHTML = `
+    <div style="font-family: sans-serif; text-align: center; padding: 2em; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);">
+        <h1>NIDRA backend has stopped.</h1>
+        <p>You can now close this tab/window.</p>
+        <p>Restart the NIDRA application to continue using it.</p>
+    </div>`;
+
     // ============================================
     // MASTER SCALING CONTROLS
     // ============================================
@@ -166,14 +173,27 @@ function initializeApp() {
     // "Browse" button functionality
     const handleBrowseClick = async (targetInputId) => {
         const scoringMode = document.querySelector('input[name="scoring-mode"]:checked').value;
+        const isFileSelection = (scoringMode === 'from_file' && targetInputId === 'input-dir');
 
-        if (scoringMode === 'from_file') {
+        if (isFileSelection) {
+            // Handle file selection for .txt mode
             try {
                 const response = await fetch('/select-file');
                 const result = await response.json();
 
                 if (response.ok && result.status === 'success') {
-                    document.getElementById(targetInputId).value = result.path;
+                    const filePath = result.path;
+                    document.getElementById('input-dir').value = filePath;
+
+                    // Set default output directory based on the file's location
+                    const outputDirInput = document.getElementById('output-dir');
+                    const separatorIndex = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+                    const dirPath = filePath.substring(0, separatorIndex);
+
+                    if (dirPath) {
+                        outputDirInput.value = dirPath + '/autoscorer_output';
+                    }
+
                 } else if (result.status === 'cancelled') {
                     console.log('File selection was cancelled.');
                 } else {
@@ -184,6 +204,7 @@ function initializeApp() {
                 alert('An error occurred while trying to open the file dialog.');
             }
         } else {
+            // Handle directory selection for all other cases
             try {
                 const response = await fetch('/select-directory');
                 const result = await response.json();
@@ -296,6 +317,8 @@ function initializeApp() {
         try {
             const response = await fetch('/status');
             const data = await response.json();
+
+            
             if (!data.is_running) {
                 setRunningState(false);
                 stopPolling();
@@ -324,7 +347,11 @@ function initializeApp() {
         try {
             await fetch('/ping', { method: 'POST' });
         } catch (error) {
-            console.error('Ping failed:', error);
+            console.error('Ping failed (backend likely down):', error);
+            // If ping fails, it's a strong indicator the server is gone.
+            document.open();
+            document.write(stoppedPageHTML);
+            document.close();
         }
     }
 

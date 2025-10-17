@@ -102,6 +102,7 @@ class ForeheadScorer:
                 raise ValueError("Input data must be a 2D array with 2 channels.")
             info = mne.create_info(['eegl', 'eegr'], sfreq=self.sfreq, ch_types=['eeg', 'eeg'], verbose=False)
             self.raw = mne.io.RawArray(self.input_data, info, verbose=False)
+            self.raw.apply_function(lambda x: np.clip(x, -500e-6, 500e-6), verbose=False)
             self.raw.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
             return
 
@@ -110,10 +111,12 @@ class ForeheadScorer:
                 # Assumes the input_file is the path to the LEFT channel EDF,
                 # and the RIGHT channel is in the same folder with a similar name.
                 rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
+                #rawL.apply_function(lambda x: np.clip(x, -500e-6, 500e-6), verbose=False)
                 rawR_path = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', str(self.input_file)))
                 if not rawR_path.exists():
                     raise FileNotFoundError(f"Could not find corresponding RIGHT channel file at {rawR_path}")
                 rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False)
+                #rawR.apply_function(lambda x: np.clip(x, -500e-6, 500e-6), verbose=False)
                 
                 # Resample and filter
                 rawL.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
@@ -126,6 +129,7 @@ class ForeheadScorer:
 
             elif self.zmax_mode == 'one_file':
                 raw = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
+                #raw.apply_function(lambda x: np.clip(x, -500e-6, 500e-6), verbose=False)
                 
                 if self.zmax_channels and len(self.zmax_channels) == 2:
                     ch_names = self.zmax_channels
@@ -183,9 +187,15 @@ class ForeheadScorer:
             sdata[ch] = np.clip(norm, -20 * iqr, 20 * iqr)
         self.raw._data = sdata
 
+        
         eegL = self.raw.get_data(picks="eegl").flatten()
         eegR = self.raw.get_data(picks="eegr").flatten()
         data_as_array = np.vstack((eegL.reshape(1, -1), eegR.reshape(1, -1)))
+        # The _load_recording method ensures self.raw contains only the two channels of interest
+        # ('eegl', 'eegr') in the correct order. We can therefore get the data directly.
+        
+        # this should be the easier way of doing the above, but is currently untested
+        # data_as_array = self.raw.get_data()
 
         if data_as_array.ndim != 2:
             raise ValueError("Input data must be a 2D array.")

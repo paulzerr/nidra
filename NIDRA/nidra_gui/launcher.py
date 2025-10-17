@@ -69,6 +69,8 @@ def check_ping(server_instance):
         time.sleep(nidra_app.ping_interval)
         if nidra_app.last_ping and time.time() - nidra_app.last_ping > nidra_app.ping_timeout:
             print("Frontend timeout. Shutting down server...")
+            nidra_app.backend_is_stopping = True
+            time.sleep(1) # give frontend a moment to react
             server_instance.shutdown()
             break
 

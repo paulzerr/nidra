@@ -26,8 +26,7 @@ TEXTS = {
     "CONSOLE_INIT_MESSAGE": "\n\nWelcome to NIDRA, the easy to use sleep autoscorer.\n\nSpecify input folder (location of your sleep recordings) to begin.\n\nTo shutdown NIDRA, simply close this window or tab.",
     "ZMAX_OPTIONS_TITLE": "Source file configuration",
     "ZMAX_OPTIONS_2_FILES": "2 files per recording (e.g. EEG R.edf & EEG L.edf)",
-    "ZMAX_OPTIONS_1_FILE_2_CHANNELS": "1 file with 2 channels per recording",
-    "ZMAX_OPTIONS_1_FILE_N_CHANNELS": "1 file with 3+ channels per recording",
+    "ZMAX_OPTIONS_1_FILE": "1 file per recording (2+ channels)",
     "ZMAX_OPTIONS_SELECT_CHANNELS": "Select channels (optional)"
 }
 
@@ -117,6 +116,44 @@ def select_directory():
     else:
         return jsonify({'status': 'cancelled'})
 
+@app.route('/select-file')
+def select_file():
+    """
+    Opens a native file selection dialog on the server, filtered for .txt files.
+    This function runs the dialog in a separate thread to avoid blocking the Flask server.
+    """
+    result = {}
+    def open_dialog():
+        import tkinter as tk
+        from tkinter import filedialog
+        try:
+            root = tk.Tk()
+            root.withdraw()  # Hide the main window
+            root.attributes('-topmost', True)  # Bring the dialog to the front
+            path = filedialog.askopenfilename(
+                title="Select a .txt file with recording paths",
+                filetypes=[("Text files", "*.txt")]
+            )
+            if path:
+                result['path'] = path
+        except Exception as e:
+            logger.error(f"An error occurred in the tkinter dialog thread: {e}", exc_info=True)
+            result['error'] = "Could not open the file dialog. Please ensure you have a graphical environment configured."
+        finally:
+            root.destroy()
+
+    dialog_thread = threading.Thread(target=open_dialog)
+    dialog_thread.start()
+    dialog_thread.join()
+
+    if 'error' in result:
+        return jsonify({'status': 'error', 'message': result['error']}), 500
+    if 'path' in result:
+        return jsonify({'status': 'success', 'path': result['path']})
+    else:
+        return jsonify({'status': 'cancelled'})
+
+
 @app.route('/open-recent-results', methods=['POST'])
 def open_recent_results():
     """Finds the most recent output folder from the log and opens it."""
@@ -174,7 +211,7 @@ def start_scoring():
         args=(
             data['input_dir'],
             data['output_dir'],
-            data['score_subdirs'],
+            data.get('score_subdirs', False) or data.get('score_from_file', False),
             data['data_source'],
             data['model_name'],
             data.get('plot', False),
@@ -220,19 +257,38 @@ def show_example():
 
 @app.route('/get-channels', methods=['POST'])
 def get_channels():
-    """Reads and returns the channel names from the first EDF file found in a directory."""
+    """
+    Reads and returns the channel names from the first EDF file found.
+    If the input path is a .txt file, it reads the first directory from the file.
+    Otherwise, it assumes the input path is a directory.
+    """
     data = request.json
-    input_dir = data.get('input_dir')
+    input_path_str = data.get('input_dir')
 
-    if not input_dir:
-        return jsonify({'status': 'error', 'message': 'Input directory not provided.'}), 400
+    if not input_path_str:
+        return jsonify({'status': 'error', 'message': 'Input path not provided.'}), 400
 
     try:
-        input_path = Path(input_dir)
+        input_path = Path(input_path_str)
+        search_dir = None
+
+        if input_path.is_file() and input_path.suffix.lower() == '.txt':
+            logger.info(f"Reading first directory from text file: {input_path}")
+            with open(input_path, 'r') as f:
+                first_line = f.readline().strip()
+            if not first_line:
+                return jsonify({'status': 'error', 'message': 'The selected .txt file is empty or the first line is blank.'}), 400
+            search_dir = Path(first_line)
+        else:
+            search_dir = input_path
+
+        if not search_dir or not search_dir.is_dir():
+            return jsonify({'status': 'error', 'message': f'Could not find a valid directory to search for recordings: {search_dir}'}), 404
+
         # Search for .edf files case-insensitively
-        edf_files = list(input_path.glob('*.edf')) + list(input_path.glob('*.EDF'))
+        edf_files = list(search_dir.glob('*.edf')) + list(search_dir.glob('*.EDF'))
         if not edf_files:
-            return jsonify({'status': 'error', 'message': f'No EDF files found in {input_dir}.'}), 404
+            return jsonify({'status': 'error', 'message': f'No EDF files found in {search_dir}.'}), 404
 
         # Read the first EDF file found
         raw = mne.io.read_raw_edf(edf_files[0], preload=False, verbose=False)
@@ -273,7 +329,8 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
                 output_dir=output_dir,
                 scorer_type=scorer_type,
                 model_name=model_name,
-                dir_list=dir_list
+                dir_list=dir_list,
+                zmax_mode=zmax_mode
             )
             success_count, total_count = batch.score(plot=plot, gen_stats=gen_stats)
         else:
@@ -284,8 +341,11 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
                 if scorer_type == 'psg':
                     input_file = next(input_path.glob('*.edf'))
                 else:  # for zmax recordings
-                    input_file = next(input_path.glob('*[lL].edf'))
-                    next(input_path.glob('*[rR].edf')) # Verify zmax EEG_R file exists
+                    if zmax_mode == 'one_file':
+                        input_file = next(input_path.glob('*.edf'))
+                    else:  # Default to 'two_files' mode
+                        input_file = next(input_path.glob('*[lL].edf'))
+                        next(input_path.glob('*[rR].edf')) # Verify zmax EEG_R file exists
             except StopIteration:
                 if any(item.is_dir() for item in input_path.iterdir()):
                     raise ValueError(
@@ -382,6 +442,8 @@ def log_stream():
             return f.read()
     except Exception as e:
         return f"Error reading log file: {e}"
+
+
 
 # heartbeat to ensure NIDRA is shutdown when tab is closed (ping disappears).
 @app.route('/ping', methods=['POST'])
