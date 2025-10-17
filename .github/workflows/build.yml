@@ -115,9 +115,9 @@ jobs:
 
       - name: Prepare release structure
         run: |
-          New-Item -ItemType Directory -Force -Path NIDRA_app
+          New-Item -ItemType Directory -Force -Path release
           $buildDir = (Get-ChildItem -Path dist -Directory).Name
-          Move-Item -Path "dist\$buildDir" -Destination "NIDRA_app\NIDRA"
+          Move-Item -Path "dist\$buildDir" -Destination "release\NIDRA"
           @"
           #include <windows.h>
           #include <string.h>
@@ -128,48 +128,55 @@ jobs:
               if (last_slash) {
                   *(last_slash + 1) = '\0';
               }
-              strcat(path, "NIDRA_app\\NIDRA\\NIDRA.exe");
+              strcat(path, "NIDRA\\NIDRA.exe");
               ShellExecute(NULL, "open", path, NULL, NULL, SW_SHOWNORMAL);
               return 0;
           }
           "@ | Set-Content -Path launcher.c
-          cl.exe launcher.c /Fe:NIDRA_launcher.exe /link /SUBSystem:windows Shell32.lib
+          cl.exe launcher.c /Fe:release\NIDRA_launcher.exe /link /SUBSystem:windows Shell32.lib
 
-      - name: Show NIDRA_app directory contents #debugging attempt
+      - name: Clean up temporary build files
+        run: |
+          Remove-Item -Path "launcher.c" -ErrorAction SilentlyContinue
+          Remove-Item -Path "launcher.obj" -ErrorAction SilentlyContinue
+
+      - name: Show release directory contents #debugging attempt
         if: always()
         run: |
-          if (Test-Path -Path NIDRA_app) {
-            Get-ChildItem -Path NIDRA_app -Recurse
+          if (Test-Path -Path release) {
+            Get-ChildItem -Path release -Recurse
           } else {
-            Write-Host "NIDRA_app directory not found."
+            Write-Host "release directory not found."
           }
 
-      - name: List files before creating archive #debugging attempt
-        if: always()
-        run: Get-ChildItem -Path .
-
-      - name: Create Self-Extracting Archive
+      - name: Create Self-Extracting Archive (Commented out for debugging)
         run: |
-          @"
-          ;!@Install@!UTF-8!
-          Title="NIDRA Installer"
-          BeginPrompt="This will install NIDRA. Do you want to continue?"
-          Progress="yes"
-          RunProgram="NIDRA_launcher.exe"
-          ;!@InstallEnd@!
-          "@ | Set-Content -Path sfx_config.txt
-          & "C:\Program Files\7-Zip\7z.exe" a NIDRA_archive.7z NIDRA_app NIDRA_launcher.exe
-          cmd.exe --% /c copy /b "C:\Program Files\7-Zip\7z.sfx" + sfx_config.txt + NIDRA_archive.7z NIDRA_installer.exe
+          # This step is commented out to allow inspection of the build folder.
+          # @"
+          # ;!@Install@!UTF-8!
+          # Title="NIDRA Installer"
+          # BeginPrompt="This will install NIDRA. Do you want to continue?"
+          # Progress="yes"
+          # RunProgram="NIDRA_launcher.exe"
+          # ;!@InstallEnd@!
+          # "@ | Set-Content -Path sfx_config.txt
+          # & "C:\Program Files\7-Zip\7z.exe" a NIDRA_archive.7z release\*
+          # cmd.exe --% /c copy /b "C:\Program Files\7-Zip\7z.sfx" + sfx_config.txt + NIDRA_archive.7z NIDRA_installer.exe
+          Write-Host "Skipping self-extracting archive creation for debugging."
 
-      - name: Upload Windows Installer
+      - name: Upload Windows build folder
         if: github.ref == 'refs/heads/development'
         uses: actions/upload-artifact@v4
         with:
-          name: NIDRA-windows-installer
-          path: NIDRA_installer.exe
+          name: NIDRA-windows-build
+          path: release
+
+      - name: Archive release folder for release
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        run: Compress-Archive -Path release\* -DestinationPath "NIDRA-windows-${{ github.ref_name }}.zip"
 
       - name: Create GitHub Release
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
-          files: NIDRA_installer.exe
+          files: NIDRA-windows-*.zip
