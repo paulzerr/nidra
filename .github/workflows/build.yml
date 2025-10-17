@@ -28,7 +28,17 @@ jobs:
           python-version: '3.9'
           cache: 'pip'
 
+      - name: Cache Python venv
+        uses: actions/cache@v4
+        id: cache-venv
+        with:
+          path: venv
+          key: ${{ runner.os }}-venv-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-venv-
+
       - name: Setup Python Environment and Install Dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
         run: |
           python -m venv venv
           .\venv\Scripts\activate
@@ -72,7 +82,17 @@ jobs:
           GITHUB_RUN_NUMBER: ${{ github.run_number }}
           GITHUB_REF: ${{ github.ref }}
 
+      - name: Cache Hugging Face models and data
+        uses: actions/cache@v4
+        id: cache-hf-data
+        with:
+          path: |
+            NIDRA/models
+            examples/test_data_zmax
+          key: ${{ runner.os }}-hf-data-v1
+
       - name: Download Models from Hugging Face
+        if: steps.cache-hf-data.outputs.cache-hit != 'true'
         run: |
           New-Item -ItemType Directory -Force -Path NIDRA/models
           Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6.onnx -OutFile NIDRA/models/ez6.onnx
@@ -81,6 +101,7 @@ jobs:
           Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024_eeg.onnx -OutFile NIDRA/models/u-sleep-nsrr-2024_eeg.onnx
 
       - name: Download Example Data from Hugging Face
+        if: steps.cache-hf-data.outputs.cache-hit != 'true'
         run: |
           New-Item -ItemType Directory -Force -Path examples/test_data_zmax
           Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_L.edf -OutFile examples/test_data_zmax/EEG_L.edf
