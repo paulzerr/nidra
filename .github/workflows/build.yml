@@ -147,6 +147,7 @@ jobs:
           Title="NIDRA Installer"
           BeginPrompt="This will install NIDRA. Do you want to continue?"
           Progress="yes"
+          FinishMessage="Do you want to launch NIDRA now?"
           RunProgram="NIDRA_app\NIDRA_launcher.exe"
           ;!@InstallEnd@!
           "@ | Set-Content -Path sfx_config.txt

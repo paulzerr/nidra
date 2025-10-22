@@ -63,20 +63,14 @@ class ForeheadScorer:
 
     def _load_model(self):
         model_filename = f"{self.model_name}.onnx"
-        if utils.get_app_dir():
-            try:
-                with importlib.resources.path('NIDRA.models', model_filename) as model_file:
-                    self.session = ort.InferenceSession(str(model_file))
-                self.input_name = self.session.get_inputs()[0].name
-                self.output_name = self.session.get_outputs()[0].name
-            except FileNotFoundError:
-                print(f"Error: Model file not found at NIDRA/models/{model_filename}")
-                raise
-        else:
-            model_path = utils.get_model_path(model_filename)
+        model_path = utils.get_model_path(model_filename)
+        try:
             self.session = ort.InferenceSession(model_path)
             self.input_name = self.session.get_inputs()[0].name
             self.output_name = self.session.get_outputs()[0].name
+        except Exception as e:
+            print(f"Error: Failed to load ONNX model from '{model_path}'. Original error: {e}")
+            raise
 
     def _load_recording(self):
         fs = 64
