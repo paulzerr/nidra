@@ -521,8 +521,9 @@ def get_app_dir():
     Returns the base path for the application when running as a PyInstaller bundle.
     Returns None otherwise.
     """
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-        return Path(sys._MEIPASS)
+    if getattr(sys, 'frozen', False):
+        # If the application is run as a bundle, the base path is the directory of the executable
+        return Path(sys.executable).parent
     return None
 
 
