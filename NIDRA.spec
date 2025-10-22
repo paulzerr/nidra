@@ -7,6 +7,7 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 # Collect MNE data files and hidden imports to ensure all necessary files are included,
 # especially .pyi stubs for lazy_loader, which was causing build failures.
 mne_datas = collect_data_files('mne', include_py_files=True)
+matplotlib_datas = collect_data_files('matplotlib')
 mne_hiddenimports = collect_submodules('mne')
 
 # Collect VC Redist DLLs
@@ -21,13 +22,14 @@ a = Analysis(
         ('docs', 'docs'),
         ('NIDRA/models', 'NIDRA/models'),
         ('examples', 'examples'),
-    ] + mne_datas,  # merge mne datas into your project datas
+    ] + mne_datas + matplotlib_datas,  # merge mne and matplotlib datas into your project datas
     hiddenimports=[
         'decorator',
         'webview',
         'scipy',
         'pandas',
         'werkzeug',
+        'matplotlib',
     ]
     + collect_submodules('scipy')
     + collect_submodules('pandas')
