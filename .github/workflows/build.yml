@@ -116,7 +116,7 @@ jobs:
       - name: Prepare release structure
         run: |
           $buildDir = (Get-ChildItem -Path dist -Directory).Name
-          Rename-Item -Path "dist\$buildDir" -NewName "NIDRA"
+
 
       - name: Create Self-Extracting Archive
         run: |
