@@ -8,7 +8,7 @@ function initializeApp() {
     // ============================================
     // MASTER SCALING CONTROLS
     // ============================================
-    const MASTER_SCALE = 0.9;      // Overall size multiplier
+    const MASTER_SCALE = 1.1;      // Overall size multiplier
     const DESIGN_WIDTH = 1920;     // Screen width where UI looks "native"
     const DESIGN_HEIGHT = 1080;    // Screen height where UI looks "native"
     
