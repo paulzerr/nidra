@@ -1,15 +1,14 @@
 function initializeApp() {
     const stoppedPageHTML = `
     <div style="font-family: sans-serif; text-align: center; padding: 2em; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);">
-        <h1>NIDRA backend has stopped.</h1>
-        <p>You can now close this tab/window.</p>
-        <p>Restart the NIDRA application to continue using it.</p>
+        <h1>NIDRA has stopped due to timeout.</h1>
+        <p>You can now close this window.</p>
     </div>`;
 
     // ============================================
     // MASTER SCALING CONTROLS
     // ============================================
-    const MASTER_SCALE = 1.0;      // Overall size multiplier
+    const MASTER_SCALE = 0.9;      // Overall size multiplier
     const DESIGN_WIDTH = 1920;     // Screen width where UI looks "native"
     const DESIGN_HEIGHT = 1080;    // Screen height where UI looks "native"
     

@@ -19,6 +19,8 @@
             <li><a href="#installation">Installation</a></li>
             <li><a href="#gui-guide">GUI (Overview)</a></li>
             <li><a href="#preparing-data">Preparing Your Data</a></li>
+            <li><a href="#scoring-options">Scoring Options</a></li>
+            <li><a href="#source-file-configuration">Source File Configuration</a></li>
             <li><a href="#gui-walkthrough">GUI (Walkthrough)</a></li>
             <li><a href="#model-performance">Model Validation</a></li>
             <li><a href="#understanding-results">Understanding Results</a></li>
@@ -34,12 +36,8 @@
     </nav>
     <main class="content">
         <section id="introduction">
-            <h2>NIDRA v0.1 - super simple sleep scoring</h2>
-            <p>Neural networks can perform highly accurate, automated sleep scoring, but these technologies are often difficult to implement.</p>
-            <p>NIDRA is a fool-proof, simple-to-use tool for scoring sleep recordings using the best currently available autoscoring machine learning algorithms. No programming required, but a CLI and python endpoints are available.</p>
-            <p>NIDRA can autoscore data from polysomnography (PSG) recordings, as well as from 2-channel EEG wearables (such as ZMax).</p>
-            <p>NIDRA enables anyone, including researchers without any programming experience, to use cutting-edge sleep scoring models.</p>
-            <p>NIDRA uses the highly accurate U-Sleep2.0 and ez6moe models by default. Both models have been validated (see below) and perform sleep scoring on the level of human interrater agreement.</p>
+            <h2>NIDRA v0.1.1 - super simple sleep scoring</h2>
+            <p>NIDRA is an easy-to-use tool for autoscoring sleep recordings with excellent accuracy using the best currently available machine learning models. No programming required, but a CLI and python endpoints are available. NIDRA can accurately score recordings from 2-channel EEG wearables (such as ZMax), as well as full PSG recordings.</p>
             <p> </p>
             <p>NIDRA lives here: <a href="https://github.com/paulzerr/nidra">github.com/paulzerr/nidra</a></p>
         </section>
@@ -111,8 +109,22 @@ pip install .</code></pre>
             <p>For NIDRA to process your recordings, your files and folders must be organized in a specific way.</p>
 
             <ul>
-                <li><strong>File Format:</strong> Currently NIDRA exclusively works with European Data Format (.edf) files.</li>
-                <li><strong>Channel Labels:</strong> Ideally your EDF files have standard channel labels (e.g., 'EEG Fpz-Cz', 'EOG left', 'Fp1', 'O2-M1') for PSG data, as NIDRA uses these to identify channel types.</li>
+                <li><strong>File format:</strong> Currently NIDRA exclusively works with European Data Format (.edf) files.</li>
+                <li><strong>Channel labels:</strong> Ideally your EDF files have standard channel labels (e.g., 'EEG Fpz-Cz', 'EOG left', 'Fp1', 'O2-M1') for PSG data, as NIDRA uses these to identify channel types.</li>
+            </ul>
+
+            <h3 id="scoring-options">Scoring Options</h3>
+            <ul>
+                <li><strong>Score single recording:</strong> Score a single recording. Specify the folder containing the edf file(s).</li>
+                <li><strong>Score all recordings (in subfolders):</strong> Score multiple recordings (batch processing). NIDRA will look for subdirectories within your selected input folder and process each one as a separate recording.</li>
+                <li><strong>Text file mode:</strong> You can use a <code>.txt</code> file with one absolute path to a single edf file to tell NIDRA which recordings to score.</li>
+            </ul>
+
+            <h3 id="source-file-configuration">Source file configuration</h3>
+            <p>This determines how NIDRA uses the source files within a recording's folder.</p>
+            <ul>
+                <li><strong>One-file mode (default):</strong> For PSG recordings, you typically have one <code>.edf</code> file with multiple channels per recording session. Place each file in its own subdirectory.</li>
+                <li><strong>Two-file mode (e.g., ZMax recordings):</strong> For ZMax recordings you can specify that recordings exist as two separate EDF files (ZMax standard output) for the left and right channels. These two files must be located in the same folder.</li>
             </ul>
 
             <p>Whether you are scoring a single file or batch processing, NIDRA expects each recording session to be in its own folder. When using the "Score all subdirectories" mode, NIDRA will treat every subfolder in your input directory as a separate recording.</p>
