@@ -394,6 +394,8 @@ def select_channels(psg_data: np.ndarray, sample_rate: int, channel_names: List[
         return list(range(psg_data.shape[0]))
 
 
+import atexit
+
 def setup_logging():
     """Configures logging for the application and returns the log file path and logger instance."""
     log_dir = Path(tempfile.gettempdir()) / "nidra_logs"
@@ -404,6 +406,9 @@ def setup_logging():
     # Open the file stream with line buffering (buffering=1)
     log_file_stream = open(log_file, 'w', encoding='utf-8', buffering=1)
     
+    # Register a cleanup function to close the stream on exit
+    atexit.register(log_file_stream.close)
+
     # Create handlers
     file_handler = logging.StreamHandler(log_file_stream)
     handlers = [file_handler]
@@ -442,8 +447,8 @@ def get_model_path(model_name: str) -> str:
     """
     bundle_dir = get_app_dir()
     if bundle_dir:
-        # In a PyInstaller bundle, models are in a 'models' subdirectory of the base path
-        return str(bundle_dir / 'models' / model_name)
+        # In a PyInstaller bundle, models are in a nested 'NIDRA/models' subdirectory
+        return str(bundle_dir / 'NIDRA' / 'models' / model_name)
     else:
         # In a standard install, models are in the user's data directory
         app_name = "NIDRA"
@@ -521,9 +526,8 @@ def get_app_dir():
     Returns the base path for the application when running as a PyInstaller bundle.
     Returns None otherwise.
     """
-    if getattr(sys, 'frozen', False):
-        # If the application is run as a bundle, the base path is the directory of the executable
-        return Path(sys.executable).parent
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        return Path(sys._MEIPASS)
     return None
 
 
