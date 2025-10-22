@@ -115,30 +115,8 @@ jobs:
 
       - name: Prepare release structure
         run: |
-          New-Item -ItemType Directory -Force -Path NIDRA_app
           $buildDir = (Get-ChildItem -Path dist -Directory).Name
-          Move-Item -Path "dist\$buildDir" -Destination "NIDRA_app\NIDRA"
-          @"
-          #include <windows.h>
-          #include <string.h>
-          int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-              char path[MAX_PATH];
-              GetModuleFileName(NULL, path, MAX_PATH);
-              char *last_slash = strrchr(path, '\\');
-              if (last_slash) {
-                  *(last_slash + 1) = '\0';
-              }
-              strcat(path, "NIDRA\\NIDRA.exe");
-              ShellExecute(NULL, "open", path, NULL, NULL, SW_SHOWNORMAL);
-              return 0;
-          }
-          "@ | Set-Content -Path launcher.c
-          cl.exe launcher.c /Fe:NIDRA_app\NIDRA_launcher.exe /link /SUBSystem:windows Shell32.lib
-
-      - name: Clean up temporary build files
-        run: |
-          Remove-Item -Path "launcher.c" -ErrorAction SilentlyContinue
-          Remove-Item -Path "launcher.obj" -ErrorAction SilentlyContinue
+          Rename-Item -Path "dist\$buildDir" -NewName "NIDRA"
 
       - name: Create Self-Extracting Archive
         run: |
@@ -148,10 +126,12 @@ jobs:
           BeginPrompt="This will install NIDRA. Do you want to continue?"
           Progress="yes"
           FinishMessage="Do you want to launch NIDRA now?"
-          RunProgram="NIDRA_app\NIDRA_launcher.exe"
+          RunProgram="NIDRA\NIDRA.exe"
           ;!@InstallEnd@!
           "@ | Set-Content -Path sfx_config.txt
-          & "C:\Program Files\7-Zip\7z.exe" a NIDRA_archive.7z NIDRA_app
+          Set-Location -Path dist
+          & "C:\Program Files\7-Zip\7z.exe" a ..\NIDRA_archive.7z NIDRA
+          Set-Location -Path ..
           cmd.exe --% /c copy /b "C:\Program Files\7-Zip\7z.sfx" + sfx_config.txt + NIDRA_archive.7z NIDRA_installer.exe
 
       - name: Upload Windows Installer
