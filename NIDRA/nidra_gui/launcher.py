@@ -61,17 +61,6 @@ class ServerWrapper(threading.Thread):
         print("Shutting down Flask server...")
         self.server.shutdown()
 
-def check_ping(server_instance):
-    """
-    Periodically checks if the frontend is still alive and shuts down the server if not.
-    """
-    while True:
-        time.sleep(nidra_app.ping_interval)
-        if nidra_app.last_ping and time.time() - nidra_app.last_ping > nidra_app.ping_timeout:
-            print("Frontend timeout. Shutting down server...")
-            server_instance.shutdown()
-            break
-
 def main():
     """
     Starts the Flask server in a background thread and then launches the browser.
@@ -82,11 +71,6 @@ def main():
     port = find_free_port()
     server = ServerWrapper(nidra_app.app, port)
     server.start()
-
-    # start the ping check thread (used to keep app alive)
-    nidra_app.last_ping = time.time()
-    ping_thread = threading.Thread(target=check_ping, args=(server,), daemon=True)
-    ping_thread.start()
 
     run_neutralino = False  # use browser by default, TODO: fix neutralino madness
 

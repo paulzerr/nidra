@@ -6,6 +6,10 @@ import logging
 from pathlib import Path
 import importlib.resources
 import platform
+import os
+import subprocess
+import mne
+import requests
 
 from NIDRA import scorer as scorer_factory
 from NIDRA import utils
@@ -21,6 +25,10 @@ TEXTS = {
     "OUTPUT_TITLE": "Output Folder", "RUN_BUTTON": "Run autoscoring", "BROWSE_BUTTON": "Browse files...",
     "HELP_TITLE": "Help & Info (opens in browser)",
     "CONSOLE_INIT_MESSAGE": "\n\nWelcome to NIDRA, the easy to use sleep autoscorer.\n\nSpecify input folder (location of your sleep recordings) to begin.\n\nTo shutdown NIDRA, simply close this window or tab.",
+    "ZMAX_OPTIONS_TITLE": "Source file configuration",
+    "ZMAX_OPTIONS_2_FILES": "2 files per recording (e.g. EEG R.edf & EEG L.edf)",
+    "ZMAX_OPTIONS_1_FILE": "1 file per recording (2+ channels)",
+    "ZMAX_OPTIONS_SELECT_CHANNELS": "Select channels (optional)"
 }
 
 base_path = utils.get_app_dir()
@@ -44,9 +52,10 @@ log.setLevel(logging.ERROR)
 is_scoring_running = False
 worker_thread = None
 _startup_check_done = False
-last_ping = None
-ping_interval = 2  # seconds
-ping_timeout = 5  # seconds
+frontend_url = None
+last_frontend_contact = None
+probe_thread = None
+frontend_grace_period = 60  # seconds
 
 
 # --- Flask Routes ---
@@ -109,6 +118,79 @@ def select_directory():
     else:
         return jsonify({'status': 'cancelled'})
 
+@app.route('/select-file')
+def select_file():
+    """
+    Opens a native file selection dialog on the server, filtered for .txt files.
+    This function runs the dialog in a separate thread to avoid blocking the Flask server.
+    """
+    result = {}
+    def open_dialog():
+        import tkinter as tk
+        from tkinter import filedialog
+        try:
+            root = tk.Tk()
+            root.withdraw()  # Hide the main window
+            root.attributes('-topmost', True)  # Bring the dialog to the front
+            path = filedialog.askopenfilename(
+                title="Select a .txt file with recording paths",
+                filetypes=[("Text files", "*.txt")]
+            )
+            if path:
+                result['path'] = path
+        except Exception as e:
+            logger.error(f"An error occurred in the tkinter dialog thread: {e}", exc_info=True)
+            result['error'] = "Could not open the file dialog. Please ensure you have a graphical environment configured."
+        finally:
+            root.destroy()
+
+    dialog_thread = threading.Thread(target=open_dialog)
+    dialog_thread.start()
+    dialog_thread.join()
+
+    if 'error' in result:
+        return jsonify({'status': 'error', 'message': result['error']}), 500
+    if 'path' in result:
+        return jsonify({'status': 'success', 'path': result['path']})
+    else:
+        return jsonify({'status': 'cancelled'})
+
+
+@app.route('/open-recent-results', methods=['POST'])
+def open_recent_results():
+    """Finds the most recent output folder from the log and opens it."""
+    try:
+        if not LOG_FILE.exists():
+            return jsonify({'status': 'error', 'message': 'Log file not found.'}), 404
+
+        last_output_dir = None
+        with open(LOG_FILE, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                if "Results saved to:" in line:
+                    # Extract the path after the colon and strip whitespace
+                    path_str = line.split("Results saved to:", 1)[1].strip()
+                    last_output_dir = Path(path_str)
+
+        if last_output_dir and last_output_dir.exists():
+            logger.info(f"Opening recent results folder: {last_output_dir}")
+            if platform.system() == "Windows":
+                os.startfile(last_output_dir)
+            elif platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", last_output_dir])
+            else:  # Linux and other UNIX-like systems
+                subprocess.run(["xdg-open", last_output_dir])
+            return jsonify({'status': 'success', 'message': f'Opened folder: {last_output_dir}'})
+        elif last_output_dir:
+            logger.error(f"Could not open recent results folder because it does not exist: {last_output_dir}")
+            return jsonify({'status': 'error', 'message': f'The most recent results folder does not exist:\n{last_output_dir}'}), 404
+        else:
+            logger.warning("Could not find a recent results folder in the log file.")
+            return jsonify({'status': 'error', 'message': 'No recent results folder found in the log.'}), 404
+
+    except Exception as e:
+        logger.error(f"An error occurred while trying to open the recent results folder: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': 'An unexpected error occurred.'}), 500
+
 @app.route('/start-scoring', methods=['POST'])
 def start_scoring():
     """Starts the scoring process in a background thread."""
@@ -131,11 +213,13 @@ def start_scoring():
         args=(
             data['input_dir'],
             data['output_dir'],
-            data['score_subdirs'],
+            data.get('score_subdirs', False) or data.get('score_from_file', False),
             data['data_source'],
             data['model_name'],
             data.get('plot', False),
-            data.get('gen_stats', False)
+            data.get('gen_stats', False),
+            data.get('zmax_mode'),
+            data.get('zmax_channels')
         )
     )
     worker_thread.start()
@@ -172,8 +256,55 @@ def show_example():
         logger.error(f"An error occurred while preparing the example: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+
+@app.route('/get-channels', methods=['POST'])
+def get_channels():
+    """
+    Reads and returns the channel names from the first EDF file found.
+    If the input path is a .txt file, it reads the first directory from the file.
+    Otherwise, it assumes the input path is a directory.
+    """
+    data = request.json
+    input_path_str = data.get('input_dir')
+
+    if not input_path_str:
+        return jsonify({'status': 'error', 'message': 'Input path not provided.'}), 400
+
+    try:
+        input_path = Path(input_path_str)
+        search_dir = None
+
+        if input_path.is_file() and input_path.suffix.lower() == '.txt':
+            logger.info(f"Reading first directory from text file: {input_path}")
+            with open(input_path, 'r') as f:
+                first_line = f.readline().strip()
+            if not first_line:
+                return jsonify({'status': 'error', 'message': 'The selected .txt file is empty or the first line is blank.'}), 400
+            search_dir = Path(first_line)
+        else:
+            search_dir = input_path
+
+        if not search_dir or not search_dir.is_dir():
+            return jsonify({'status': 'error', 'message': f'Could not find a valid directory to search for recordings: {search_dir}'}), 404
+
+        # Search for .edf files case-insensitively
+        edf_files = list(search_dir.glob('*.edf')) + list(search_dir.glob('*.EDF'))
+        if not edf_files:
+            return jsonify({'status': 'error', 'message': f'No EDF files found in {search_dir}.'}), 404
+
+        # Read the first EDF file found
+        raw = mne.io.read_raw_edf(edf_files[0], preload=False, verbose=False)
+        channels = raw.ch_names
+        
+        return jsonify({'status': 'success', 'channels': channels})
+
+    except Exception as e:
+        logger.error(f"Error reading channels from EDF file: {e}", exc_info=True)
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
 # this enables reporting on successful/failed scorings
-def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, model_name, plot, gen_stats):
+def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, model_name, plot, gen_stats, zmax_mode=None, zmax_channels=None):
     """
     Manages the global running state and executes the scoring process.
     This function is intended to be run in a separate thread.
@@ -183,11 +314,25 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
     try:
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
         if score_subdirs:
+            dir_list = None
+            # If the input is a text file, read the directories from it
+            if Path(input_dir).suffix.lower() == '.txt':
+                try:
+                    with open(input_dir, 'r') as f:
+                        dir_list = [line.strip() for line in f if line.strip()]
+                    logger.info(f"Found {len(dir_list)} directories to process from {input_dir}.")
+                except Exception as e:
+                    logger.error(f"Error reading directory list from {input_dir}: {e}", exc_info=True)
+                    is_scoring_running = False
+                    return
+
             batch = utils.batch_scorer(
                 input_dir=input_dir,
                 output_dir=output_dir,
                 scorer_type=scorer_type,
-                model_name=model_name
+                model_name=model_name,
+                dir_list=dir_list,
+                zmax_mode=zmax_mode
             )
             success_count, total_count = batch.score(plot=plot, gen_stats=gen_stats)
         else:
@@ -198,8 +343,11 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
                 if scorer_type == 'psg':
                     input_file = next(input_path.glob('*.edf'))
                 else:  # for zmax recordings
-                    input_file = next(input_path.glob('*[lL].edf'))
-                    next(input_path.glob('*[rR].edf')) # Verify zmax EEG_R file exists
+                    if zmax_mode == 'one_file':
+                        input_file = next(input_path.glob('*.edf'))
+                    else:  # Default to 'two_files' mode
+                        input_file = next(input_path.glob('*[lL].edf'))
+                        next(input_path.glob('*[rR].edf')) # Verify zmax EEG_R file exists
             except StopIteration:
                 if any(item.is_dir() for item in input_path.iterdir()):
                     raise ValueError(
@@ -213,7 +361,7 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
             logger.info(f"Processing: {input_file}")
             logger.info("-" * 80)
             total_count = 1
-            if _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot):
+            if _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot, zmax_mode, zmax_channels):
                 success_count = 1
 
     except (FileNotFoundError, ValueError) as e:
@@ -233,19 +381,24 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
 
         logger.info("\n" + "="*80 + "\nScoring process finished.\n" + "="*80)
 
-def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot):
+def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot, zmax_mode=None, zmax_channels=None):
     """
     Performs scoring on a single recording file.
     """
     try:
         start_time = time.time()
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
-        scorer = scorer_factory(
-            scorer_type=scorer_type,
-            input_file=str(input_file),
-            output_dir=output_dir,
-            model_name=model_name
-        )
+        
+        scorer_kwargs = {
+            'input_file': str(input_file),
+            'output_dir': output_dir,
+            'model_name': model_name
+        }
+        if scorer_type == 'forehead':
+            scorer_kwargs['zmax_mode'] = zmax_mode
+            scorer_kwargs['zmax_channels'] = zmax_channels
+
+        scorer = scorer_factory(scorer_type=scorer_type, **scorer_kwargs)
         
         hypnogram, probabilities = scorer.score(plot=plot)
 
@@ -292,12 +445,71 @@ def log_stream():
     except Exception as e:
         return f"Error reading log file: {e}"
 
+
+
 # heartbeat to ensure NIDRA is shutdown when tab is closed (ping disappears).
-@app.route('/ping', methods=['POST'])
-def ping():
-    """Resets the ping timer."""
-    global last_ping
-    last_ping = time.time()
+def probe_frontend_loop():
+    """
+    Periodically probes the frontend to ensure it's still alive.
+    If the frontend is unresponsive for a grace period, the backend shuts down.
+    """
+    global last_frontend_contact
+    # logger.info("Starting frontend probe loop...")
+
+    while True:
+        if frontend_url and last_frontend_contact:
+            try:
+                # The frontend doesn't need to respond to this, we just need to see if the server is up.
+                # A simple HEAD request is lighter than GET.
+                requests.head(f"{frontend_url}/alive-ping", timeout=3)
+                last_frontend_contact = time.time()
+            except requests.exceptions.RequestException:
+                # If the probe fails, we don't update last_frontend_contact.
+                pass
+
+            if time.time() - last_frontend_contact > frontend_grace_period:
+                logger.warning(f"Frontend has been unresponsive for {frontend_grace_period} seconds. Shutting down backend.")
+                os._exit(0)
+
+        time.sleep(5) # Probe every 5 seconds
+
+
+@app.route('/register', methods=['POST'])
+def register_frontend():
+    """
+    Receives the frontend's URL and starts the monitoring thread.
+    """
+    global frontend_url, last_frontend_contact, probe_thread
+    data = request.json
+    url = data.get('url')
+    if not url:
+        return jsonify({'status': 'error', 'message': 'URL not provided'}), 400
+
+    frontend_url = url
+    last_frontend_contact = time.time()
+    # logger.info(f"Frontend registered from URL: {frontend_url}")
+
+    if probe_thread is None:
+        probe_thread = threading.Thread(target=probe_frontend_loop, daemon=True)
+        probe_thread.start()
+
+    return jsonify({'status': 'success'})
+
+
+@app.route('/goodbye', methods=['POST'])
+def goodbye():
+    """
+    Provides a way for the frontend to signal a clean shutdown.
+    """
+    logger.info("Received /goodbye signal from frontend. Shutting down in 0.3 seconds.")
+    # Short delay to allow the beacon to be sent successfully
+    threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0))).start()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/alive-ping')
+def alive_ping():
+    """A lightweight endpoint for the backend to probe itself to see if the frontend is still responsive."""
     return jsonify({'status': 'ok'})
 
 

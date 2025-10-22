@@ -11,14 +11,14 @@
 </head>
 <body>
     <nav class="sidebar">
-        <div class="sidebar-header">
-            <img src="logo.png" alt="NIDRA Logo" class="sidebar-logo">
-        </div>
+            <h2>Manual</h2>
         <ul>
             <li><a href="#introduction">Introduction</a></li>
             <li><a href="#installation">Installation</a></li>
             <li><a href="#gui-guide">GUI (Overview)</a></li>
             <li><a href="#preparing-data">Preparing Your Data</a></li>
+            <li><a href="#scoring-options">Scoring Options</a></li>
+            <li><a href="#source-file-configuration">Source File Configuration</a></li>
             <li><a href="#gui-walkthrough">GUI (Walkthrough)</a></li>
             <li><a href="#model-performance">Model Validation</a></li>
             <li><a href="#understanding-results">Understanding Results</a></li>
@@ -34,27 +34,29 @@
     </nav>
     <main class="content">
         <section id="introduction">
-            <h2>NIDRA v0.1 - super simple sleep scoring</h2>
-            <p>Neural networks can perform highly accurate, automated sleep scoring, but these technologies are often difficult to implement.</p>
-            <p>NIDRA is a fool-proof, simple-to-use tool for scoring sleep recordings using the best currently available autoscoring machine learning algorithms. No programming required, but a CLI and python endpoints are available.</p>
-            <p>NIDRA can autoscore data from polysomnography (PSG) recordings, as well as from 2-channel EEG wearables (such as ZMax).</p>
-            <p>NIDRA enables anyone, including researchers without any programming experience, to use cutting-edge sleep scoring models.</p>
-            <p>NIDRA uses the highly accurate U-Sleep2.0 and ez6moe models by default. Both models have been validated (see below) and perform sleep scoring on the level of human interrater agreement.</p>
-            <p> </p>
-            <p>NIDRA lives here: <a href="https://github.com/paulzerr/nidra">github.com/paulzerr/nidra</a></p>
+            <table class="intro-table">
+                <tr>
+                    <td class="intro-logo-cell">
+                        <img src="logo.png" alt="NIDRA Logo" class="logo">
+                        <h2>super simple sleep scoring</h2>
+                    </td>
+                    <td class="intro-text-cell">
+                        <p>NIDRA is an easy-to-use tool for autoscoring sleep recordings with excellent accuracy using the best currently available machine learning models. No programming required, but a CLI and python endpoints are available. NIDRA can accurately score recordings from 2-channel EEG wearables (such as ZMax), as well as full PSG recordings. <a href="https://github.com/paulzerr/nidra">github.com/paulzerr/nidra</a></p>
+                    </td>
+                </tr>
+            </table>
         </section>
 
         <section id="installation">
             <h2>Installation</h2>
-            <h3>Option 1: Standalone executable</h3>
-            <p>The easiest way to use NIDRA on Windows is via the portable, ready-to-go executable which requires no installation.</p>
+            <h3>Option 1: Standalone installer</h3>
+            <p>The easiest way to use NIDRA on Windows is via the portable self-extracting archive which requires no installation.</p>
 
             <h3><strong><a href="https://github.com/paulzerr/nidra/releases/latest/download/NIDRA.exe">Download standalone NIDRA for Windows</a></strong></h3>
 
-            <p><strong>Note:</strong> due to the restrictive environment of Windows, you may see a "Search on app store" popup window. Click "No". You may also see the blue Smartscreen warning. In that case click "run anyway". Should this fail, try installing via pip (see below).</p>
+            <p><strong>Note:</strong> due to the restrictive environment of Windows, you may see a "Search on app store" popup window. Click "No". You may also see the blue Smartscreen warning. In that case click "More info" and then "run anyway". Should this fail, try installing via pip (see below).</p>
             <br>
-            <h3>Option 2: Install from PyPI</h3>
-            <p>First, make sure you have Python installed (3.10 or later recommended). 
+            <h3>Option 2: Install with pip</h3>
             <p>It is highly recommended to create a clean virtual environment to install NIDRA. This prevents conflicts with other packages.</p>
             <p><strong>Windows:</strong></p>
             <pre><code>python -m venv nidra-env
@@ -69,22 +71,13 @@ pip install nidra</code></pre>
             <pre><code>conda create -n nidra-env
 conda activate nidra-env
 pip install nidra</code></pre>
-            <p>Launch the graphical interface:</p>
+            <p><strong>Launch the graphical interface:</strong></p>
             <pre><code>nidra</code></pre>
             <p><strong>Note:</strong> If you installed via pip, the first time you run NIDRA, the necessary model files will be automatically downloaded from <a href="https://huggingface.co/pzerr/NIDRA_models/">https://huggingface.co/pzerr/NIDRA_models/</a> (~152MB). </p>
             <br>
             <h3>Option 3: Install from source</h3>
-            <p><strong>macOS and Linux:</strong></p>
             <pre><code>git clone https://github.com/paulzerr/nidra.git
 cd NIDRA
-python -m venv nidra-env
-source nidra-env/bin/activate
-pip install .</code></pre>
-            <p><strong>Windows:</strong></p>
-            <pre><code>git clone https://github.com/paulzerr/nidra.git
-cd NIDRA
-python -m venv nidra-env
-nidra-env\Scripts\activate
 pip install .</code></pre>
         </section>
 
@@ -97,9 +90,9 @@ pip install .</code></pre>
             <ol>
                 <li><strong>Input Folder</strong>: Select the directory containing the sleep recording data.</li>
                 <li><strong>Output Folder</strong>: Select the directory where the results will be saved.</li>
-                <li><strong>Scoring Mode</strong>: Choose to score a single recording or batch-process all subdirectories, eaching containing one recording.</li>
-                <li><strong>Data Source</strong>: Select "Forehead EEG" or "PSG".</li>
-                <li><strong>Model</strong>: Select the appropriate model for your data source. Default models are reliable.</li>
+                <li><strong>Scoring Mode</strong>: Choose to score a single recording, multiple recordings in subfolders, or use a text file with file paths.</li>
+                <li><strong>Data Source</strong>: Select "Forehead EEG" (e.g., for ZMax files) or "PSG" (typical lab EEG sleep recording).</li>
+                <li><strong>Model</strong>: Select a machine learning model to score your recordings with. </li>
                 <li><strong>Options</strong>: Choose whether to generate plots and statistics.</li>
                 <li><strong>Run</strong>: Start the scoring process.</li>
             </ol>
@@ -111,8 +104,22 @@ pip install .</code></pre>
             <p>For NIDRA to process your recordings, your files and folders must be organized in a specific way.</p>
 
             <ul>
-                <li><strong>File Format:</strong> Currently NIDRA exclusively works with European Data Format (.edf) files.</li>
-                <li><strong>Channel Labels:</strong> Ideally your EDF files have standard channel labels (e.g., 'EEG Fpz-Cz', 'EOG left', 'Fp1', 'O2-M1') for PSG data, as NIDRA uses these to identify channel types.</li>
+                <li><strong>File format:</strong> Currently NIDRA exclusively works with European Data Format (.edf) files.</li>
+                <li><strong>Channel labels:</strong> Ideally your EDF files have standard channel labels (e.g., 'EEG Fpz-Cz', 'EOG left', 'Fp1', 'O2-M1') for PSG data, as NIDRA uses these to identify channel types.</li>
+            </ul>
+
+            <h3 id="scoring-options">Scoring Options</h3>
+            <ul>
+                <li><strong>Score single recording:</strong> Score a single recording. Specify the folder containing the edf file(s).</li>
+                <li><strong>Score all recordings (in subfolders):</strong> Score multiple recordings (batch processing). NIDRA will look for subdirectories within your selected input folder and process each one as a separate recording.</li>
+                <li><strong>Text file mode:</strong> You can use a <code>.txt</code> file with one absolute path to a single edf file to tell NIDRA which recordings to score.</li>
+            </ul>
+
+            <h3 id="source-file-configuration">Source file configuration</h3>
+            <p>This determines how NIDRA uses the source files within a recording's folder.</p>
+            <ul>
+                <li><strong>One-file mode (default):</strong> For PSG recordings, you typically have one <code>.edf</code> file with multiple channels per recording session. Place each file in its own subdirectory.</li>
+                <li><strong>Two-file mode (e.g., ZMax recordings):</strong> For ZMax recordings you can specify that recordings exist as two separate EDF files (ZMax standard output) for the left and right channels. These two files must be located in the same folder.</li>
             </ul>
 
             <p>Whether you are scoring a single file or batch processing, NIDRA expects each recording session to be in its own folder. When using the "Score all subdirectories" mode, NIDRA will treat every subfolder in your input directory as a separate recording.</p>
