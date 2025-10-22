@@ -17,6 +17,7 @@ from datetime import datetime
 from huggingface_hub import hf_hub_download, hf_hub_url
 from appdirs import user_data_dir
 import requests
+import importlib.util
 
 class BatchScorer:
     """
@@ -526,9 +527,20 @@ def get_app_dir():
     Returns the base path for the application when running as a PyInstaller bundle.
     Returns None otherwise.
     """
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+
+    if getattr(sys, 'frozen', False):
+        internal_dir = Path(os.path.dirname(sys.executable)) / "_internal"
+        if internal_dir.exists():
+            return internal_dir
+    
+    if hasattr(sys, '_MEIPASS'):
         return Path(sys._MEIPASS)
-    return None
+    
+    spec = importlib.util.find_spec("NIDRA")
+    if spec and spec.origin:
+        return Path(spec.origin).resolve().parent
+    
+    return Path(__file__).resolve().parent
 
 
 def download_example_data(logger):
