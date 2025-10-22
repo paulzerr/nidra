@@ -9,6 +9,7 @@ import platform
 import os
 import subprocess
 import mne
+import requests
 
 from NIDRA import scorer as scorer_factory
 from NIDRA import utils
@@ -51,9 +52,10 @@ log.setLevel(logging.ERROR)
 is_scoring_running = False
 worker_thread = None
 _startup_check_done = False
-last_ping = None
-ping_interval = 2  # seconds
-ping_timeout = 5  # seconds
+frontend_url = None
+last_frontend_contact = None
+probe_thread = None
+frontend_grace_period = 60  # seconds
 
 
 # --- Flask Routes ---
@@ -446,11 +448,68 @@ def log_stream():
 
 
 # heartbeat to ensure NIDRA is shutdown when tab is closed (ping disappears).
-@app.route('/ping', methods=['POST'])
-def ping():
-    """Resets the ping timer."""
-    global last_ping
-    last_ping = time.time()
+def probe_frontend_loop():
+    """
+    Periodically probes the frontend to ensure it's still alive.
+    If the frontend is unresponsive for a grace period, the backend shuts down.
+    """
+    global last_frontend_contact
+    # logger.info("Starting frontend probe loop...")
+
+    while True:
+        if frontend_url and last_frontend_contact:
+            try:
+                # The frontend doesn't need to respond to this, we just need to see if the server is up.
+                # A simple HEAD request is lighter than GET.
+                requests.head(f"{frontend_url}/alive-ping", timeout=3)
+                last_frontend_contact = time.time()
+            except requests.exceptions.RequestException:
+                # If the probe fails, we don't update last_frontend_contact.
+                pass
+
+            if time.time() - last_frontend_contact > frontend_grace_period:
+                logger.warning(f"Frontend has been unresponsive for {frontend_grace_period} seconds. Shutting down backend.")
+                os._exit(0)
+
+        time.sleep(5) # Probe every 5 seconds
+
+
+@app.route('/register', methods=['POST'])
+def register_frontend():
+    """
+    Receives the frontend's URL and starts the monitoring thread.
+    """
+    global frontend_url, last_frontend_contact, probe_thread
+    data = request.json
+    url = data.get('url')
+    if not url:
+        return jsonify({'status': 'error', 'message': 'URL not provided'}), 400
+
+    frontend_url = url
+    last_frontend_contact = time.time()
+    # logger.info(f"Frontend registered from URL: {frontend_url}")
+
+    if probe_thread is None:
+        probe_thread = threading.Thread(target=probe_frontend_loop, daemon=True)
+        probe_thread.start()
+
+    return jsonify({'status': 'success'})
+
+
+@app.route('/goodbye', methods=['POST'])
+def goodbye():
+    """
+    Provides a way for the frontend to signal a clean shutdown.
+    """
+    logger.info("Received /goodbye signal from frontend. Shutting down in 0.3 seconds.")
+    # Short delay to allow the beacon to be sent successfully
+    threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0))).start()
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/alive-ping')
+def alive_ping():
+    """A lightweight endpoint for the backend to probe itself to see if the frontend is still responsive."""
     return jsonify({'status': 'ok'})
 
 

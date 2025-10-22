@@ -339,22 +339,50 @@ function initializeApp() {
 
     checkStatus();
 
-    // --- Ping Server ---
-    const PING_INTERVAL = 2000; 
+    // --- Backend Liveness & Shutdown ---
 
-    async function pingServer() {
+    // Register the frontend with the backend as soon as the page loads.
+    async function registerFrontend() {
         try {
-            await fetch('/ping', { method: 'POST' });
+            await fetch('/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: window.location.origin })
+            });
         } catch (error) {
-            console.error('Ping failed (backend likely down):', error);
-            // If ping fails, it's a strong indicator the server is gone.
-            document.open();
-            document.write(stoppedPageHTML);
-            document.close();
+            console.error('Failed to register frontend:', error);
         }
     }
 
-    setInterval(pingServer, PING_INTERVAL);
+    // When the user closes the tab, send a final signal to the backend.
+    window.addEventListener('beforeunload', () => {
+        // Use sendBeacon as it's more reliable for requests during page unload.
+        if (navigator.sendBeacon) {
+            navigator.sendBeacon('/goodbye', new Blob());
+        }
+    });
+
+    // Periodically check if the backend is still reachable. If not, show the stopped page.
+    async function checkBackendStatus() {
+        try {
+            // A simple fetch to any endpoint will do. /status is a good choice.
+            const response = await fetch('/status');
+            if (!response.ok) {
+                throw new Error('Backend not responding');
+            }
+        } catch (error) {
+            console.error('Backend connection lost:', error);
+            document.open();
+            document.write(stoppedPageHTML);
+            document.close();
+            // Stop all polling once the backend is confirmed to be down.
+            stopPolling();
+            clearInterval(backendStatusInterval);
+        }
+    }
+
+    registerFrontend();
+    const backendStatusInterval = setInterval(checkBackendStatus, 5000); // Check every 5 seconds
 }
 
 document.addEventListener('DOMContentLoaded', initializeApp);
