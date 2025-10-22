@@ -529,7 +529,7 @@ def get_app_dir():
     """
 
     if getattr(sys, 'frozen', False):
-        internal_dir = Path(os.path.dirname(sys.executable)) / "_internal"
+        internal_dir = Path(os.path.dirname(sys.executable)) / "runtime"
         if internal_dir.exists():
             return internal_dir
     

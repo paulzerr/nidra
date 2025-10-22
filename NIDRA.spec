@@ -72,5 +72,6 @@ coll = COLLECT(
     a.datas,
     strip=True,
     upx=False,
-    name='NIDRA'
+    name='NIDRA',
+    bindir='runtime'
 )
