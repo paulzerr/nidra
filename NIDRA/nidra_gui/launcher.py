@@ -1,28 +1,26 @@
-import subprocess
-import threading
 import sys
+import time
 import os
 import socket
+import subprocess
+import threading
 from pathlib import Path
 import webbrowser
-import time
 import multiprocessing
-from NIDRA.nidra_gui import app as nidra_app
-from NIDRA import utils
-import time
 import importlib.resources
 from werkzeug.serving import make_server
+from NIDRA.nidra_gui import app as nidra_app
+from NIDRA import utils
 
-def get_resource_path(relative_path):
-    bundle_dir = utils.get_app_dir()
-    if bundle_dir:
-        return os.path.join(bundle_dir, relative_path)
-    try:
-        package_resources = importlib.resources.files('NIDRA.nidra_gui')
-        return str(package_resources.joinpath(relative_path))
-    except (ModuleNotFoundError, AttributeError):
-        base_path = os.path.abspath(Path(__file__).parent)
-        return os.path.join(base_path, relative_path)
+
+# def get_resource_path(relative_path: str) -> str:
+#     _, is_bundle = utils.get_app_dir() 
+#     if is_bundle:
+#         return str(utils.get_app_dir()[0] / relative_path)
+#     try:
+#         return str(importlib.resources.files('NIDRA.nidra_gui').joinpath(relative_path))
+#     except Exception:
+#         return str(Path(__file__).parent / relative_path)
 
 def find_free_port(preferred_ports=[5001, 5002, 5003, 62345, 62346, 62347, 62348, 62349]):
     """
@@ -84,42 +82,42 @@ def main():
         except KeyboardInterrupt:
             server.shutdown()
             server.join()
-    else:
-        if sys.platform == "win32":
-            binary_name = "neutralino-win_x64.exe"
-        elif sys.platform == "darwin":
-            binary_name = "neutralino-mac_10"
-        else:
-            binary_name = "neutralino-linux_x64"
-        binary_path = get_resource_path(f"neutralino/{binary_name}")
+    # else:
+    #     if sys.platform == "win32":
+    #         binary_name = "neutralino-win_x64.exe"
+    #     elif sys.platform == "darwin":
+    #         binary_name = "neutralino-mac_10"
+    #     else:
+    #         binary_name = "neutralino-linux_x64"
+    #     binary_path = get_resource_path(f"neutralino/{binary_name}")
 
-        url = f"http://127.0.0.1:{port}"
-        neutralino_process = None
-        try:
-            time.sleep(1)
-            with open(os.devnull, 'w') as devnull:
-                neutralino_process = subprocess.Popen(
-                    [binary_path, f'--url={url}'],
-                    cwd=os.path.dirname(binary_path),
-                    stdout=devnull, stderr=devnull
-                )
-            neutralino_process.wait() 
+    #     url = f"http://127.0.0.1:{port}"
+    #     neutralino_process = None
+    #     try:
+    #         time.sleep(1)
+    #         with open(os.devnull, 'w') as devnull:
+    #             neutralino_process = subprocess.Popen(
+    #                 [binary_path, f'--url={url}'],
+    #                 cwd=os.path.dirname(binary_path),
+    #                 stdout=devnull, stderr=devnull
+    #             )
+    #         neutralino_process.wait() 
 
-        except FileNotFoundError:
-            print(f"Neutralino binary not found at {binary_path}.")
-            print("Falling back to opening in the default web browser.")
-            webbrowser.open(url)
-            server.join() 
+    #     except FileNotFoundError:
+    #         print(f"Neutralino binary not found at {binary_path}.")
+    #         print("Falling back to opening in the default web browser.")
+    #         webbrowser.open(url)
+    #         server.join() 
 
-        except KeyboardInterrupt:
-            print("\nCtrl+C detected. Shutting down Neutralino and server...")
-            if neutralino_process:
-                neutralino_process.terminate()
+    #     except KeyboardInterrupt:
+    #         print("\nCtrl+C detected. Shutting down Neutralino and server...")
+    #         if neutralino_process:
+    #             neutralino_process.terminate()
         
-        finally:
-            print("Shutting down server...")
-            server.shutdown()
-            server.join()
+    #     finally:
+    #         print("Shutting down server...")
+    #         server.shutdown()
+    #         server.join()
 
     print("Server has shut down. Exiting.")
 

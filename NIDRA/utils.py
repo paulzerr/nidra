@@ -457,26 +457,14 @@ def setup_logging():
 
 
 
-def get_model_path(model_name: str) -> str:
+def get_model_path(model_name=None):
     """
-    Determines the full path to a model file, accommodating both standard installs and PyInstaller bundles.
-
-    Args:
-        model_name (str): The filename of the model (e.g., "my_model.onnx").
-
-    Returns:
-        str: The absolute path to the model file.
+    returns model file path if name specified or model folder path if name not specified
     """
-    bundle_dir = get_app_dir()
-    if bundle_dir:
-        # In a PyInstaller bundle, models are in a nested 'NIDRA/models' subdirectory
-        return str(bundle_dir / 'NIDRA' / 'models' / model_name)
-    else:
-        # In a standard install, models are in the user's data directory
-        app_name = "NIDRA"
-        app_author = "pzerr"
-        data_dir = user_data_dir(app_name, app_author)
-        return os.path.join(data_dir, "models", model_name)
+    app_dir, is_bundle = get_app_dir()
+    base_path = Path(app_dir) if is_bundle else Path(user_data_dir())
+    models_dir = base_path / "NIDRA" / "models"
+    return models_dir / model_name if model_name else models_dir
 
 
 def download_models(logger):
@@ -485,30 +473,30 @@ def download_models(logger):
     Logs progress to the provided logger instance.
     Returns True if a download was attempted, False otherwise.
     """
-    if get_app_dir():
-        logger.info("Running in a PyInstaller bundle, models should be included. Skipping download check.")
+    app_dir, is_bundle = get_app_dir()
+    if is_bundle:
         return False
 
+    # make local models folder
     repo_id = "pzerr/NIDRA_models"
     models = ["u-sleep-nsrr-2024.onnx", "u-sleep-nsrr-2024_eeg.onnx", "ez6.onnx", "ez6moe.onnx"]
+    models_dir = get_model_path() 
+    models_dir.mkdir(parents=True, exist_ok=True) 
 
-    models_dir = os.path.dirname(get_model_path("dummy.onnx"))
-    os.makedirs(models_dir, exist_ok=True)
-
-    models_to_download = [m for m in models if not os.path.exists(get_model_path(m))]
+    # check which model files already exist
+    models_to_download = [m for m in models if not get_model_path(m).exists()]
 
     if not models_to_download:
-        logger.info(f"All models found at: {models_dir}")
+        logger.info(f"Models found at: {models_dir}")
         return False
 
-    # --- Download is needed ---
-    logger.info("--- NIDRA Model Download ---")
-    
+    # download models
+    logger.info("--- Downloading model files ---")
     total_size = 0
     for model_name in models_to_download:
         try:
             url = hf_hub_url(repo_id, model_name)
-            response = requests.head(url, timeout=15)
+            response = requests.head(url, timeout=30)
             response.raise_for_status()
             file_size = int(response.headers.get('content-length', 0))
             total_size += file_size
@@ -545,23 +533,29 @@ def download_models(logger):
 
 def get_app_dir():
     """
-    Returns the base path for the application when running as a PyInstaller bundle.
-    Returns None otherwise.
+    Returns (base_path, is_bundle)
+      - base_path: Path object for the application's root directory
+      - is_bundle: 1 if running as a PyInstaller bundle, 0 otherwise
     """
-
+    # PyInstaller bundle (one-dir)
     if getattr(sys, 'frozen', False):
-        internal_dir = Path(os.path.dirname(sys.executable)) / "_internal"
+        exe_dir = Path(sys.executable).resolve().parent
+        internal_dir = exe_dir / "_internal"
         if internal_dir.exists():
-            return internal_dir
-    
-    if hasattr(sys, '_MEIPASS'):
-        return Path(sys._MEIPASS)
-    
+            return internal_dir, 1
+        return exe_dir, 1
+
+    # Running from source
+    this_file = Path(__file__).resolve()
+    if this_file.is_file():
+        return this_file.parent, 0
+
+    # Installed as pip package
     spec = importlib.util.find_spec("NIDRA")
     if spec and spec.origin:
-        return Path(spec.origin).resolve().parent
-    
-    return Path(__file__).resolve().parent
+        return Path(spec.origin).resolve().parent, 0
+
+    return None, 0
 
 
 def download_example_data(logger):

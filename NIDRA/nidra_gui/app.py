@@ -31,20 +31,37 @@ TEXTS = {
     "ZMAX_OPTIONS_SELECT_CHANNELS": "Select channels (optional)"
 }
 
-base_path = utils.get_app_dir()
-if base_path:
-    # Running as a PyInstaller bundle
-    app = Flask(__name__)
-    app.docs_path = base_path / 'docs'
-else:
-    # Running as a standard Python package
-    base_path = Path(__file__).parent
-    app = Flask(__name__, instance_relative_config=True)
-    app.docs_path = importlib.resources.files('docs')
-app.template_folder = str(base_path / 'neutralino' / 'resources' / 'templates')
-app.static_folder = str(base_path / 'neutralino' / 'resources' / 'static')
 
-# Suppress noisy HTTP request logging
+base_path, is_bundle = utils.get_app_dir()
+if is_bundle:
+    docs_path = base_path / 'docs'
+    instance_relative = False
+    # Running as PyInstaller bundle
+    #template_folder = str(base_path / 'neutralino' / 'resources' / 'templates')
+    #static_folder = str(base_path / 'neutralino' / 'resources' / 'static')
+    #app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
+    #app.docs_path = base_path / 'docs'
+else:
+    docs_path = importlib.resources.files('docs')
+    instance_relative = True
+    base_path = Path(__file__).parent
+    #template_folder = str(base_path / 'neutralino' / 'resources' / 'templates')
+    #static_folder = str(base_path / 'neutralino' / 'resources' / 'static')
+    #app = Flask(__name__, instance_relative_config=True, template_folder=template_folder, static_folder=static_folder)
+    #app.docs_path = importlib.resources.files('docs')
+
+template_folder = str(base_path / 'neutralino' / 'resources' / 'templates')
+static_folder = str(base_path / 'neutralino' / 'resources' / 'static')
+app = Flask(
+    __name__, 
+    instance_relative_config=instance_relative,
+    template_folder=template_folder, 
+    static_folder=static_folder
+)
+app.docs_path = docs_path
+
+
+# suppress noisy HTTP request logging
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
@@ -55,7 +72,7 @@ _startup_check_done = False
 frontend_url = None
 last_frontend_contact = None
 probe_thread = None
-frontend_grace_period = 60  # seconds
+frontend_grace_period = 2  # seconds (should be 60)
 
 
 # --- Flask Routes ---
@@ -233,9 +250,9 @@ def show_example():
         logger.info("\n--- Preparing scoring of example data ---")
 
         # If running as a PyInstaller bundle, use local examples
-        bundle_dir = utils.get_app_dir()
-        if bundle_dir:
-            example_data_path = bundle_dir / 'examples' / 'test_data_zmax'
+        app_dir, is_bundle = utils.get_app_dir()
+        if is_bundle:
+            example_data_path = app_dir / 'examples' / 'test_data_zmax'
             if example_data_path.exists():
                 logger.info(f"Using local example data from: {example_data_path}")
                 return jsonify({'status': 'success', 'path': str(example_data_path)})
@@ -337,7 +354,7 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
             success_count, total_count = batch.score(plot=plot, gen_stats=gen_stats)
         else:
             # Logic for single scoring.
-            logger.info(f"Searching for recordings in '{input_dir}'...")
+            logger.info(f"Looking for recordings in '{input_dir}'...")
             input_path = Path(input_dir)
             try:
                 if scorer_type == 'psg':
