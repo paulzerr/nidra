@@ -182,14 +182,14 @@ class ForeheadScorer:
         self.raw._data = sdata
 
         
-        eegL = self.raw.get_data(picks="eegl").flatten()
-        eegR = self.raw.get_data(picks="eegr").flatten()
-        data_as_array = np.vstack((eegL.reshape(1, -1), eegR.reshape(1, -1)))
+        #eegL = self.raw.get_data(picks="eegl").flatten()
+        #eegR = self.raw.get_data(picks="eegr").flatten()
+        #data_as_array = np.vstack((eegL.reshape(1, -1), eegR.reshape(1, -1)))
         # The _load_recording method ensures self.raw contains only the two channels of interest
         # ('eegl', 'eegr') in the correct order. We can therefore get the data directly.
         
         # this should be the easier way of doing the above, but is currently untested
-        # data_as_array = self.raw.get_data()
+        data_as_array = self.raw.get_data()
 
         if data_as_array.ndim != 2:
             raise ValueError("Input data must be a 2D array.")
