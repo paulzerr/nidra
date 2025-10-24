@@ -18,7 +18,7 @@ body {
     font-size: 18px;
 }
 .sidebar {
-    width: 240px;
+    width: 15%;
     position: fixed;
     top: 0;
     left: 0;
@@ -49,20 +49,26 @@ body {
 }
 
 .intro-logo-cell {
-    width: 40%;
+    width: 50%;
     text-align: center;
 }
 
 .logo {
     display: block;
-    width: 50%;
+    width: 100%;
     margin: 0 auto 1rem;
     mix-blend-mode: multiply;
 }
 
+#introduction td:first-child {
+    padding-right: 4rem;
+}
+
 #introduction h2 {
-    text-align: center;
+    text-align: left;
     border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0.25rem;
 }
 
 .intro-text-cell {
@@ -85,7 +91,7 @@ body {
 .sidebar ul li a:hover { color: var(--primary-color); }
 .content {
     margin-left: 240px;
-    padding: 2rem 4rem;
+    padding: 2rem 8rem;
 }
 section {
     padding-top: 2rem;

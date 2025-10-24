@@ -13,36 +13,33 @@
     <nav class="sidebar">
             <h2>Manual</h2>
         <ul>
-            <li><a href="#introduction">Introduction</a></li>
             <li><a href="#installation">Installation</a></li>
-            <li><a href="#gui-guide">GUI (Overview)</a></li>
             <li><a href="#preparing-data">Preparing Your Data</a></li>
-            <li><a href="#scoring-options">Scoring Options</a></li>
-            <li><a href="#source-file-configuration">Source File Configuration</a></li>
-            <li><a href="#gui-walkthrough">GUI (Walkthrough)</a></li>
+            <li><a href="#gui-walkthrough">GUI </a></li>
             <li><a href="#model-performance">Model Validation</a></li>
             <li><a href="#understanding-results">Understanding Results</a></li>
-            <li><a href="#cli-guide">CLI Guide</a></li>
-            <li><a href="#python-package">Python Guide</a></li>
-            <li><a href="#install-from-source">Install from Source</a></li>
+            <li><a href="#python-package">Python Endpoints</a></li>
             <li><a href="#how-to-cite">How to Cite</a></li>
-            <li><a href="#faq">FAQ & Troubleshooting</a></li>
-            <li><a href="#attribution">Attribution</a></li>
-            <li><a href="#license">License</a></li>
+            <li><a href="#faq">FAQ+Troubleshooting</a></li>
             <li><a href="#contact">Contact</a></li>
         </ul>
     </nav>
     <main class="content">
         <section id="introduction">
-            <table class="intro-table">
+            <table>
                 <tr>
-                    <td class="intro-logo-cell">
+                    <td width="30%" valign="top">
                         <img src="logo.png" alt="NIDRA Logo" class="logo">
-                        <h2>super simple sleep scoring</h2>
                     </td>
-                    <td class="intro-text-cell">
-                        <p>NIDRA is an easy-to-use tool for autoscoring sleep recordings with excellent accuracy using the best currently available machine learning models. No programming required, but a CLI and python endpoints are available. NIDRA can accurately score recordings from 2-channel EEG wearables (such as ZMax), as well as full PSG recordings. <a href="https://github.com/paulzerr/nidra">github.com/paulzerr/nidra</a></p>
-                    </td>
+                    <td valign="top">
+                        <h1>NIDRA v0.1.1 - super simple sleep scoring</h1>
+                        <a href="https://github.com/paulzerr/nidra" class="intro-link">https://github.com/paulzerr/nidra</a>
+                        <p>An easy way to use powerful machine learning models to autoscore sleep recordings with excellent accuracy. No programming required, but Python endpoints are available. NIDRA can accurately score recordings from 2-channel EEG wearables such as ZMax (using ez6 and ez6moe models), as well as full PSG recordings (using U-Sleep 2.0 via sleepyland).</p>
+                        
+                        <p><h2><strong>Download <a href="https://github.com/paulzerr/nidra/releases/latest/download/NIDRA.exe">NIDRA for Windows 10/11</a></strong></h1></p>
+                    <p></p>
+                    <br>
+                    </td>   
                 </tr>
             </table>
         </section>
@@ -50,14 +47,12 @@
         <section id="installation">
             <h2>Installation</h2>
             <h3>Option 1: Standalone installer</h3>
-            <p>The easiest way to use NIDRA on Windows is via the portable self-extracting archive which requires no installation.</p>
-
-            <h3><strong><a href="https://github.com/paulzerr/nidra/releases/latest/download/NIDRA.exe">Download standalone NIDRA for Windows</a></strong></h3>
-
-            <p><strong>Note:</strong> due to the restrictive environment of Windows, you may see a "Search on app store" popup window. Click "No". You may also see the blue Smartscreen warning. In that case click "More info" and then "run anyway". Should this fail, try installing via pip (see below).</p>
+            <p>The easiest way to use NIDRA on Windows is to <a href="https://github.com/paulzerr/nidra/releases/latest/download/NIDRA.exe">download</a> the portable self-extracting archive which requires no installation.</p>
+<p><strong>Note:</strong> due to the restrictive environment of Windows, you may see a "Search on app store" popup window. Click "No". You may also see the blue Smartscreen warning. In that case click "More info" and then "run anyway". Should this fail, try installing via pip (see below).</p>
+            
             <br>
             <h3>Option 2: Install with pip</h3>
-            <p>It is highly recommended to create a clean virtual environment to install NIDRA. This prevents conflicts with other packages.</p>
+            <p>It is highly recommended to create a clean virtual environment to install NIDRA. This prevents conflicts with other packages. Python 3.10 recommended.</p>
             <p><strong>Windows:</strong></p>
             <pre><code>python -m venv nidra-env
 nidra-env\Scripts\activate
@@ -210,15 +205,6 @@ psg_study/
             </ul>
         </section>
 
-        <section id="cli-guide">
-            <h2>Commandline interface (CLI)</h2>
-            <p>The basic command is <code>nidra score</code>. You must provide the input path, output directory, and the type of scorer.</p>
-            <pre><code>nidra score --input_path /path/to/data --output_dir /path/to/output --scorer_type forehead</code></pre>
-            <h3>Example: Batch Processing a Full Study</h3>
-            <p>Let's say you have a study with data structured as recommended in the "Preparing Your Data" section. You can process all subjects with a single command by pointing the <code>--input_path</code> to the main study directory.</p>
-            <pre><code>nidra score --input_path /my_study_data/ --output_dir /my_study_results/ --scorer_type forehead --model_name ez6moe</code></pre>
-            <p>NIDRA will automatically find the subdirectories, process the recording in each one, and place the results in a correspondingly named folder inside <code>/my_study_results/</code>.</p>
-        </section>
 
         <section id="python-package">
             <h2>Python Endpoints</h2>
@@ -240,6 +226,12 @@ psg_study/
                         <li><code>ch_names</code> (list of str): A list of channel names.</li>
                     </ul>
                 </li>
+                <li><strong>For Forehead EEG data from file:</strong>
+                    <ul>
+                        <li><code>zmax_mode</code> (str, optional): How to treat the input file(s). Can be <code>'two_files'</code> (default) where NIDRA looks for a corresponding L/R file, or <code>'one_file'</code> where both channels are in the <code>input_file</code>.</li>
+                        <li><code>zmax_channels</code> (list of str, optional): When using <code>'one_file'</code> mode, you can specify the names of the two channels to use, e.g., <code>['EEG L', 'EEG R']</code>. If not provided, the first two channels in the file are used.</li>
+                    </ul>
+                </li>
             </ul>
 
             <h4><code>scorer.score(...)</code> Method</h4>
@@ -254,7 +246,26 @@ psg_study/
                 <li><strong>probabilities</strong> (<code>numpy.ndarray</code>): A 2D array of shape (n_epochs, n_classes). Each row corresponds to an epoch, and each column contains the model's predicted probability for a specific sleep stage.</li>
             </ol>
 
-            <h3>Example 1: Scoring a PSG File</h3>
+            <h3>Example 1: Scoring a Forehead EEG File</h3>
+            <p>This example shows how to score a single forehead EEG recording from an EDF file. This is the typical use case for ZMax data where the left and right channels are in a single file. You must specify the channel names using <code>zmax_channels</code>.</p>
+            <pre>
+import NIDRA
+
+# Initialize the scorer
+scorer = NIDRA.scorer(
+    scorer_type='forehead',
+    input_file='/path/to/your/data/zmax_recording.edf',
+    output_dir='/path/to/your/output',
+    model_name='ez6moe',
+    zmax_mode='one_file',
+    zmax_channels=['EEG L', 'EEG R']
+)
+
+# Run scoring
+hypnogram, probabilities = scorer.score(plot=True)
+</pre>
+
+            <h3>Example 2: Scoring a PSG File</h3>
             <p>This example shows how to score a single PSG recording from an EDF file.</p>
             <pre>
 import NIDRA
@@ -272,7 +283,7 @@ hypnogram, probabilities = scorer.score(plot=True)
 
 </pre>
 
-            <h3>Example 2: Scoring In-Memory NumPy Data</h3>
+            <h3>Example 3: Scoring In-Memory NumPy Data</h3>
             <p>You can also score data that you already have in memory as a NumPy array. This is useful for real-time applications or custom data loading pipelines. When scoring PSG data from an array, you must provide the sampling frequency (<code>sfreq</code>). Providing channel names is recommended but optional; if not provided, they will be auto-generated. All channels are then assumed to contain EEG data.</p>
             <pre>
 import NIDRA
@@ -293,7 +304,7 @@ scorer = NIDRA.scorer(
 hypnogram, probabilities = scorer.score()
 
 </pre>
-            <h3>Example 3: Batch Processing a Study</h3>
+            <h3>Example 4: Batch Processing a Study</h3>
             <p>For batch processing, NIDRA provides a convenient <code>batch_scorer</code>. This function automatically discovers all valid recordings in the subdirectories of your input path, mirroring the behavior of the GUI. This is the recommended way to process a full study. Please see the <a href="#preparing-data">Preparing Your Data</a> section for details on how to structure your study directory.</p>
             <pre>
 import NIDRA

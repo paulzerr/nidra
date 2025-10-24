@@ -22,7 +22,6 @@ dynamic = ["dependencies"]
 "Homepage" = "https://github.com/paulzerr/NIDRA"
 
 [project.scripts]
-nid = "NIDRA.cli:run_cli"
 nidra = "NIDRA.nidra_gui.launcher:main"
 
 [tool.setuptools]
