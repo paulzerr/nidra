@@ -29,53 +29,6 @@ body {
     box-sizing: border-box;
     overflow-y: auto;
 }
-.sidebar-header {
-    margin-bottom: 1rem;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 1rem;
-}
-.sidebar-header h1 {
-    margin: 0;
-    font-size: 1.8rem;
-    color: var(--text-color);
-}
-.sidebar-header span {
-    font-size: 0.9rem;
-    color: #6C757D;
-}
-.intro-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.intro-logo-cell {
-    width: 50%;
-    text-align: center;
-}
-
-.logo {
-    display: block;
-    width: 100%;
-    margin: 0 auto 1rem;
-    mix-blend-mode: multiply;
-}
-
-#introduction td:first-child {
-    padding-right: 4rem;
-}
-
-#introduction h2 {
-    text-align: left;
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0.25rem;
-}
-
-.intro-text-cell {
-    width: 60%;
-    vertical-align: middle;
-    padding-left: 2rem;
-}
 .sidebar ul {
     list-style: none;
     padding: 0;
@@ -90,7 +43,7 @@ body {
 }
 .sidebar ul li a:hover { color: var(--primary-color); }
 .content {
-    margin-left: 240px;
+    margin-left: 15%;
     padding: 2rem 8rem;
 }
 section {
@@ -99,6 +52,28 @@ section {
     border-bottom: 1px solid var(--border-color);
 }
 section:last-child { border-bottom: none; }
+
+/* --- Introduction Section --- */
+.intro-container {
+    display: grid;
+    grid-template-columns: 30% auto;
+    gap: 4rem;
+    align-items: start;
+}
+.logo {
+    display: block;
+    width: 100%;
+    margin: 0 auto 1rem;
+    mix-blend-mode: multiply;
+}
+#introduction h2 {
+    text-align: left;
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0.25rem;
+}
+/* --- End Introduction Section --- */
+
 h2 {
     font-size: 2rem;
     margin-top: 0;
