@@ -52,7 +52,7 @@ class BatchScorer:
             # Exclude NIDRA-generated batch output folders to avoid spurious scans
             dirs_to_search = [
                 subdir for subdir in sorted(self.input_dir.iterdir())
-                if subdir.is_dir() and not subdir.name.startswith('batch_run_')
+                if subdir.is_dir() and not subdir.name.startswith(('autoscorer_output_run_'))
             ]
 
         files = []
@@ -102,7 +102,7 @@ class BatchScorer:
             return 0, 0
 
         batch_start_time = time.time()
-        batch_output_dir = self.output_dir / f"batch_run_{time.strftime('%Y%m%d_%H%M%S')}"
+        batch_output_dir = self.output_dir / f"autoscorer_output_run_{time.strftime('%Y%m%d_%H%M%S')}"
         batch_output_dir.mkdir(parents=True, exist_ok=True)
         logger.info("\n" + "-" * 80)
         logger.info(f"Starting batch processing. Results will be saved to: {batch_output_dir}")
@@ -169,7 +169,7 @@ def batch_scorer(input_dir, output_dir=None, scorer_type=None, model_name=None, 
         zmax_mode (str, optional): The ZMax mode ('one_file' or 'two_files') for forehead data.
 
     Returns:
-        BatchScorer: Configured BatchScorer. Call .score() to run processing. A new timestamped folder 'batch_run_YYYYmmdd_HHMMSS'
+        BatchScorer: Configured BatchScorer. Call .score() to run processing. A new timestamped folder 'autoscorer_output_run_YYYYmmdd_HHMMSS'
                      will be created inside output_dir to contain all per-recording outputs.
     """
     return BatchScorer(input_dir, output_dir, scorer_type, model_name, dir_list=dir_list, zmax_mode=zmax_mode)

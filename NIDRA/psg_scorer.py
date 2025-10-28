@@ -49,7 +49,7 @@ class PSGScorer:
 
         if output_dir is None:
             if input_dir:
-                output_dir = input_dir
+                output_dir = Path(input_dir) / "autoscorer_output"
 
         # if no output file parameter given, and we're using numpy array data input, no outfiles should be written
         # otherwise, if we're scoring edf's we do want to write output files by default

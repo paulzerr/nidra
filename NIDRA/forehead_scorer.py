@@ -46,7 +46,7 @@ class ForeheadScorer:
 
         if output_dir is None:
             if input_dir:
-                output_dir = input_dir
+                output_dir = Path(input_dir) / "autoscorer_output"
 
         if create_output_files is None:
             self.create_output_files = True if input_file else False
