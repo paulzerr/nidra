@@ -25,8 +25,7 @@ dynamic = ["dependencies"]
 nidra = "NIDRA.nidra_gui.launcher:main"
 
 [tool.setuptools]
-packages = {find = {}}
-
+packages = { find = { include = ["NIDRA*", "docs*"], exclude = ["examples*"] } }
 
 [tool.setuptools.package-data]
 "NIDRA" = ["nidra_gui/neutralino/resources/**"]

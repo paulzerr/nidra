@@ -1,7 +1,3 @@
-import sys
-"""
-Utility functions for NIDRA sleep scoring.
-"""
 import re
 import os
 import sys
@@ -9,8 +5,6 @@ import numpy as np
 from typing import List
 import logging
 import time
-from NIDRA import scorer as scorer_factory
-logger = logging.getLogger(__name__)
 import tempfile
 from pathlib import Path
 from datetime import datetime
@@ -18,16 +12,31 @@ from huggingface_hub import hf_hub_download, hf_hub_url
 from appdirs import user_data_dir
 import requests
 import importlib.util
+import NIDRA
+
+logger = logging.getLogger(__name__)
 
 class BatchScorer:
     """
     A class to handle batch scoring of a study directory.
     It finds all valid recordings in subdirectories and scores them in a single run.
     """
-    def __init__(self, input_dir, output_dir, scorer_type, model_name=None, dir_list=None, zmax_mode=None):
+    def __init__(self, input_dir, output_dir=None, scorer_type=None, model_name=None, dir_list=None, zmax_mode=None):
         self.input_dir = Path(input_dir) if input_dir else None
-        self.output_dir = Path(output_dir)
+
+        # Default output_dir to input_dir if not provided
+        if output_dir is None:
+            if self.input_dir is not None:
+                self.output_dir = self.input_dir
+                logger.info(f"No output_dir specified. Using input_dir as output_dir: {self.output_dir}")
+            else:
+                raise ValueError("output_dir must be specified when input_dir is not provided.")
+        else:
+            self.output_dir = Path(output_dir)
+
         self.scorer_type = scorer_type
+        if self.scorer_type is None:
+            raise ValueError("scorer_type must be specified: 'forehead' or 'psg'.")
         self.model_name = model_name
         self.dir_list = dir_list
         self.zmax_mode = zmax_mode
@@ -40,7 +49,11 @@ class BatchScorer:
             dirs_to_search = [Path(d) for d in self.dir_list]
         else:
             logger.info(f"Searching for recordings in '{self.input_dir}'...")
-            dirs_to_search = [subdir for subdir in sorted(self.input_dir.iterdir()) if subdir.is_dir()]
+            # Exclude NIDRA-generated batch output folders to avoid spurious scans
+            dirs_to_search = [
+                subdir for subdir in sorted(self.input_dir.iterdir())
+                if subdir.is_dir() and not subdir.name.startswith('batch_run_')
+            ]
 
         files = []
         for subdir in dirs_to_search:
@@ -105,7 +118,7 @@ class BatchScorer:
 
             try:
                 start_time = time.time()
-                scorer = scorer_factory(
+                scorer = NIDRA.scorer(
                     scorer_type=self.scorer_type,
                     input_file=str(file),
                     output_dir=str(recording_output_dir),
@@ -114,7 +127,7 @@ class BatchScorer:
                 )
                 hypnogram, _ = scorer.score(plot=plot)
                 logger.info("Autoscoring completed.")
-
+                
                 if gen_stats:
                     logger.info("Calculating sleep statistics...")
                     stats = compute_sleep_stats(hypnogram.tolist())
@@ -142,19 +155,22 @@ class BatchScorer:
         
         return processed_count, len(self.files_to_process)
 
-def batch_scorer(input_dir, output_dir, scorer_type, model_name=None, dir_list=None, zmax_mode=None):
+def batch_scorer(input_dir, output_dir=None, scorer_type=None, model_name=None, dir_list=None, zmax_mode=None):
     """
     Factory function to create a BatchScorer instance.
     This is the recommended entry point for batch processing.
+
     Args:
-        input_dir (str): Path to the main study directory.
-        output_dir (str): Path where results will be saved.
+        input_dir (str): Path to the main study directory that contains one subfolder per recording.
+        output_dir (str, optional): Base directory where batch results will be saved. Defaults to input_dir when omitted.
         scorer_type (str): Type of data, either 'forehead' or 'psg'.
         model_name (str, optional): Name of the model to use.
-        dir_list (list, optional): A list of directories to process.
-        zmax_mode (str, optional): The ZMax mode ('one_file' or 'two_files').
+        dir_list (list, optional): A list of specific directories to process instead of scanning all subdirectories.
+        zmax_mode (str, optional): The ZMax mode ('one_file' or 'two_files') for forehead data.
+
     Returns:
-        BatchScorer: An instance of the BatchScorer class.
+        BatchScorer: Configured BatchScorer. Call .score() to run processing. A new timestamped folder 'batch_run_YYYYmmdd_HHMMSS'
+                     will be created inside output_dir to contain all per-recording outputs.
     """
     return BatchScorer(input_dir, output_dir, scorer_type, model_name, dir_list=dir_list, zmax_mode=zmax_mode)
 
@@ -416,7 +432,6 @@ def select_channels(psg_data: np.ndarray, sample_rate: int, channel_names: List[
         return list(range(psg_data.shape[0]))
 
 
-import atexit
 
 def setup_logging():
     """Configures logging for the application and returns the log file path and logger instance."""
@@ -429,6 +444,7 @@ def setup_logging():
     log_file_stream = open(log_file, 'w', encoding='utf-8', buffering=1)
     
     # Register a cleanup function to close the stream on exit
+    import atexit
     atexit.register(log_file_stream.close)
 
     # Create handlers

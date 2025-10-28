@@ -11,7 +11,7 @@ class ForeheadScorer:
     """
     Scores sleep stages from forehead EEG data.
     """
-    def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None,
+    def __init__(self, input_file: str = None, output_dir: str = None, data: np.ndarray = None,
                  sfreq: float = None, model_name: str = "ez6", device_type: str = 'zmax',
                  zmax_mode: str = 'two_files', zmax_channels: list = None,
                  create_output_files: bool = None):
@@ -20,21 +20,45 @@ class ForeheadScorer:
         if data is not None and sfreq is None:
             raise ValueError("'sfreq' must be provided when 'data' is given.")
 
+        if input_file:
+            input_path = Path(input_file)
+            if input_path.is_dir():
+                input_dir = input_path
+                try:
+                    # Default to 'two_files' if zmax_mode is not provided, to maintain old behavior
+                    if zmax_mode in [None, 'two_files']:
+                        found_file = next(input_path.glob('*[lL].edf'))
+                        # Verify R file exists
+                        next(input_path.glob('*[rR].edf'))
+                    else:  # 'one_file'
+                        found_file = next(input_path.glob('*.edf'))
+                    self.input_file = found_file
+                except StopIteration:
+                    raise FileNotFoundError(f"Could not find a complete recording in directory '{input_path}'.")
+            else:
+                input_dir = input_path.parent
+                self.input_file = input_path
+            self.base_filename = f"{self.input_file.parent.name}_{self.input_file.stem}"
+        else:
+            input_dir = None
+            self.input_file = None
+            self.base_filename = "numpy_input"
+
+        if output_dir is None:
+            if input_dir:
+                output_dir = input_dir
+
         if create_output_files is None:
             self.create_output_files = True if input_file else False
         else:
             self.create_output_files = create_output_files
 
-        self.output_dir = Path(output_dir)
+        if output_dir is None and self.create_output_files:
+            raise ValueError("output_dir must be specified when create_output_files is True and it cannot be inferred from input_file.")
+
+        self.output_dir = Path(output_dir) if output_dir is not None else None
         self.input_data = data
         self.sfreq = sfreq
-        if input_file:
-            self.input_file = Path(input_file)
-            self.base_filename = f"{self.input_file.parent.name}_{self.input_file.stem}"
-        else:
-            self.input_file = None
-            self.base_filename = "numpy_input"
-
         self.model_name = model_name
         self.device_type = device_type
         self.zmax_mode = zmax_mode
@@ -101,7 +125,7 @@ class ForeheadScorer:
             return
 
         if self.device_type == 'zmax':
-            if self.zmax_mode == 'two_files':
+            if self.zmax_mode in [None, 'two_files']:
                 # Assumes the input_file is the path to the LEFT channel EDF,
                 # and the RIGHT channel is in the same folder with a similar name.
                 rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
@@ -139,6 +163,10 @@ class ForeheadScorer:
                 # Resample and filter
                 raw.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
                 self.raw = raw
+
+        # Validate that a recording was loaded
+        if self.raw is None:
+            raise ValueError(f"Failed to load recording. Ensure EDF(s) exist.")
 
     def _predict(self):
         seq_length = 100
@@ -185,10 +213,7 @@ class ForeheadScorer:
         #eegL = self.raw.get_data(picks="eegl").flatten()
         #eegR = self.raw.get_data(picks="eegr").flatten()
         #data_as_array = np.vstack((eegL.reshape(1, -1), eegR.reshape(1, -1)))
-        # The _load_recording method ensures self.raw contains only the two channels of interest
-        # ('eegl', 'eegr') in the correct order. We can therefore get the data directly.
-        
-        # this should be the easier way of doing the above, but is currently untested
+        # this replaces the above:
         data_as_array = self.raw.get_data()
 
         if data_as_array.ndim != 2:

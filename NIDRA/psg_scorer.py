@@ -24,32 +24,51 @@ class PSGScorer:
     """
     Scores sleep stages from PSG data.
     """
-    def __init__(self, output_dir: str, input_file: str = None, data: np.ndarray = None, ch_names: List[str] = None, sfreq: float = None, model_name: str = "u-sleep-nsrr-2024_eeg", epoch_sec: int = 30, create_output_files: bool = None):
+    def __init__(self, input_file: str = None, output_dir: str = None, data: np.ndarray = None, ch_names: List[str] = None, sfreq: float = None, model_name: str = "u-sleep-nsrr-2024_eeg", epoch_sec: int = 30, create_output_files: bool = None):
         if input_file is None and data is None:
             raise ValueError("Either 'input_file' or 'data' must be provided.")
         if data is not None and sfreq is None:
             raise ValueError("'sfreq' must be provided when 'data' is given.")
 
-        if create_output_files is None:
-            self.create_output_files = True if input_file else False
-        else:
-            self.create_output_files = create_output_files
-
-        self.output_dir = Path(output_dir)
-        self.input_data = data
-        self.ch_names = ch_names
-        self.sfreq = sfreq
-        
         if input_file:
-            self.input_file = Path(input_file)
+            input_path = Path(input_file)
+            if input_path.is_dir():
+                input_dir = input_path
+                try:
+                    self.input_file = next(input_path.glob('*.edf'))
+                except StopIteration:
+                    raise FileNotFoundError(f"Could not find an EDF file in directory '{input_path}'.")
+            else:
+                input_dir = input_path.parent
+                self.input_file = input_path
             self.base_filename = f"{self.input_file.parent.name}_{self.input_file.stem}"
         else:
+            input_dir = None
             self.input_file = None
             self.base_filename = "numpy_input"
 
+        if output_dir is None:
+            if input_dir:
+                output_dir = input_dir
+
+        # if no output file parameter given, and we're using numpy array data input, no outfiles should be written
+        # otherwise, if we're scoring edf's we do want to write output files by default
+        if create_output_files is None:
+            self.create_output_files = True if input_file else False
+        else:
+            # if we specified output file parameter, use that specification
+            self.create_output_files = create_output_files
+
+        if output_dir is None and self.create_output_files:
+            raise ValueError("output_dir must be specified when create_output_files is True and it cannot be inferred from input_file.")
+
+        self.output_dir = Path(output_dir) if output_dir is not None else None
+        self.input_data = data
+        self.ch_names = ch_names
+        self.sfreq = sfreq
         self.model_name = model_name
         self.epoch_sec = 30 #epoch_sec # we ignore this input for now and enforce 30s epochs
-        self.new_sample_rate = 128
+        self.new_sample_rate = 128 # resample to 128 for usleep models
         self.auto_channel_grouping = ['EEG', 'EOG']
         self.onnx_model_path = None
         self.preprocessed_psg = None
@@ -60,7 +79,7 @@ class PSGScorer:
         self.output_name = None
         self.hypnogram = None
         self.probabilities = None
-        
+
         if self.create_output_files:
             self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -249,14 +268,14 @@ class PSGScorer:
         """Saves the hypnogram and probabilities to files."""
         print(f"Saving results to {self.output_dir}...")
         
-        # Save hypnogram to CSV
+        # save hypnogram to file
         hypnogram_csv_file = self.output_dir / f"{self.base_filename}_hypnogram.csv"
         with open(hypnogram_csv_file, 'w') as f:
             f.write("sleep_stage\n")
             for stage in self.hypnogram:
                 f.write(f"{int(stage)}\n")
 
-        # Save probabilities to CSV
+        # save probabilities
         prob_csv_file = self.output_dir / f"{self.base_filename}_probabilities.csv"
         with open(prob_csv_file, 'w') as f:
             header = "Epoch,Wake,N1,N2,N3,Unknown,REM\n"
