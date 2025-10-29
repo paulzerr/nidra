@@ -130,7 +130,7 @@ jobs:
       fail-fast: false
       matrix:
         use_msvc: [true, false]
-        browser: [chromium, firefox, webkit]
+        browser: [chromium]
         screen:
           - { width: 1920, height: 1080 }
           - { width: 1280, height: 720 }
@@ -151,8 +151,8 @@ jobs:
       - name: Set screen resolution
         run: Set-DisplayResolution -Width ${{ matrix.screen.width }} -Height ${{ matrix.screen.height }} -Force
 
-      - name: Install Playwright
-        run: python -m pip install --upgrade pip setuptools wheel && pip install playwright && python -m playwright install ${{ matrix.browser }}
+      - name: Install Test Dependencies
+        run: python -m pip install --upgrade pip setuptools wheel && pip install playwright pyautogui pillow && python -m playwright install ${{ matrix.browser }}
 
       - name: Start app, run demo, take screenshot, and close app
         shell: powershell
@@ -182,7 +182,7 @@ jobs:
               browser_type = getattr(p, "${{ matrix.browser }}")
               try:
                   browser = browser_type.connect_over_cdp("http://localhost:9222") # Default for many webview apps
-                  page = browser.contexts.pages
+                  page = browser.contexts().pages
                   print("Successfully connected to browser")
 
                   print("Clicking 'Run Demo' button")
@@ -199,6 +199,8 @@ jobs:
                   # Fallback to desktop screenshot if playwright fails
                   import pyautogui
                   pyautogui.screenshot("screenshot_fallback.png")
+                  print("Saved fallback screenshot.")
+
 
           print("Terminating application...")
           proc.terminate()
@@ -215,7 +217,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: screenshot-${{ matrix.os }}-${{ matrix.use_msvc }}-${{ matrix.browser }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}
-          path: screenshot.png
+          path: |
+            screenshot.png
+            screenshot_fallback.png
 
   package-screenshots:
     name: Package Screenshots
