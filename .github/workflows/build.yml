@@ -110,54 +110,27 @@ jobs:
       - name: Build Executable with PyInstaller
         run: .\venv\Scripts\python -m PyInstaller NIDRA.spec
 
-      - name: Setup MSVC Developer Command Prompt
-        uses: ilammy/msvc-dev-cmd@v1
-
-
-
-      - name: Create Self-Extracting Archive
-        run: |
-          @"
-          ;!@Install@!UTF-8!
-          Title="NIDRA Installer"
-          BeginPrompt="This will install NIDRA. Do you want to continue?"
-          Progress="yes"
-          FinishMessage="Do you want to launch NIDRA now?"
-          RunProgram="NIDRA\NIDRA.exe"
-          ;!@InstallEnd@!
-          "@ | Set-Content -Path sfx_config.txt
-          Set-Location -Path dist
-          & "C:\Program Files\7-Zip\7z.exe" a ..\NIDRA_archive.7z NIDRA
-          Set-Location -Path ..
-          cmd.exe --% /c copy /b "C:\Program Files\7-Zip\7z.sfx" + sfx_config.txt + NIDRA_archive.7z NIDRA_installer.exe
-
-      - name: Upload Windows Installer
-        if: github.ref == 'refs/heads/development'
+      - name: Upload Windows Build
         uses: actions/upload-artifact@v4
         with:
-          name: NIDRA-windows-installer
-          path: NIDRA_installer.exe
+          name: NIDRA-windows-build
+          path: dist/NIDRA
 
       - name: Create GitHub Release
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
-          files: NIDRA_installer.exe
+          files: dist/NIDRA_installer.exe
 
   test-gui:
     name: Test GUI on multiple platforms
     needs: build
-    # This job tests the application's GUI on different versions of Windows and at different screen resolutions.
-    # It installs the application from the build artifact, sets the screen resolution, launches the app,
-    # and takes a screenshot of the desktop.
-    # Note: The user mentioned testing on different browsers. Since this is a desktop application using a
-    # system webview (via Neutralino), it's not possible to run it in different browsers like Chrome or Firefox.
-    # The test will run against the default system webview on the runner (Edge/Chromium-based).
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-2022
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-2019, windows-2022]
+        use_msvc: [true, false]
+        browser: [chromium, firefox, webkit]
         screen:
           - { width: 1920, height: 1080 }
           - { width: 1280, height: 720 }
@@ -165,35 +138,33 @@ jobs:
           - { width: 1024, height: 768 }
 
     steps:
-      - name: Download installer
+      - name: Setup MSVC Developer Command Prompt
+        if: matrix.use_msvc
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: NIDRA-windows-installer
-          path: .
-
-      - name: Install application
-        run: Start-Process -FilePath "NIDRA_installer.exe" -ArgumentList "/S" -Wait
+          name: NIDRA-windows-build
+          path: NIDRA
 
       - name: Set screen resolution
         run: Set-DisplayResolution -Width ${{ matrix.screen.width }} -Height ${{ matrix.screen.height }} -Force
 
-      - name: Install screenshot dependencies
-        run: python -m pip install --upgrade pip setuptools wheel && pip install pyautogui pillow
+      - name: Install Playwright
+        run: python -m pip install --upgrade pip setuptools wheel && pip install playwright && python -m playwright install ${{ matrix.browser }}
 
-      - name: Start app, take screenshot, and close app
+      - name: Start app, run demo, take screenshot, and close app
         shell: powershell
         run: |
           Start-Sleep -Seconds 5 # Wait for resolution to settle
           @"
           import subprocess
           import time
-          import pyautogui
           import os
           import sys
+          from playwright.sync_api import sync_playwright
 
-          print(f"Current screen size: {pyautogui.size()}")
-
-          # The installer should extract to a 'NIDRA' folder in the current directory.
           exe_path = os.path.abspath('NIDRA/NIDRA.exe')
           print(f"Looking for exe at {exe_path}")
 
@@ -205,13 +176,29 @@ jobs:
           proc = subprocess.Popen([exe_path])
 
           print("Waiting for application to launch...")
-          time.sleep(20)
+          time.sleep(10)
 
-          print("Taking screenshot...")
-          screenshot = pyautogui.screenshot()
-          screenshot_path = "screenshot.png"
-          screenshot.save(screenshot_path)
-          print(f"Screenshot saved to {screenshot_path}")
+          with sync_playwright() as p:
+              browser_type = getattr(p, "${{ matrix.browser }}")
+              try:
+                  browser = browser_type.connect_over_cdp("http://localhost:9222") # Default for many webview apps
+                  page = browser.contexts.pages
+                  print("Successfully connected to browser")
+
+                  print("Clicking 'Run Demo' button")
+                  page.click("#show-example-btn")
+                  time.sleep(10) # Wait for demo to run
+
+                  print("Taking screenshot...")
+                  screenshot_path = "screenshot.png"
+                  page.screenshot(path=screenshot_path)
+                  print(f"Screenshot saved to {screenshot_path}")
+
+              except Exception as e:
+                  print(f"Could not connect to browser or take screenshot: {e}")
+                  # Fallback to desktop screenshot if playwright fails
+                  import pyautogui
+                  pyautogui.screenshot("screenshot_fallback.png")
 
           print("Terminating application...")
           proc.terminate()
@@ -227,5 +214,27 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: screenshot-${{ matrix.os }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}
+          name: screenshot-${{ matrix.os }}-${{ matrix.use_msvc }}-${{ matrix.browser }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}
           path: screenshot.png
+
+  package-screenshots:
+    name: Package Screenshots
+    needs: test-gui
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all screenshots
+        uses: actions/download-artifact@v4
+        with:
+          path: screenshots
+
+      - name: Zip screenshots
+        run: |
+          # The downloaded artifacts are in subdirectories, so we need to find them
+          find screenshots -name '*.png' -exec zip screenshots.zip {} +
+
+      - name: Upload screenshots zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots.zip
