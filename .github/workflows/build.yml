@@ -130,7 +130,7 @@ jobs:
       fail-fast: false
       matrix:
         use_msvc: [true, false]
-        browser: [chromium]
+        browser: [chromium, msedge]
         screen:
           - { width: 1920, height: 1080 }
           - { width: 1280, height: 720 }
@@ -138,6 +138,11 @@ jobs:
           - { width: 1024, height: 768 }
 
     steps:
+      - name: Disable Edge First-Run Experience
+        run: |
+          reg add "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v "HideFirstRunExperience" /t REG_DWORD /d 1 /f
+          reg add "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v "NewTabPageLocation" /t REG_SZ /d "https://www.blank.org/" /f
+
       - name: Setup MSVC Developer Command Prompt
         if: matrix.use_msvc
         uses: ilammy/msvc-dev-cmd@v1
@@ -152,7 +157,7 @@ jobs:
         run: Set-DisplayResolution -Width ${{ matrix.screen.width }} -Height ${{ matrix.screen.height }} -Force
 
       - name: Install Test Dependencies
-        run: python -m pip install --upgrade pip setuptools wheel && pip install playwright pyautogui pillow && python -m playwright install ${{ matrix.browser }}
+        run: python -m pip install --upgrade pip setuptools wheel && pip install playwright requests && python -m playwright install ${{ matrix.browser }}
 
       - name: Start app, run demo, take screenshot, and close app
         shell: powershell
@@ -163,7 +168,12 @@ jobs:
           import time
           import os
           import sys
+          import requests
           from playwright.sync_api import sync_playwright
+
+          # Prevent the app from opening its own browser window
+          env = os.environ.copy()
+          env['BROWSER'] = 'echo'
 
           exe_path = os.path.abspath('NIDRA/NIDRA.exe')
           print(f"Looking for exe at {exe_path}")
@@ -173,34 +183,51 @@ jobs:
               sys.exit(1)
 
           print(f"Starting application from {exe_path}")
-          proc = subprocess.Popen([exe_path])
+          proc = subprocess.Popen([exe_path], env=env)
 
-          print("Waiting for application to launch...")
-          time.sleep(10)
+          # Wait for server to be ready and find the correct port
+          base_url = "http://127.0.0.1"
+          ports_to_try = + list(range(62345, 62350))
+          app_url = None
+          print("Searching for running server...")
+          # Give the server up to 20 seconds to start
+          for _ in range(20):
+              for port in ports_to_try:
+                  url = f"{base_url}:{port}"
+                  try:
+                      response = requests.get(url, timeout=0.5)
+                      if response.status_code == 200:
+                          print(f"Server is up and running on {url}")
+                          app_url = url
+                          break
+                  except requests.ConnectionError:
+                      continue
+              if app_url:
+                  break
+              time.sleep(1)
+
+          if not app_url:
+              print("Could not connect to the Flask server on any expected port.")
+              proc.kill()
+              sys.exit(1)
 
           with sync_playwright() as p:
               browser_type = getattr(p, "${{ matrix.browser }}")
-              try:
-                  browser = browser_type.connect_over_cdp("http://localhost:9222") # Default for many webview apps
-                  page = browser.contexts().pages
-                  print("Successfully connected to browser")
+              browser = browser_type.launch()
+              page = browser.new_page()
+              print(f"Navigating to {app_url}")
+              page.goto(app_url)
+              print("Successfully loaded page.")
 
-                  print("Clicking 'Run Demo' button")
-                  page.click("#show-example-btn")
-                  time.sleep(10) # Wait for demo to run
+              print("Clicking 'Run Demo' button")
+              page.click("#show-example-btn")
+              time.sleep(10) # Wait for demo to run
 
-                  print("Taking screenshot...")
-                  screenshot_path = "screenshot.png"
-                  page.screenshot(path=screenshot_path)
-                  print(f"Screenshot saved to {screenshot_path}")
-
-              except Exception as e:
-                  print(f"Could not connect to browser or take screenshot: {e}")
-                  # Fallback to desktop screenshot if playwright fails
-                  import pyautogui
-                  pyautogui.screenshot("screenshot_fallback.png")
-                  print("Saved fallback screenshot.")
-
+              print("Taking screenshot...")
+              screenshot_path = "screenshot.png"
+              page.screenshot(path=screenshot_path, full_page=True)
+              print(f"Screenshot saved to {screenshot_path}")
+              browser.close()
 
           print("Terminating application...")
           proc.terminate()
@@ -216,10 +243,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: screenshot-${{ matrix.os }}-${{ matrix.use_msvc }}-${{ matrix.browser }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}
-          path: |
-            screenshot.png
-            screenshot_fallback.png
+          name: screenshot-${{ matrix.browser }}-${{ matrix.use_msvc }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}
+          path: screenshot.png
 
   package-screenshots:
     name: Package Screenshots
@@ -233,9 +258,7 @@ jobs:
           path: screenshots
 
       - name: Zip screenshots
-        run: |
-          # The downloaded artifacts are in subdirectories, so we need to find them
-          find screenshots -name '*.png' -exec zip screenshots.zip {} +
+        run: zip -j screenshots.zip screenshots/*/*.png
 
       - name: Upload screenshots zip
         uses: actions/upload-artifact@v4
