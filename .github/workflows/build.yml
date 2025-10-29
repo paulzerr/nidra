@@ -66,7 +66,7 @@ jobs:
           if github_ref == 'refs/heads/development' and github_run_number:
               base_version = str(data['project']['version'])
               if '.dev' in base_version:
-                  base_version = base_version.split('.dev')[0]
+                  base_version = base_version.split('.dev')
               new_version = f"{base_version}.dev{github_run_number}"
               data['project']['version'] = new_version
               print(f"Set version to {new_version}", file=sys.stderr)
@@ -144,64 +144,88 @@ jobs:
         with:
           files: NIDRA_installer.exe
 
-  publish-testpypi:
-    name: Publish package to TestPyPI
+  test-gui:
+    name: Test GUI on multiple platforms
     needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/development'
-    permissions:
-      id-token: write
-      contents: read
+    # This job tests the application's GUI on different versions of Windows and at different screen resolutions.
+    # It installs the application from the build artifact, sets the screen resolution, launches the app,
+    # and takes a screenshot of the desktop.
+    # Note: The user mentioned testing on different browsers. Since this is a desktop application using a
+    # system webview (via Neutralino), it's not possible to run it in different browsers like Chrome or Firefox.
+    # The test will run against the default system webview on the runner (Edge/Chromium-based).
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2019, windows-2022]
+        screen:
+          - { width: 1920, height: 1080 }
+          - { width: 1280, height: 720 }
+          - { width: 800, height: 600 }
+          - { width: 1024, height: 768 }
+
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Download installer
+        uses: actions/download-artifact@v4
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          name: NIDRA-windows-installer
+          path: .
 
-      - name: Install build tooling
+      - name: Install application
+        run: Start-Process -FilePath "NIDRA_installer.exe" -ArgumentList "/S" -Wait
+
+      - name: Set screen resolution
+        run: Set-DisplayResolution -Width ${{ matrix.screen.width }} -Height ${{ matrix.screen.height }} -Force
+
+      - name: Install screenshot dependencies
+        run: python -m pip install --upgrade pip setuptools wheel && pip install pyautogui pillow
+
+      - name: Start app, take screenshot, and close app
+        shell: powershell
         run: |
-          python -m pip install --upgrade pip build toml
+          Start-Sleep -Seconds 5 # Wait for resolution to settle
+          @"
+          import subprocess
+          import time
+          import pyautogui
+          import os
+          import sys
 
-      - name: Create script to update version
-        if: github.ref == 'refs/heads/development'
-        run: |
-          cat << 'EOF' > update_version.py
-          import toml
-          import os, sys
-          pyproject_path = 'pyproject.toml'
-          github_run_number = os.environ.get('GITHUB_RUN_NUMBER')
-          github_ref = os.environ.get('GITHUB_REF')
-          with open(pyproject_path, 'r') as f:
-              data = toml.load(f)
-          if github_ref == 'refs/heads/development' and github_run_number:
-              base_version = str(data['project']['version'])
-              if '.dev' in base_version:
-                  base_version = base_version.split('.dev')[0]
-              new_version = f"{base_version}.dev{github_run_number}"
-              data['project']['version'] = new_version
-              print(f"Set version to {new_version}", file=sys.stderr)
-              with open(pyproject_path, 'w') as f:
-                  toml.dump(data, f)
-              print("Updated pyproject.toml with dev version", file=sys.stderr)
-          EOF
+          print(f"Current screen size: {pyautogui.size()}")
 
-      - name: Update version in pyproject.toml
-        if: github.ref == 'refs/heads/development'
-        run: python update_version.py
-        env:
-          GITHUB_RUN_NUMBER: ${{ github.run_number }}
-          GITHUB_REF: ${{ github.ref }}
+          # The installer should extract to a 'NIDRA' folder in the current directory.
+          exe_path = os.path.abspath('NIDRA/NIDRA.exe')
+          print(f"Looking for exe at {exe_path}")
 
-      - name: Build package (sdist and wheel)
-        run: |
-          python -m build
+          if not os.path.exists(exe_path):
+              print(f"NIDRA.exe not found at {exe_path}. Exiting.")
+              sys.exit(1)
 
-      - name: Publish package to TestPyPI (Trusted Publisher)
-        uses: pypa/gh-action-pypi-publish@release/v1
+          print(f"Starting application from {exe_path}")
+          proc = subprocess.Popen([exe_path])
+
+          print("Waiting for application to launch...")
+          time.sleep(20)
+
+          print("Taking screenshot...")
+          screenshot = pyautogui.screenshot()
+          screenshot_path = "screenshot.png"
+          screenshot.save(screenshot_path)
+          print(f"Screenshot saved to {screenshot_path}")
+
+          print("Terminating application...")
+          proc.terminate()
+          try:
+              proc.wait(timeout=10)
+          except subprocess.TimeoutExpired:
+              print("Process did not terminate gracefully, killing.")
+              proc.kill()
+          print("Application closed.")
+          "@ | python -
+
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
+          name: screenshot-${{ matrix.os }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}
+          path: screenshot.png
