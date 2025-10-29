@@ -1,5 +1,4 @@
 import re
-import os
 import mne
 import numpy as np
 import onnxruntime as ort
@@ -9,7 +8,6 @@ from collections import namedtuple, OrderedDict
 from itertools import product
 from typing import List, Tuple, Dict, Any
 from NIDRA.plotting import plot_hypnodensity
-import importlib.resources
 from NIDRA import utils
 
 
@@ -113,8 +111,12 @@ class PSGScorer:
             print("Scoring must be run before plotting.")
 
     def _load_model(self):
-        model_filename = f"{self.model_name}.onnx"
-        print(f"Loading model {model_filename}...")
+        if self.has_eog:
+            model_filename = self.model_name + "_eeg.onnx"
+            print(f"No EOG channels found, loading EEG-only model: {self.model_name}")
+        else:
+            model_filename = self.model_name + ".onnx"
+            print(f"EOG channels found, loading model {model_filename}...")
         model_path = utils.get_model_path(model_filename)
         try:
             self.session = ort.InferenceSession(model_path)
@@ -126,17 +128,16 @@ class PSGScorer:
 
     def _load_recording(self):
         """Loads a PSG file or creates a raw object from numpy data."""
-        print("Loading sleep study...")
+        print("Loading recording...")
         if self.input_data is not None:
             if self.input_data.ndim != 2:
                 raise ValueError("Input data must be a 2D array.")
             
+            # name channels if no names given
             n_channels = self.input_data.shape[0]
-            if self.ch_names is None:
+            if self.ch_names is None: 
                 self.ch_names = [f"Ch{i+1:02d}" for i in range(n_channels)]
-            elif len(self.ch_names) != n_channels:
-                raise ValueError("Number of channel names does not match number of channels in data.")
-            
+
             info = mne.create_info(ch_names=self.ch_names, sfreq=self.sfreq, ch_types='eeg', verbose=False)
             self.raw = mne.io.RawArray(self.input_data, info, verbose=False)
         else:
@@ -185,21 +186,7 @@ class PSGScorer:
         
         print(f"Study preprocessed successfully. Shape: {self.preprocessed_psg.shape}")
 
-    def _initialize_model(self):
-        """Initializes the ONNX inference session."""
-        model_name = self.model_name
-        if not self.has_eog:
-            print("No EOG channels detected. Attempting to use EEG-only model.")
-            eeg_only_model_filename = f"{model_name}_eeg.onnx"
-            model_path = utils.get_model_path(eeg_only_model_filename)
-            if os.path.exists(model_path):
-                model_name += "_eeg"
-                print(f"Using EEG-only model: {model_name}")
-            else:
-                print(f"Warning: EEG-only model not found at '{model_path}'. Using standard model.")
 
-        self.model_name = model_name
-        self._load_model()
 
     def _predict(self):
         """Runs the prediction on the loaded sleep study."""

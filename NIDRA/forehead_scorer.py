@@ -4,7 +4,6 @@ import numpy as np
 from pathlib import Path
 import onnxruntime as ort
 from NIDRA.plotting import plot_hypnodensity
-import importlib.resources
 from NIDRA import utils
 
 class ForeheadScorer:
@@ -158,8 +157,7 @@ class ForeheadScorer:
                 
                 raw.pick(ch_names)
                 raw.rename_channels({ch_names[0]: 'eegl', ch_names[1]: 'eegr'})
-                raw.reorder_channels(['eegl', 'eegr'])
-                
+  
                 # Resample and filter
                 raw.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
                 self.raw = raw
@@ -209,11 +207,6 @@ class ForeheadScorer:
             sdata[ch] = np.clip(norm, -20 * iqr, 20 * iqr)
         self.raw._data = sdata
 
-        
-        #eegL = self.raw.get_data(picks="eegl").flatten()
-        #eegR = self.raw.get_data(picks="eegr").flatten()
-        #data_as_array = np.vstack((eegL.reshape(1, -1), eegR.reshape(1, -1)))
-        # this replaces the above:
         data_as_array = self.raw.get_data()
 
         if data_as_array.ndim != 2:
@@ -252,6 +245,7 @@ class ForeheadScorer:
         reorder_indices = [4, 2, 1, 0, 3, 5]
         self.probabilities = ypred_raw[:, reorder_indices]
         self.hypnogram = np.argmax(self.probabilities, axis=1)
+        # shift A+R classes by 1 to avoid confusion (4 is now unassigned, was traditionally N4)
         self.hypnogram[self.hypnogram == 5] = 6 # artefact class
         self.hypnogram[self.hypnogram == 4] = 5 # REM 
         

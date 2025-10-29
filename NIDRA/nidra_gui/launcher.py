@@ -1,26 +1,13 @@
-import sys
+
 import time
 import os
 import socket
-import subprocess
 import threading
-from pathlib import Path
 import webbrowser
 import multiprocessing
-import importlib.resources
 from werkzeug.serving import make_server
 from NIDRA.nidra_gui import app as nidra_app
-from NIDRA import utils
 
-
-# def get_resource_path(relative_path: str) -> str:
-#     _, is_bundle = utils.get_app_dir() 
-#     if is_bundle:
-#         return str(utils.get_app_dir()[0] / relative_path)
-#     try:
-#         return str(importlib.resources.files('NIDRA.nidra_gui').joinpath(relative_path))
-#     except Exception:
-#         return str(Path(__file__).parent / relative_path)
 
 def find_free_port(preferred_ports=[5001, 5002, 5003, 62345, 62346, 62347, 62348, 62349]):
     """
@@ -64,6 +51,27 @@ def main():
     Starts the Flask server in a background thread and then launches the browser.
     """
     multiprocessing.set_start_method('spawn', force=True)
+
+    # One-shot silent Matplotlib font cache build to suppress FreeType emoji noise
+    try:
+        import contextlib, logging
+        # Temporarily silence Matplotlib/font_manager during cache priming
+        mpl_logger = logging.getLogger('matplotlib')
+        fm_logger = logging.getLogger('matplotlib.font_manager')
+        prev_mpl_level = mpl_logger.level
+        prev_fm_level = fm_logger.level
+        mpl_logger.setLevel(logging.CRITICAL)
+        fm_logger.setLevel(logging.CRITICAL)
+        with open(os.devnull, 'w') as devnull, contextlib.redirect_stderr(devnull):
+            import matplotlib
+            matplotlib.use('Agg', force=True)
+            from matplotlib import font_manager
+            font_manager.FontManager()
+        # restore levels
+        mpl_logger.setLevel(prev_mpl_level)
+        fm_logger.setLevel(prev_fm_level)
+    except Exception:
+        pass
 
     # start the flask server in its own process
     port = find_free_port()
