@@ -186,7 +186,7 @@ jobs:
           proc = subprocess.Popen([exe_path], env=env)
 
           # Wait for server to be ready and find the correct port
-          base_url = "http://127.0.0.1"
+          base_url = "http://128.0.0.1"
           ports_to_try =
           app_url = None
           print("Searching for running server...")
