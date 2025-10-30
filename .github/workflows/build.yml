@@ -270,14 +270,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: screenshots
+          pattern: screenshot-*
+          merge-multiple: true
 
-      - name: Zip screenshots
+      - name: Flatten screenshot directory
         run: |
-          cd screenshots
-          zip -r ../screenshots.zip .
+          find screenshots -type f -name '*.png' -exec mv -t screenshots/ {} +
+          find screenshots -mindepth 1 -type d -empty -delete
 
-      - name: Upload screenshots zip
+      - name: Upload screenshots
         uses: actions/upload-artifact@v4
         with:
           name: screenshots
-          path: screenshots.zip
+          path: screenshots
