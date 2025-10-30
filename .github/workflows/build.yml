@@ -185,7 +185,7 @@ jobs:
 
           # Wait for server to be ready and find the correct port
           base_url = "http://127.0.0.1"
-          ports_to_try = 50001
+          ports_to_try = [5001, 5002]
           app_url = None
           print("Searching for running server...")
           # Give the server up to 20 seconds to start
