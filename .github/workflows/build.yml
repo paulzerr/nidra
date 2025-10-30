@@ -273,13 +273,9 @@ jobs:
           pattern: screenshot-*
           merge-multiple: true
 
-      - name: Flatten screenshot directory
-        run: |
-          find screenshots -type f -name '*.png' -exec mv -t screenshots/ {} +
-          find screenshots -mindepth 1 -type d -empty -delete
 
       - name: Upload screenshots
         uses: actions/upload-artifact@v4
         with:
           name: screenshots
-          path: screenshots
+          path: screenshots/*
