@@ -132,7 +132,11 @@ jobs:
         use_msvc: [true, false]
         browser: [chromium, msedge, firefox, webkit]
         screen:
-          - { width: 1920, height: 1080 }
+          - { width: 3840, height: 2160 }  # 4K
+          - { width: 2560, height: 1440 }  # 2K
+          - { width: 1920, height: 1080 }  # Full HD
+          - { width: 1280, height: 720 }   # HD
+          - { width: 800, height: 600 }    # Small
 
     steps:
       - name: Disable Edge First-Run Experience
@@ -157,7 +161,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           pip install playwright requests
-          # Install all browsers to ensure all matrix variants have them
           python -m playwright install chromium firefox webkit
 
       - name: Start app, run demo, take screenshot, and close app
@@ -235,9 +238,9 @@ jobs:
                   time.sleep(10)
 
                   print("Taking screenshot...")
-                  screenshot_path = "screenshot.png"
-                  page.screenshot(path=screenshot_path, full_page=True)
-                  print(f"Screenshot saved to {screenshot_path}")
+                  screenshot_name = f"screenshot-${{ matrix.browser }}-${{ matrix.use_msvc }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}.png"
+                  page.screenshot(path=screenshot_name, full_page=True)
+                  print(f"Screenshot saved to {screenshot_name}")
                   browser.close()
           finally:
               print("Terminating application...")
@@ -255,7 +258,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: screenshot-${{ matrix.browser }}-${{ matrix.use_msvc }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}
-          path: screenshot.png
+          path: screenshot-${{ matrix.browser }}-${{ matrix.use_msvc }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}.png
 
   package-screenshots:
     name: Package Screenshots
@@ -269,7 +272,9 @@ jobs:
           path: screenshots
 
       - name: Zip screenshots
-        run: zip -j screenshots.zip screenshots/*/*.png
+        run: |
+          cd screenshots
+          zip -r ../screenshots.zip .
 
       - name: Upload screenshots zip
         uses: actions/upload-artifact@v4
