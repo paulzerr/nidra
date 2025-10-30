@@ -66,7 +66,7 @@ jobs:
           if github_ref == 'refs/heads/development' and github_run_number:
               base_version = str(data['project']['version'])
               if '.dev' in base_version:
-                  base_version = base_version.split('.dev')
+                  base_version = base_version.split('.dev')[0]
               new_version = f"{base_version}.dev{github_run_number}"
               data['project']['version'] = new_version
               print(f"Set version to {new_version}", file=sys.stderr)
@@ -130,7 +130,7 @@ jobs:
       fail-fast: false
       matrix:
         use_msvc: [true, false]
-        browser: [chromium, msedge]
+        browser: [chromium, msedge, firefox, webkit]
         screen:
           - { width: 1920, height: 1080 }
 
@@ -154,12 +154,16 @@ jobs:
         run: Set-DisplayResolution -Width ${{ matrix.screen.width }} -Height ${{ matrix.screen.height }} -Force
 
       - name: Install Test Dependencies
-        run: python -m pip install --upgrade pip setuptools wheel && pip install playwright requests && python -m playwright install ${{ matrix.browser }}
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install playwright requests
+          # Install all browsers to ensure all matrix variants have them
+          python -m playwright install chromium firefox webkit
 
       - name: Start app, run demo, take screenshot, and close app
         shell: powershell
         run: |
-          Start-Sleep -Seconds 5 # Wait for resolution to settle
+          Start-Sleep -Seconds 5
           @"
           import subprocess
           import time
@@ -168,7 +172,6 @@ jobs:
           import requests
           from playwright.sync_api import sync_playwright
 
-          # Prevent the app from opening its own browser window
           env = os.environ.copy()
           env['BROWSER'] = 'echo'
 
@@ -180,15 +183,12 @@ jobs:
               sys.exit(1)
 
           print(f"Starting application from {exe_path}")
-          # Use PIPE to capture stdout and stderr
           proc = subprocess.Popen([exe_path], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-          # Wait for server to be ready and find the correct port
           base_url = "http://127.0.0.1"
           ports_to_try = [5001, 5002]
           app_url = None
           print("Searching for running server...")
-          # Give the server up to 20 seconds to start
           for i in range(20):
               for port in ports_to_try:
                   url = f"{base_url}:{port}"
@@ -208,7 +208,6 @@ jobs:
           if not app_url:
               print("Could not connect to the Flask server on any expected port.")
               proc.kill()
-              # Print output from the process for debugging
               stdout, stderr = proc.communicate()
               print("--- STDOUT ---")
               print(stdout)
@@ -218,8 +217,14 @@ jobs:
 
           try:
               with sync_playwright() as p:
-                  browser_type = getattr(p, "${{ matrix.browser }}")
-                  browser = browser_type.launch()
+                  browser_name = "${{ matrix.browser }}"
+                  if browser_name == "msedge":
+                      print("Launching Microsoft Edge via Playwright (Chromium channel=msedge)...")
+                      browser = p.chromium.launch(channel="msedge")
+                  else:
+                      print(f"Launching {browser_name}...")
+                      browser = getattr(p, browser_name).launch()
+
                   page = browser.new_page()
                   print(f"Navigating to {app_url}")
                   page.goto(app_url)
@@ -227,7 +232,7 @@ jobs:
 
                   print("Clicking 'Run Demo' button")
                   page.click("#show-example-btn")
-                  time.sleep(10) # Wait for demo to run
+                  time.sleep(10)
 
                   print("Taking screenshot...")
                   screenshot_path = "screenshot.png"

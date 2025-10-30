@@ -84,7 +84,7 @@ class PSGScorer:
     def score(self, plot: bool = False):
         self._load_recording()
         self._preprocess()
-        self._initialize_model()
+        self._load_model()
         self._predict()
         self._postprocess()
         if self.create_output_files:
@@ -112,11 +112,12 @@ class PSGScorer:
 
     def _load_model(self):
         if self.has_eog:
-            model_filename = self.model_name + "_eeg.onnx"
-            print(f"No EOG channels found, loading EEG-only model: {self.model_name}")
-        else:
             model_filename = self.model_name + ".onnx"
             print(f"EOG channels found, loading model {model_filename}...")
+        else:
+            model_filename = self.model_name + "_eeg.onnx"
+            print(f"No EOG channels found, loading EEG-only model: {model_filename}")
+        
         model_path = utils.get_model_path(model_filename)
         try:
             self.session = ort.InferenceSession(model_path)

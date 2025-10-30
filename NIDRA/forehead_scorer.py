@@ -118,9 +118,8 @@ class ForeheadScorer:
             if self.input_data.ndim != 2 or self.input_data.shape[0] != 2:
                 raise ValueError("Input data must be a 2D array with 2 channels.")
             info = mne.create_info(['eegl', 'eegr'], sfreq=self.sfreq, ch_types=['eeg', 'eeg'], verbose=False)
-            self.raw = mne.io.RawArray(self.input_data, info, verbose=False)
-            self.raw.apply_function(lambda x: np.clip(x, -500e-6, 500e-6), verbose=False)
-            self.raw.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+            raw = mne.io.RawArray(self.input_data, info, verbose=False)
+            self.raw = raw.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
             return
 
         if self.device_type == 'zmax':

@@ -8,7 +8,7 @@ __pycache__/
 models/
 examples/
 executables/
-
+test/
 nidra-env/
 
 autoscorer_output/
