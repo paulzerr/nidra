@@ -133,9 +133,6 @@ jobs:
         browser: [chromium, msedge]
         screen:
           - { width: 1920, height: 1080 }
-          - { width: 1280, height: 720 }
-          - { width: 800, height: 600 }
-          - { width: 1024, height: 768 }
 
     steps:
       - name: Disable Edge First-Run Experience
@@ -188,7 +185,7 @@ jobs:
 
           # Wait for server to be ready and find the correct port
           base_url = "http://127.0.0.1"
-          ports_to_try =
+          ports_to_try = 50001
           app_url = None
           print("Searching for running server...")
           # Give the server up to 20 seconds to start
