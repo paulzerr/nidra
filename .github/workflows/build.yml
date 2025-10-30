@@ -183,15 +183,16 @@ jobs:
               sys.exit(1)
 
           print(f"Starting application from {exe_path}")
-          proc = subprocess.Popen([exe_path], env=env)
+          # Use PIPE to capture stdout and stderr
+          proc = subprocess.Popen([exe_path], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
           # Wait for server to be ready and find the correct port
           base_url = "http://127.0.0.1"
-          ports_to_try = list(range(50001, 50003))
+          ports_to_try =
           app_url = None
           print("Searching for running server...")
           # Give the server up to 20 seconds to start
-          for _ in range(20):
+          for i in range(20):
               for port in ports_to_try:
                   url = f"{base_url}:{port}"
                   try:
@@ -204,39 +205,47 @@ jobs:
                       continue
               if app_url:
                   break
+              print(f"Still waiting for server... ({i+1}/20)")
               time.sleep(1)
 
           if not app_url:
               print("Could not connect to the Flask server on any expected port.")
               proc.kill()
+              # Print output from the process for debugging
+              stdout, stderr = proc.communicate()
+              print("--- STDOUT ---")
+              print(stdout)
+              print("--- STDERR ---")
+              print(stderr)
               sys.exit(1)
 
-          with sync_playwright() as p:
-              browser_type = getattr(p, "${{ matrix.browser }}")
-              browser = browser_type.launch()
-              page = browser.new_page()
-              print(f"Navigating to {app_url}")
-              page.goto(app_url)
-              print("Successfully loaded page.")
-
-              print("Clicking 'Run Demo' button")
-              page.click("#show-example-btn")
-              time.sleep(10) # Wait for demo to run
-
-              print("Taking screenshot...")
-              screenshot_path = "screenshot.png"
-              page.screenshot(path=screenshot_path, full_page=True)
-              print(f"Screenshot saved to {screenshot_path}")
-              browser.close()
-
-          print("Terminating application...")
-          proc.terminate()
           try:
-              proc.wait(timeout=10)
-          except subprocess.TimeoutExpired:
-              print("Process did not terminate gracefully, killing.")
-              proc.kill()
-          print("Application closed.")
+              with sync_playwright() as p:
+                  browser_type = getattr(p, "${{ matrix.browser }}")
+                  browser = browser_type.launch()
+                  page = browser.new_page()
+                  print(f"Navigating to {app_url}")
+                  page.goto(app_url)
+                  print("Successfully loaded page.")
+
+                  print("Clicking 'Run Demo' button")
+                  page.click("#show-example-btn")
+                  time.sleep(10) # Wait for demo to run
+
+                  print("Taking screenshot...")
+                  screenshot_path = "screenshot.png"
+                  page.screenshot(path=screenshot_path, full_page=True)
+                  print(f"Screenshot saved to {screenshot_path}")
+                  browser.close()
+          finally:
+              print("Terminating application...")
+              proc.terminate()
+              try:
+                  proc.wait(timeout=10)
+              except subprocess.TimeoutExpired:
+                  print("Process did not terminate gracefully, killing.")
+                  proc.kill()
+              print("Application closed.")
           "@ | python -
 
       - name: Upload screenshot
