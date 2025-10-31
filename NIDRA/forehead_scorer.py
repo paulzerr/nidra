@@ -6,13 +6,12 @@ import onnxruntime as ort
 from NIDRA.plotting import plot_hypnodensity
 from NIDRA import utils
 
-
 class ForeheadScorer:
     """
     Scores sleep stages from forehead EEG data.
     """
     def __init__(self, input_file: str = None, output_dir: str = None, data: np.ndarray = None,
-                 sfreq: float = None, model_name: str = "ez6", device_type: str = 'zmax',
+                 sfreq: float = None, model_name: str = "ez6",
                  zmax_mode: str = 'two_files', ch_names: list = None,
                  create_output_files: bool = None):
         if input_file is None and data is None:
@@ -22,22 +21,44 @@ class ForeheadScorer:
 
         if input_file:
             input_path = Path(input_file)
-            if input_path.is_dir():
-                input_dir = input_path
-                try:
-                    # Default to 'two_files' if zmax_mode is not provided, to maintain old behavior
-                    if zmax_mode in [None, 'two_files']:
-                        found_file = next(input_path.glob('*[lL].edf'))
-                        # Verify R file exists
-                        next(input_path.glob('*[rR].edf'))
-                    else:  # 'one_file'
-                        found_file = next(input_path.glob('*.edf'))
-                    self.input_file = found_file
-                except StopIteration:
-                    raise FileNotFoundError(f"Could not find a complete recording in directory '{input_path}'.")
-            else:
-                input_dir = input_path.parent
-                self.input_file = input_path
+            
+            # Handle 'one_file' mode first as it's simpler
+            if zmax_mode == 'one_file':
+                if input_path.is_dir():
+                    input_dir = input_path
+                    try:
+                        self.input_file = next(input_path.glob('*.edf'))
+                    except StopIteration:
+                        raise FileNotFoundError(f"Could not find an EDF file in directory '{input_path}'.") from None
+                else:
+                    input_dir = input_path.parent
+                    self.input_file = input_path
+            
+            # Handle 'two_files' mode
+            else: # zmax_mode in [None, 'two_files']
+                if input_path.is_dir():
+                    input_dir = input_path
+                    l_file = next(input_path.glob('*[lL].edf'), None)
+                    r_file = next(input_path.glob('*[rR].edf'), None)
+                    if not l_file or not r_file:
+                        raise FileNotFoundError(f"Could not find a complete L/R recording in directory '{input_path}'.")
+                    self.input_file = l_file
+                else: # input is a file
+                    input_dir = input_path.parent
+                    input_file_str = str(input_path)
+                    if re.search(r'(?i)[_ ]L\.edf$', input_file_str):
+                        l_file = input_path
+                        r_file = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', input_file_str))
+                    elif re.search(r'(?i)[_ ]R\.edf$', input_file_str):
+                        r_file = input_path
+                        l_file = Path(re.sub(r'(?i)([_ ])R\.edf$', r'\1L.edf', input_file_str))
+                    else:
+                        raise FileNotFoundError(f"Input file '{input_path}' is not a valid L or R file for two-file mode.")
+                    
+                    if not l_file.exists() or not r_file.exists():
+                        raise FileNotFoundError(f"Could not find the corresponding pair for '{input_path}'.")
+                    self.input_file = l_file
+
             self.base_filename = f"{self.input_file.parent.name}_{self.input_file.stem}"
         else:
             input_dir = None
@@ -60,7 +81,6 @@ class ForeheadScorer:
         self.input_data = data
         self.sfreq = sfreq
         self.model_name = model_name
-        self.device_type = device_type
         self.zmax_mode = zmax_mode
         self.ch_names = ch_names
         self.session = None
@@ -117,30 +137,22 @@ class ForeheadScorer:
     def _load_recording(self):
         """Load EEG recording from NumPy array or EDF(s), normalize to 2-channel Raw object."""
 
-        # === 1. NumPy input mode (direct memory) ===
+        #  NumPy array input mode (direct memory)
         if self.input_data is not None:
             data = np.asarray(self.input_data, dtype=np.float64)
             if data.ndim != 2 or data.shape[0] != 2:
                 raise ValueError("Input data must be a 2D array with 2 channels.")
             if self.sfreq is None:
                 raise ValueError("'sfreq' must be provided when 'data' is given.")
-
             info = mne.create_info(['eegl', 'eegr'], sfreq=float(self.sfreq),
                                    ch_types=['eeg', 'eeg'], verbose=False)
             raw = mne.io.RawArray(data, info, verbose=False)
-
-            # One combined resample + filter pass
             raw.resample(self.target_fs, verbose=False)
             raw.filter(l_freq=0.5, h_freq=None, verbose=False)
-
             self.raw = raw
             return
 
-        # === 2. ZMax device ===
-        if self.device_type != 'zmax':
-            raise ValueError("Unsupported device type or missing input data.")
-
-        # --- 2a. Legacy 'two-file' mode (unchanged) ---
+        # 'two-file' mode 
         if self.zmax_mode in [None, 'two_files']:
             rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
             rawR_path = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', str(self.input_file)))
@@ -148,7 +160,6 @@ class ForeheadScorer:
                 raise FileNotFoundError(f"Could not find corresponding RIGHT channel file at {rawR_path}")
             rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False)
 
-            # Resample and filter individually (ground truth)
             rawL.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
             rawR.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
 
@@ -159,11 +170,10 @@ class ForeheadScorer:
             self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
             return
 
-        # --- 2b. One-file mode (two channels in one EDF) ---
+        # one-file mode (two+ channels in one EDF) 
         if self.zmax_mode == 'one_file':
             raw = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
 
-            # Determine which two EEG channels to use
             # If channel names are not provided, default to the first two.
             if self.ch_names is None:
                 self.ch_names = raw.ch_names[:2]
@@ -173,11 +183,9 @@ class ForeheadScorer:
             if len(self.ch_names) != 2:
                 raise ValueError("Please provide exactly two channel names for one-file mode.")
 
-            # Pick and rename channels for consistency
             raw.pick(self.ch_names)
             raw.rename_channels({self.ch_names[0]: 'eegl', self.ch_names[1]: 'eegr'})
 
-            # Resample + filter once for both
             raw.resample(self.target_fs, verbose=False)
             raw.filter(l_freq=0.5, h_freq=None, verbose=False)
 
@@ -213,7 +221,6 @@ class ForeheadScorer:
                 prob_str = ",".join(f"{p:.6f}" for p in probs)
                 f.write(f"{i},{prob_str}\n")
         
-
     def _preprocess(self):
         seq_length = 100
         sdata = self.raw.get_data()
