@@ -6,13 +6,14 @@ import onnxruntime as ort
 from NIDRA.plotting import plot_hypnodensity
 from NIDRA import utils
 
+
 class ForeheadScorer:
     """
     Scores sleep stages from forehead EEG data.
     """
     def __init__(self, input_file: str = None, output_dir: str = None, data: np.ndarray = None,
                  sfreq: float = None, model_name: str = "ez6", device_type: str = 'zmax',
-                 zmax_mode: str = 'two_files', zmax_channels: list = None,
+                 zmax_mode: str = 'two_files', ch_names: list = None,
                  create_output_files: bool = None):
         if input_file is None and data is None:
             raise ValueError("Either 'input_file' or 'data' must be provided.")
@@ -61,7 +62,7 @@ class ForeheadScorer:
         self.model_name = model_name
         self.device_type = device_type
         self.zmax_mode = zmax_mode
-        self.zmax_channels = zmax_channels
+        self.ch_names = ch_names
         self.session = None
         self.input_name = None
         self.output_name = None
@@ -114,56 +115,75 @@ class ForeheadScorer:
             raise
 
     def _load_recording(self):
+        """Load EEG recording from NumPy array or EDF(s), normalize to 2-channel Raw object."""
+
+        # === 1. NumPy input mode (direct memory) ===
         if self.input_data is not None:
-            if self.input_data.ndim != 2 or self.input_data.shape[0] != 2:
+            data = np.asarray(self.input_data, dtype=np.float64)
+            if data.ndim != 2 or data.shape[0] != 2:
                 raise ValueError("Input data must be a 2D array with 2 channels.")
-            info = mne.create_info(['eegl', 'eegr'], sfreq=self.sfreq, ch_types=['eeg', 'eeg'], verbose=False)
-            raw = mne.io.RawArray(self.input_data, info, verbose=False)
-            self.raw = raw.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+            if self.sfreq is None:
+                raise ValueError("'sfreq' must be provided when 'data' is given.")
+
+            info = mne.create_info(['eegl', 'eegr'], sfreq=float(self.sfreq),
+                                   ch_types=['eeg', 'eeg'], verbose=False)
+            raw = mne.io.RawArray(data, info, verbose=False)
+
+            # One combined resample + filter pass
+            raw.resample(self.target_fs, verbose=False)
+            raw.filter(l_freq=0.5, h_freq=None, verbose=False)
+
+            self.raw = raw
             return
 
-        if self.device_type == 'zmax':
-            if self.zmax_mode in [None, 'two_files']:
-                # Assumes the input_file is the path to the LEFT channel EDF,
-                # and the RIGHT channel is in the same folder with a similar name.
-                rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
-                #rawL.apply_function(lambda x: np.clip(x, -500e-6, 500e-6), verbose=False)
-                rawR_path = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', str(self.input_file)))
-                if not rawR_path.exists():
-                    raise FileNotFoundError(f"Could not find corresponding RIGHT channel file at {rawR_path}")
-                rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False)
-                #rawR.apply_function(lambda x: np.clip(x, -500e-6, 500e-6), verbose=False)
-                
-                # Resample and filter
-                rawL.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
-                rawR.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+        # === 2. ZMax device ===
+        if self.device_type != 'zmax':
+            raise ValueError("Unsupported device type or missing input data.")
 
-                dataL = rawL.get_data().flatten()
-                dataR = rawR.get_data().flatten()
-                info = mne.create_info(['eegl', 'eegr'], sfreq=self.target_fs, ch_types=['eeg', 'eeg'], verbose=False)
-                self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
+        # --- 2a. Legacy 'two-file' mode (unchanged) ---
+        if self.zmax_mode in [None, 'two_files']:
+            rawL = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
+            rawR_path = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', str(self.input_file)))
+            if not rawR_path.exists():
+                raise FileNotFoundError(f"Could not find corresponding RIGHT channel file at {rawR_path}")
+            rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False)
 
-            elif self.zmax_mode == 'one_file':
-                raw = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
-                #raw.apply_function(lambda x: np.clip(x, -500e-6, 500e-6), verbose=False)
-                
-                if self.zmax_channels and len(self.zmax_channels) == 2:
-                    ch_names = self.zmax_channels
-                else:
-                    if len(raw.ch_names) < 2:
-                        raise ValueError("EDF file must have at least two channels for 'one_file' mode when no channels are selected.")
-                    ch_names = raw.ch_names[:2]
-                
-                raw.pick(ch_names)
-                raw.rename_channels({ch_names[0]: 'eegl', ch_names[1]: 'eegr'})
-  
-                # Resample and filter
-                raw.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
-                self.raw = raw
+            # Resample and filter individually (ground truth)
+            rawL.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
+            rawR.resample(self.target_fs, verbose=False).filter(l_freq=0.5, h_freq=None, verbose=False)
 
-        # Validate that a recording was loaded
-        if self.raw is None:
-            raise ValueError(f"Failed to load recording. Ensure EDF(s) exist.")
+            dataL = rawL.get_data().flatten()
+            dataR = rawR.get_data().flatten()
+            info = mne.create_info(['eegl', 'eegr'], sfreq=self.target_fs,
+                                   ch_types=['eeg', 'eeg'], verbose=False)
+            self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
+            return
+
+        # --- 2b. One-file mode (two channels in one EDF) ---
+        if self.zmax_mode == 'one_file':
+            raw = mne.io.read_raw_edf(self.input_file, preload=True, verbose=False)
+
+            # Determine which two EEG channels to use
+            # If channel names are not provided, default to the first two.
+            if self.ch_names is None:
+                self.ch_names = raw.ch_names[:2]
+                if len(self.ch_names) < 2:
+                    raise ValueError("Could not find at least two channels in the EDF file.")
+            
+            if len(self.ch_names) != 2:
+                raise ValueError("Please provide exactly two channel names for one-file mode.")
+
+            # Pick and rename channels for consistency
+            raw.pick(self.ch_names)
+            raw.rename_channels({self.ch_names[0]: 'eegl', self.ch_names[1]: 'eegr'})
+
+            # Resample + filter once for both
+            raw.resample(self.target_fs, verbose=False)
+            raw.filter(l_freq=0.5, h_freq=None, verbose=False)
+
+            self.raw = raw
+            return
+
 
     def _predict(self):
         seq_length = 100

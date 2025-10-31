@@ -227,7 +227,7 @@ psg_study/
                 <li><strong>For Forehead EEG data from file:</strong>
                     <ul>
                         <li><code>zmax_mode</code> (str, optional): How to treat the input file(s). Can be <code>'two_files'</code> (default) where NIDRA looks for a corresponding L/R file, or <code>'one_file'</code> where both channels are in the <code>input_file</code>.</li>
-                        <li><code>zmax_channels</code> (list of str, optional): When using <code>'one_file'</code> mode, you can specify the names of the two channels to use, e.g., <code>['EEG L', 'EEG R']</code>. If not provided, the first two channels in the file are used.</li>
+                        <li><code>ch_names</code> (list of str, optional): When using <code>'one_file'</code> mode, you can specify the names of the two channels to use, e.g., <code>['EEG L', 'EEG R']</code>. If not provided, the first two channels in the file are used.</li>
                     </ul>
                 </li>
             </ul>
@@ -245,7 +245,7 @@ psg_study/
             </ol>
 
             <h3>Example 1: Scoring a Forehead EEG File</h3>
-            <p>This example shows how to score a single forehead EEG recording from an EDF file. This is the typical use case for ZMax data where the left and right channels are in a single file. You must specify the channel names using <code>zmax_channels</code>.</p>
+            <p>This example shows how to score a single forehead EEG recording from an EDF file. This is the typical use case for ZMax data where the left and right channels are in a single file. You must specify the channel names using <code>ch_names</code>.</p>
             <pre>
 import NIDRA
 
@@ -256,7 +256,7 @@ scorer = NIDRA.scorer(
     output_dir='/path/to/your/output',
     model_name='ez6moe',
     zmax_mode='one_file',
-    zmax_channels=['EEG L', 'EEG R']
+    ch_names=['EEG L', 'EEG R']
 )
 
 # Run scoring

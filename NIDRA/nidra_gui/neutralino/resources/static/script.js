@@ -8,9 +8,9 @@ function initializeApp() {
     // ============================================
     // MASTER SCALING CONTROLS
     // ============================================
-    const MASTER_SCALE = 1.1;      // Overall size multiplier
-    const DESIGN_WIDTH = 1920;     // Screen width where UI looks "native"
-    const DESIGN_HEIGHT = 1080;    // Screen height where UI looks "native"
+    const MASTER_SCALE = 1.0;      // Overall size multiplier
+    const DESIGN_WIDTH =  2560;// 1920;     // Screen width where UI looks "native"
+    const DESIGN_HEIGHT = 1440;// 1080;    // Screen height where UI looks "native"
     
     function scaleUi() {
         const container = document.querySelector('.container');
@@ -136,7 +136,7 @@ function initializeApp() {
             score_subdirs: scoringMode === 'subdirs',
             score_from_file: scoringMode === 'from_file',
             zmax_mode: zmaxMode,
-            zmax_channels: zmaxMode === 'one_file' ? window.selectedChannels : null
+            ch_names: zmaxMode === 'one_file' ? window.selectedChannels : null
         };
 
         if (!payload.input_dir || !payload.output_dir) {

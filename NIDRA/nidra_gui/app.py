@@ -236,7 +236,7 @@ def start_scoring():
             data.get('plot', False),
             data.get('gen_stats', False),
             data.get('zmax_mode'),
-            data.get('zmax_channels')
+            data.get('ch_names')
         )
     )
     worker_thread.start()
@@ -321,7 +321,7 @@ def get_channels():
 
 
 # this enables reporting on successful/failed scorings
-def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, model_name, plot, gen_stats, zmax_mode=None, zmax_channels=None):
+def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, model_name, plot, gen_stats, zmax_mode=None, ch_names=None):
     """
     Manages the global running state and executes the scoring process.
     This function is intended to be run in a separate thread.
@@ -378,7 +378,7 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
             logger.info(f"Processing: {input_file}")
             logger.info("-" * 80)
             total_count = 1
-            if _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot, zmax_mode, zmax_channels):
+            if _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot, zmax_mode, ch_names):
                 success_count = 1
 
     except (FileNotFoundError, ValueError) as e:
@@ -398,7 +398,7 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
 
         logger.info("\n" + "="*80 + "\nScoring process finished.\n" + "="*80)
 
-def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot, zmax_mode=None, zmax_channels=None):
+def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot, zmax_mode=None, ch_names=None):
     """
     Performs scoring on a single recording file.
     """
@@ -413,7 +413,7 @@ def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plo
         }
         if scorer_type == 'forehead':
             scorer_kwargs['zmax_mode'] = zmax_mode
-            scorer_kwargs['zmax_channels'] = zmax_channels
+            scorer_kwargs['ch_names'] = ch_names
 
         scorer = scorer_factory(scorer_type=scorer_type, **scorer_kwargs)
         
