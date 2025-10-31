@@ -24,8 +24,7 @@ TEXTS = {
     "DATA_SOURCE_FEE": "EEG wearable (e.g. ZMax)   ", "DATA_SOURCE_PSG": "PSG (EEG/EOG)   ",
     "OUTPUT_TITLE": "Output Folder", "RUN_BUTTON": "Run autoscoring", "BROWSE_BUTTON": "Browse files...",
     "HELP_TITLE": "Help & Info (opens in browser)",
-    "CONSOLE_INIT_MESSAGE": "\n\nWelcome to NIDRA, the easy to use sleep autoscorer.\n\nSpecify input folder (location of your sleep recordings) to begin.\n\nTo shutdown NIDRA, simply close this window or tab.",
-    "ZMAX_OPTIONS_TITLE": "Source file configuration",
+    "CONSOLE_INIT_MESSAGE": "\n\nWelcome to NIDRA, the easy-to-use sleep autoscorer.\n\nSpecify input folder (location of your sleep recordings) to begin.\n\nTo shutdown NIDRA, simply close this window or tab.",
     "ZMAX_OPTIONS_2_FILES": "2 files per recording (e.g. EEG R.edf & EEG L.edf)",
     "ZMAX_OPTIONS_1_FILE": "1 file per recording (2+ channels)",
     "ZMAX_OPTIONS_SELECT_CHANNELS": "Select channels (optional)"

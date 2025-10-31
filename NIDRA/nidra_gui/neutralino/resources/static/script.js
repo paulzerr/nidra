@@ -8,9 +8,9 @@ function initializeApp() {
     // ============================================
     // MASTER SCALING CONTROLS
     // ============================================
-    const MASTER_SCALE = 1.0;      // Overall size multiplier
-    const DESIGN_WIDTH =  2560;// 1920;     // Screen width where UI looks "native"
-    const DESIGN_HEIGHT = 1440;// 1080;    // Screen height where UI looks "native"
+    const MASTER_SCALE = 1.1;      // Overall size multiplier
+    const DESIGN_WIDTH =  1920;     // Screen width where UI looks "native"
+    const DESIGN_HEIGHT = 1080;    // Screen height where UI looks "native"
     
     function scaleUi() {
         const container = document.querySelector('.container');
@@ -279,7 +279,7 @@ function initializeApp() {
 
     function setRunningState(isRunning) {
         runBtn.disabled = isRunning;
-        runBtn.textContent = isRunning ? 'Running...' : 'Run Scoring';
+        runBtn.textContent = isRunning ? 'Running...' : 'Begin Autoscoring';
     }
 
     function startPolling() {
