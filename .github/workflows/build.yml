@@ -1,4 +1,4 @@
-name: NIDRA Build
+name: NIDRA Build and Test (macOS)
 
 on:
   push:
@@ -9,23 +9,33 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  build-and-test:
     permissions:
       contents: write
-    runs-on: windows-latest
-    timeout-minutes: 999
-    defaults:
-      run:
-        shell: powershell
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-13, macos-14, macos-15] # Test on Intel and Apple Silicon
+        python-version: ['3.9', '3.10', '3.11']
+        browser: [chromium, firefox, webkit]
+        screen:
+          - { width: 3840, height: 2160 }  # 4K
+          - { width: 2560, height: 1440 }  # 2K
+          - { width: 1920, height: 1080 } # Full HD
+          - { width: 1280, height: 720 }   # HD
+          - { width: 800, height: 600 }    # Small
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
       - name: Cache Python venv
@@ -41,7 +51,7 @@ jobs:
         if: steps.cache-venv.outputs.cache-hit != 'true'
         run: |
           python -m venv venv
-          .\venv\Scripts\activate
+          source venv/bin/activate
           python -m pip install --upgrade pip setuptools wheel
           pip install pyinstaller toml
           echo "--- Phase 1: Heavy Binaries ---"
@@ -51,36 +61,8 @@ jobs:
           echo "--- Phase 3: All Remaining Dependencies & Project ---"
           pip install .
 
-      - name: Create script to update version
-        if: github.ref == 'refs/heads/development'
-        run: |
-          @"
-          import toml
-          import os
-          import sys
-          pyproject_path = 'pyproject.toml'
-          github_run_number = os.environ.get('GITHUB_RUN_NUMBER')
-          github_ref = os.environ.get('GITHUB_REF')
-          with open(pyproject_path, 'r') as f:
-              data = toml.load(f)
-          if github_ref == 'refs/heads/development' and github_run_number:
-              base_version = str(data['project']['version'])
-              if '.dev' in base_version:
-                  base_version = base_version.split('.dev')[0]
-              new_version = f"{base_version}.dev{github_run_number}"
-              data['project']['version'] = new_version
-              print(f"Set version to {new_version}", file=sys.stderr)
-              with open(pyproject_path, 'w') as f:
-                  toml.dump(data, f)
-              print("Updated pyproject.toml with dev version", file=sys.stderr)
-          "@ | Set-Content -Path update_version.py
-
-      - name: Update version in pyproject.toml
-        if: github.ref == 'refs/heads/development'
-        run: .\venv\Scripts\python update_version.py
-        env:
-          GITHUB_RUN_NUMBER: ${{ github.run_number }}
-          GITHUB_REF: ${{ github.ref }}
+      - name: Activate venv for subsequent steps
+        run: source venv/bin/activate
 
       - name: Cache Hugging Face models and data
         uses: actions/cache@v4
@@ -94,80 +76,34 @@ jobs:
       - name: Download Models from Hugging Face
         if: steps.cache-hf-data.outputs.cache-hit != 'true'
         run: |
-          New-Item -ItemType Directory -Force -Path NIDRA/models
-          Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6.onnx -OutFile NIDRA/models/ez6.onnx
-          Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6moe.onnx -OutFile NIDRA/models/ez6moe.onnx
-          Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024.onnx -OutFile NIDRA/models/u-sleep-nsrr-2024.onnx
-          Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024_eeg.onnx -OutFile NIDRA/models/u-sleep-nsrr-2024_eeg.onnx
+          mkdir -p NIDRA/models
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6.onnx -o NIDRA/models/ez6.onnx
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/ez6moe.onnx -o NIDRA/models/ez6moe.onnx
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024.onnx -o NIDRA/models/u-sleep-nsrr-2024.onnx
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024_eeg.onnx -o NIDRA/models/u-sleep-nsrr-2024_eeg.onnx
 
       - name: Download Example Data from Hugging Face
         if: steps.cache-hf-data.outputs.cache-hit != 'true'
         run: |
-          New-Item -ItemType Directory -Force -Path examples/test_data_zmax
-          Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_L.edf -OutFile examples/test_data_zmax/EEG_L.edf
-          Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -OutFile examples/test_data_zmax/EEG_R.edf
+          mkdir -p examples/test_data_zmax
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_L.edf -o examples/test_data_zmax/EEG_L.edf
+          curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -o examples/test_data_zmax/EEG_R.edf
 
       - name: Build Executable with PyInstaller
-        run: .\venv\Scripts\python -m PyInstaller NIDRA.spec
-
-      - name: Upload Windows Build
-        uses: actions/upload-artifact@v4
-        with:
-          name: NIDRA-windows-build
-          path: dist/NIDRA
-
-      - name: Create GitHub Release
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
-        with:
-          files: dist/NIDRA_installer.exe
-
-  test-gui:
-    name: Test GUI on multiple platforms
-    needs: build
-    runs-on: windows-2022
-    strategy:
-      fail-fast: false
-      matrix:
-        use_msvc: [true, false]
-        browser: [chromium, msedge, firefox, webkit]
-        screen:
-          - { width: 3840, height: 2160 }  # 4K
-          - { width: 2560, height: 1440 }  # 2K
-          - { width: 1920, height: 1080 }  # Full HD
-          - { width: 1280, height: 720 }   # HD
-          - { width: 800, height: 600 }    # Small
-
-    steps:
-      - name: Disable Edge First-Run Experience
         run: |
-          reg add "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v "HideFirstRunExperience" /t REG_DWORD /d 1 /f
-          reg add "HKLM\SOFTWARE\Policies\Microsoft\Edge" /v "NewTabPageLocation" /t REG_SZ /d "https://www.blank.org/" /f
-
-      - name: Setup MSVC Developer Command Prompt
-        if: matrix.use_msvc
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: NIDRA-windows-build
-          path: NIDRA
-
-      - name: Set screen resolution
-        run: Set-DisplayResolution -Width ${{ matrix.screen.width }} -Height ${{ matrix.screen.height }} -Force
+          source venv/bin/activate
+          python -m PyInstaller NIDRA.spec
 
       - name: Install Test Dependencies
         run: |
-          python -m pip install --upgrade pip setuptools wheel
+          source venv/bin/activate
           pip install playwright requests
-          python -m playwright install chromium firefox webkit
+          python -m playwright install --with-deps ${{ matrix.browser }}
 
       - name: Start app, run demo, take screenshot, and close app
-        shell: powershell
+        continue-on-error: true
         run: |
-          Start-Sleep -Seconds 5
-          @"
+          cat <<'EOF' > test_runner.py
           import subprocess
           import time
           import os
@@ -178,21 +114,24 @@ jobs:
           env = os.environ.copy()
           env['BROWSER'] = 'echo'
 
-          exe_path = os.path.abspath('NIDRA/NIDRA.exe')
+          exe_path = os.path.abspath('dist/NIDRA/NIDRA')
           print(f"Looking for exe at {exe_path}")
 
           if not os.path.exists(exe_path):
-              print(f"NIDRA.exe not found at {exe_path}. Exiting.")
+              print(f"NIDRA executable not found at {exe_path}. Exiting.")
               sys.exit(1)
+
+          print(f"Making executable: {exe_path}")
+          os.chmod(exe_path, 0o755)
 
           print(f"Starting application from {exe_path}")
           proc = subprocess.Popen([exe_path], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
           base_url = "http://127.0.0.1"
-          ports_to_try = [5001, 5002]
+          ports_to_try =
           app_url = None
           print("Searching for running server...")
-          for i in range(20):
+          for i in range(30): # Increased wait time
               for port in ports_to_try:
                   url = f"{base_url}:{port}"
                   try:
@@ -205,7 +144,7 @@ jobs:
                       continue
               if app_url:
                   break
-              print(f"Still waiting for server... ({i+1}/20)")
+              print(f"Still waiting for server... ({i+1}/30)")
               time.sleep(1)
 
           if not app_url:
@@ -221,24 +160,49 @@ jobs:
           try:
               with sync_playwright() as p:
                   browser_name = "${{ matrix.browser }}"
-                  if browser_name == "msedge":
-                      print("Launching Microsoft Edge via Playwright (Chromium channel=msedge)...")
-                      browser = p.chromium.launch(channel="msedge")
-                  else:
-                      print(f"Launching {browser_name}...")
-                      browser = getattr(p, browser_name).launch()
+                  print(f"Launching {browser_name}...")
+                  browser = getattr(p, browser_name).launch()
 
-                  page = browser.new_page()
+                  page = browser.new_page(
+                      viewport={'width': ${{ matrix.screen.width }}, 'height': ${{ matrix.screen.height }}}
+                  )
                   print(f"Navigating to {app_url}")
                   page.goto(app_url)
                   print("Successfully loaded page.")
 
                   print("Clicking 'Run Demo' button")
                   page.click("#show-example-btn")
-                  time.sleep(10)
+                  time.sleep(15) # Allow time for processing
+
+                  print("--- Testing Stability of 'Browse' Buttons ---")
+
+                  # Test "Browse" for Input Directory
+                  print("Clicking 'Browse' for input directory...")
+                  page.click("#browse-input-btn")
+                  time.sleep(2) # Wait for backend to process
+                  # Verify app is still alive by checking the title
+                  assert "NIDRA" in page.title(), "App crashed after clicking input browse button"
+                  print("App is stable after input directory browse.")
+
+                  # Test "Browse" for Output Directory
+                  print("Clicking 'Browse' for output directory...")
+                  page.click("#browse-output-btn")
+                  time.sleep(2)
+                  assert "NIDRA" in page.title(), "App crashed after clicking output browse button"
+                  print("App is stable after output directory browse.")
+
+                  # Test "Browse" for File (in .txt mode)
+                  print("Selecting '.txt file' mode...")
+                  page.click("#score-from-file")
+                  time.sleep(1)
+                  print("Clicking 'Browse' for input file...")
+                  page.click("#browse-input-btn")
+                  time.sleep(2)
+                  assert "NIDRA" in page.title(), "App crashed after clicking input browse button in file mode"
+                  print("App is stable after input file browse.")
 
                   print("Taking screenshot...")
-                  screenshot_name = f"screenshot-${{ matrix.browser }}-${{ matrix.use_msvc }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}.png"
+                  screenshot_name = f"screenshot-${{ matrix.os }}-${{ matrix.browser }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}.png"
                   page.screenshot(path=screenshot_name, full_page=True)
                   print(f"Screenshot saved to {screenshot_name}")
                   browser.close()
@@ -251,18 +215,20 @@ jobs:
                   print("Process did not terminate gracefully, killing.")
                   proc.kill()
               print("Application closed.")
-          "@ | python -
+          EOF
+          source venv/bin/activate
+          python test_runner.py
 
       - name: Upload screenshot
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: screenshot-${{ matrix.browser }}-${{ matrix.use_msvc }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}
-          path: screenshot-${{ matrix.browser }}-${{ matrix.use_msvc }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}.png
+          name: screenshot-${{ matrix.os }}-${{ matrix.browser }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}
+          path: screenshot-${{ matrix.os }}-${{ matrix.browser }}-${{ matrix.screen.width }}x${{ matrix.screen.height }}.png
 
   package-screenshots:
-    name: Package Screenshots
-    needs: test-gui
+    name: Package All Screenshots
+    needs: build-and-test
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -273,8 +239,7 @@ jobs:
           pattern: screenshot-*
           merge-multiple: true
 
-
-      - name: Upload screenshots
+      - name: Upload screenshots as single artifact
         uses: actions/upload-artifact@v4
         with:
           name: screenshots

@@ -100,12 +100,44 @@ def serve_docs(filename):
     """Serves files from the docs directory."""
     return send_from_directory(app.docs_path, filename)
 
+def _choose_folder_mac(prompt="Select a folder"):
+    """Opens a folder selection dialog on macOS using AppleScript."""
+    try:
+        script = f'POSIX path of (choose folder with prompt "{prompt}")'
+        out = subprocess.check_output(["osascript", "-e", script], text=True)
+        return out.strip()
+    except subprocess.CalledProcessError:  # User cancelled
+        return None
+    except Exception as e:
+        logger.error(f"AppleScript folder selection failed: {e}", exc_info=True)
+        return None
+
+def _choose_file_mac(prompt="Select a file", file_type='txt'):
+    """Opens a file selection dialog on macOS using AppleScript."""
+    try:
+        script = f'POSIX path of (choose file with prompt "{prompt}" of type {{"{file_type}"}})'
+        out = subprocess.check_output(["osascript", "-e", script], text=True)
+        return out.strip()
+    except subprocess.CalledProcessError:  # User cancelled
+        return None
+    except Exception as e:
+        logger.error(f"AppleScript file selection failed: {e}", exc_info=True)
+        return None
+d
 @app.route('/select-directory')
 def select_directory():
     """
     Opens a native directory selection dialog on the server.
     This function runs the dialog in a separate thread to avoid blocking the Flask server.
+    On macOS, it uses a thread-safe AppleScript dialog.
     """
+    if platform.system() == "Darwin":
+        path = _choose_folder_mac(prompt="Select a Folder")
+        if path:
+            return jsonify({'status': 'success', 'path': path})
+        else:
+            return jsonify({'status': 'cancelled'})
+
     result = {}
     def open_dialog():
         import tkinter as tk
@@ -121,7 +153,8 @@ def select_directory():
             logger.error(f"An error occurred in the tkinter dialog thread: {e}", exc_info=True)
             result['error'] = "Could not open the file dialog. Please ensure you have a graphical environment configured."
         finally:
-            root.destroy()
+            if 'root' in locals() and root:
+                root.destroy()
 
     dialog_thread = threading.Thread(target=open_dialog)
     dialog_thread.start()
@@ -139,7 +172,15 @@ def select_file():
     """
     Opens a native file selection dialog on the server, filtered for .txt files.
     This function runs the dialog in a separate thread to avoid blocking the Flask server.
+    On macOS, it uses a thread-safe AppleScript dialog.
     """
+    if platform.system() == "Darwin":
+        path = _choose_file_mac(prompt="Select a .txt file with recording paths", file_type='txt')
+        if path:
+            return jsonify({'status': 'success', 'path': path})
+        else:
+            return jsonify({'status': 'cancelled'})
+
     result = {}
     def open_dialog():
         import tkinter as tk
@@ -158,7 +199,8 @@ def select_file():
             logger.error(f"An error occurred in the tkinter dialog thread: {e}", exc_info=True)
             result['error'] = "Could not open the file dialog. Please ensure you have a graphical environment configured."
         finally:
-            root.destroy()
+            if 'root' in locals() and root:
+                root.destroy()
 
     dialog_thread = threading.Thread(target=open_dialog)
     dialog_thread.start()

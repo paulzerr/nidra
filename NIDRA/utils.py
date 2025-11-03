@@ -116,14 +116,18 @@ class BatchScorer:
 
             try:
                 start_time = time.time()
-                scorer = NIDRA.scorer(
-                    scorer_type=self.scorer_type,
-                    input_file=str(file),
-                    output_dir=str(recording_output_dir),
-                    model_name=self.model_name,
-                    zmax_mode=self.zmax_mode,
-                    ch_names=self.ch_names
-                )
+                
+                scorer_kwargs = {
+                    'scorer_type': self.scorer_type,
+                    'input_file': str(file),
+                    'output_dir': str(recording_output_dir),
+                    'model_name': self.model_name,
+                    'ch_names': self.ch_names
+                }
+                if self.scorer_type == 'forehead':
+                    scorer_kwargs['zmax_mode'] = self.zmax_mode
+                
+                scorer = NIDRA.scorer(**scorer_kwargs)
                 hypnogram, _ = scorer.score(plot=plot)
                 logger.info("Autoscoring completed.")
                 
