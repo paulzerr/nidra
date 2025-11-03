@@ -18,7 +18,7 @@ class BatchScorer:
     A class to handle batch scoring of a study directory.
     It finds all valid recordings in subdirectories and scores them in a single run.
     """
-    def __init__(self, input_dir, output_dir=None, scorer_type=None, model_name=None, dir_list=None, zmax_mode=None):
+    def __init__(self, input_dir, output_dir=None, scorer_type=None, model_name=None, dir_list=None, zmax_mode=None, ch_names=None):
         self.input_dir = Path(input_dir) if input_dir else None
 
         # Default output_dir to input_dir if not provided
@@ -37,6 +37,7 @@ class BatchScorer:
         self.model_name = model_name
         self.dir_list = dir_list
         self.zmax_mode = zmax_mode
+        self.ch_names = ch_names
         self.files_to_process = self._find_files()
 
     def _find_files(self):
@@ -120,7 +121,8 @@ class BatchScorer:
                     input_file=str(file),
                     output_dir=str(recording_output_dir),
                     model_name=self.model_name,
-                    zmax_mode=self.zmax_mode
+                    zmax_mode=self.zmax_mode,
+                    ch_names=self.ch_names
                 )
                 hypnogram, _ = scorer.score(plot=plot)
                 logger.info("Autoscoring completed.")
@@ -152,7 +154,7 @@ class BatchScorer:
         
         return processed_count, len(self.files_to_process)
 
-def batch_scorer(input_dir, output_dir=None, scorer_type=None, model_name=None, dir_list=None, zmax_mode=None):
+def batch_scorer(input_dir, output_dir=None, scorer_type=None, model_name=None, dir_list=None, zmax_mode=None, ch_names=None):
     """
     Factory function to create a BatchScorer instance.
     This is the recommended entry point for batch processing.
@@ -164,12 +166,13 @@ def batch_scorer(input_dir, output_dir=None, scorer_type=None, model_name=None, 
         model_name (str, optional): Name of the model to use.
         dir_list (list, optional): A list of specific directories to process instead of scanning all subdirectories.
         zmax_mode (str, optional): The ZMax mode ('one_file' or 'two_files') for forehead data.
+        ch_names (list, optional): A list of channel names to use.
 
     Returns:
         BatchScorer: Configured BatchScorer. Call .score() to run processing. A new timestamped folder 'autoscorer_output_run_YYYYmmdd_HHMMSS'
                      will be created inside output_dir to contain all per-recording outputs.
     """
-    return BatchScorer(input_dir, output_dir, scorer_type, model_name, dir_list=dir_list, zmax_mode=zmax_mode)
+    return BatchScorer(input_dir, output_dir, scorer_type, model_name, dir_list=dir_list, zmax_mode=zmax_mode, ch_names=ch_names)
 
 def calculate_font_size(screen_height, percentage, min_size, max_size):
     """Calculates font size as a percentage of screen height with min/max caps."""

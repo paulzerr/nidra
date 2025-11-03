@@ -11,7 +11,7 @@ class ForeheadScorer:
     Scores sleep stages from forehead EEG data.
     """
     def __init__(self, input_file: str = None, output_dir: str = None, data: np.ndarray = None,
-                 sfreq: float = None, model_name: str = "ez6",
+                 sfreq: float = None, model_name: str = "ez6moe",
                  zmax_mode: str = 'two_files', ch_names: list = None,
                  create_output_files: bool = None):
         if input_file is None and data is None:
@@ -22,7 +22,6 @@ class ForeheadScorer:
         if input_file:
             input_path = Path(input_file)
             
-            # Handle 'one_file' mode first as it's simpler
             if zmax_mode == 'one_file':
                 if input_path.is_dir():
                     input_dir = input_path
@@ -34,8 +33,7 @@ class ForeheadScorer:
                     input_dir = input_path.parent
                     self.input_file = input_path
             
-            # Handle 'two_files' mode
-            else: # zmax_mode in [None, 'two_files']
+            elif zmax_mode in [None, 'two_files']:
                 if input_path.is_dir():
                     input_dir = input_path
                     l_file = next(input_path.glob('*[lL].edf'), None)

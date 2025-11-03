@@ -2,6 +2,7 @@ import re
 import mne
 import numpy as np
 import onnxruntime as ort
+import logging
 from scipy.signal import resample_poly
 from pathlib import Path
 from collections import namedtuple, OrderedDict
@@ -23,6 +24,7 @@ class PSGScorer:
     Scores sleep stages from PSG data.
     """
     def __init__(self, input_file: str = None, output_dir: str = None, data: np.ndarray = None, ch_names: List[str] = None, sfreq: float = None, model_name: str = "u-sleep-nsrr-2024_eeg", epoch_sec: int = 30, create_output_files: bool = None):
+        self.logger = logging.getLogger(__name__)
         if input_file is None and data is None:
             raise ValueError("Either 'input_file' or 'data' must be provided.")
         if data is not None and sfreq is None:
@@ -198,7 +200,7 @@ class PSGScorer:
         window_size = self.session.get_inputs()[0].shape[1]
 
         for i, channel_group in enumerate(self.channel_groups):
-            print(f"Predicting on group {i+1}/{len(self.channel_groups)}: {channel_group.channel_names}")
+            self.logger.info(f"Predicting on group {i+1}/{len(self.channel_groups)}: {channel_group.channel_names}")
             psg_subset = self.preprocessed_psg[:, :, tuple(channel_group.channel_indices)]
             n_epochs_total = psg_subset.shape[0]
 
@@ -266,11 +268,11 @@ class PSGScorer:
         # save probabilities
         prob_csv_file = self.output_dir / f"{self.base_filename}_probabilities.csv"
         with open(prob_csv_file, 'w') as f:
-            header = "Epoch,Wake,N1,N2,N3,Unknown,REM\n"
+            header = "Epoch,Wake,N1,N2,N3,REM,Art\n"
             f.write(header)
             for i, probs in enumerate(self.probabilities):
                 prob_str = ",".join(f"{p:.6f}" for p in probs)
-                f.write(f"{i},{prob_str}\n")
+                f.write(f"{i},{prob_str},0.000000\n")
         
         print(f"Hypnogram saved to {hypnogram_csv_file}")
         print(f"Probabilities saved to {prob_csv_file}")

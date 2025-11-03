@@ -348,7 +348,8 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
                 scorer_type=scorer_type,
                 model_name=model_name,
                 dir_list=dir_list,
-                zmax_mode=zmax_mode
+                zmax_mode=zmax_mode,
+                ch_names=ch_names
             )
             success_count, total_count = batch.score(plot=plot, gen_stats=gen_stats)
         else:
@@ -401,6 +402,8 @@ def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plo
     """
     Performs scoring on a single recording file.
     """
+    if ch_names:
+        logger.info(f"Using custom channel selection: {ch_names}")
     try:
         start_time = time.time()
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
