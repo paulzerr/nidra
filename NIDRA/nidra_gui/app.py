@@ -123,7 +123,7 @@ def _choose_file_mac(prompt="Select a file", file_type='txt'):
     except Exception as e:
         logger.error(f"AppleScript file selection failed: {e}", exc_info=True)
         return None
-d
+
 @app.route('/select-directory')
 def select_directory():
     """
