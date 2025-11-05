@@ -13,28 +13,49 @@ mne_hiddenimports = collect_submodules('mne')
 # Collect VC Redist DLLs
 vc_redist_binaries = [(f, '.') for f in glob.glob('NIDRA/dll/*.dll')]
 
+# --- Comprehensive Debugging Output ---
+print("### DEBUGGING OUTPUT")
+
+# 1. Inspect collected data files
+print("\n--- MNE Datas ---")
+print(mne_datas)
+print("\n--- Matplotlib Datas ---")
+print(matplotlib_datas)
+
+# 2. Construct final lists for Analysis
+final_datas = [
+    ('NIDRA/nidra_gui/neutralino', 'neutralino'),
+    ('docs', 'docs'),
+    ('NIDRA/models', 'NIDRA/models'),
+    ('examples', 'examples'),
+] + mne_datas + matplotlib_datas
+
+final_hiddenimports = [
+    'decorator',
+    'webview',
+    'scipy',
+    'pandas',
+    'werkzeug',
+    'matplotlib',
+] + collect_submodules('scipy') + collect_submodules('pandas') + collect_submodules('werkzeug') + mne_hiddenimports
+
+# 3. Print the final lists that will be passed to Analysis
+print("\n--- Final `datas` for Analysis ---")
+print(final_datas)
+print("\n--- Final `binaries` for Analysis ---")
+print(vc_redist_binaries)
+print("\n--- Final `hiddenimports` for Analysis ---")
+print(final_hiddenimports)
+
+print("\n### END DEBUGGING OUTPUT")
+# ------------------------------------
+
 a = Analysis(
     ['NIDRA/nidra_gui/launcher.py'],
     pathex=['.', 'NIDRA'],
     binaries=vc_redist_binaries,
-    datas=[
-        ('NIDRA/nidra_gui/neutralino', 'neutralino'),
-        ('docs', 'docs'),
-        ('NIDRA/models', 'NIDRA/models'),
-        ('examples', 'examples'),
-    ] + mne_datas + matplotlib_datas,  # merge mne and matplotlib datas into your project datas
-    hiddenimports=[
-        'decorator',
-        'webview',
-        'scipy',
-        'pandas',
-        'werkzeug',
-        'matplotlib',
-    ]
-    + collect_submodules('scipy')
-    + collect_submodules('pandas')
-    + collect_submodules('werkzeug')
-    + mne_hiddenimports,  # merge mne hiddenimports
+    datas=final_datas,
+    hiddenimports=final_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

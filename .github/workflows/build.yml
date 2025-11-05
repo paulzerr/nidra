@@ -338,6 +338,19 @@ jobs:
           curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_L.edf -o examples/test_data_zmax/EEG_L.edf
           curl -L https://huggingface.co/pzerr/NIDRA_models/resolve/main/EEG_R.edf -o examples/test_data_zmax/EEG_R.edf
 
+      - name: Debugging File and Directory Structure
+        run: |
+          echo "### DEBUGGING OUTPUT"
+          echo "\n--- Current Working Directory ---"
+          pwd
+          echo "\n--- Full Project Structure ---"
+          ls -laR
+          echo "\n--- Verifying Key Directories ---"
+          ls -R NIDRA/nidra_gui/neutralino || echo "Missing: neutralino"
+          ls -R docs || echo "Missing: docs"
+          ls -R NIDRA/models || echo "Missing: models"
+          ls -R examples || echo "Missing: examples"
+          echo "### END DEBUGGING OUTPUT"
       - name: Build Executable with PyInstaller (Unix)
         if: runner.os != 'Windows'
         run: venv/bin/python -m PyInstaller NIDRA.spec
