@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import logging
 import time
@@ -50,29 +51,53 @@ class BatchScorer:
             # Exclude NIDRA-generated batch output folders to avoid spurious scans
             dirs_to_search = [
                 subdir for subdir in sorted(self.input_dir.iterdir())
-                if subdir.is_dir() and not subdir.name.startswith(('autoscorer_output_run_'))
+                if subdir.is_dir() and not subdir.name.startswith(('autoscorer_output')) and not subdir.name.startswith(('batch_'))
             ]
 
         files = []
-        for subdir in dirs_to_search:
-            if not subdir.is_dir():
-                logger.warning(f"'{subdir}' is not a directory. Skipping.")
+        for path_item in dirs_to_search:
+            if path_item.is_file():
+                if self.scorer_type == 'forehead' and self.zmax_mode in [None, 'two_files']:
+                    input_file_str = str(path_item)
+                    if re.search(r'(?i)[_ ]L\.edf$', input_file_str):
+                        l_file = path_item
+                        r_file = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', input_file_str))
+                    elif re.search(r'(?i)[_ ]R\.edf$', input_file_str):
+                        r_file = path_item
+                        l_file = Path(re.sub(r'(?i)([_ ])R\.edf$', r'\1L.edf', input_file_str))
+                    else:
+                        logger.warning(f"'{path_item}' is not a valid L or R file for two-file mode. Skipping.")
+                        continue
+
+                    if not l_file.exists() or not r_file.exists():
+                        logger.warning(f"Could not find the corresponding pair for '{path_item}'. Skipping.")
+                        continue
+                    
+                    # Add the L file to be processed, ensuring we don't add duplicates
+                    if l_file not in files:
+                        files.append(l_file)
+                else:
+                    files.append(path_item)
                 continue
+            elif not path_item.is_dir():
+                logger.warning(f"'{path_item}' is not a valid file or directory. Skipping.")
+                continue
+            
+            # If it's a directory, search for recordings inside it
             try:
                 if self.scorer_type == 'psg':
-                    file = next(subdir.glob('*.edf'))
+                    file = next(path_item.glob('*.edf'))
                     files.append(file)
                 else:  # 'forehead'
-                    # Default to 'two_files' if zmax_mode is not provided, to maintain old behavior
                     if self.zmax_mode in [None, 'two_files']:
-                        l_file = next(subdir.glob('*[lL].edf'))
-                        next(subdir.glob('*[rR].edf'))  # Verify R file exists
+                        l_file = next(path_item.glob('*[lL].edf'))
+                        next(path_item.glob('*[rR].edf'))  # Verify R file exists
                         files.append(l_file)
                     else:  # 'one_file'
-                        file = next(subdir.glob('*.edf'))
+                        file = next(path_item.glob('*.edf'))
                         files.append(file)
             except StopIteration:
-                logger.warning(f"Could not find a complete recording in subdirectory '{subdir}'. Skipping.")
+                logger.warning(f"Could not find a complete recording in subdirectory '{path_item}'. Skipping.")
                 continue
         
         if not files:
