@@ -426,13 +426,6 @@ class PSGScorer:
         iqr[iqr == 0] = 1.0
         return (x - median) / iqr
     
-    # 
-    # def _robust_scale_channel(self, channel_data: np.ndarray) -> np.ndarray:
-    #     """RobustScaler: (x - median) / IQR."""
-    #     p25, p75 = np.percentile(channel_data, [25, 75])
-    #     iqr = p75 - p25
-    #     return (channel_data - np.median(channel_data)) / iqr if iqr else np.zeros_like(channel_data)
-
     def _softmax(self, x: np.ndarray, axis: int = -1) -> np.ndarray:
         """NumPy implementation of softmax"""
         exp_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
