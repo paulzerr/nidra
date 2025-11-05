@@ -294,7 +294,7 @@ jobs:
             ${{ runner.os }}-venv-
 
       - name: Setup Python Environment and Install Dependencies (Unix)
-        if: runner.os != 'Windows' and steps.cache-venv.outputs.cache-hit != 'true'
+        if: runner.os != 'Windows' && steps.cache-venv.outputs.cache-hit != 'true'
         run: |
           python -m venv venv
           venv/bin/python -m pip install --upgrade pip setuptools wheel
@@ -304,7 +304,7 @@ jobs:
           venv/bin/pip install .
 
       - name: Setup Python Environment and Install Dependencies (Windows)
-        if: runner.os == 'Windows' and steps.cache-venv.outputs.cache-hit != 'true'
+        if: runner.os == 'Windows' && steps.cache-venv.outputs.cache-hit != 'true'
         run: |
           python -m venv venv
           .\venv\Scripts\python.exe -m pip install --upgrade pip setuptools wheel
@@ -502,7 +502,7 @@ jobs:
 
   package-screenshots:
     name: Package All Screenshots
-    needs: build-and-test
+    needs: gui-test
     if: always()
     runs-on: ubuntu-latest
     steps:
