@@ -54,7 +54,7 @@
             </div>
 
             <div id="zmax-options" class="control-group" style="display: none;">
-                <div class="radio-group">
+                <!-- <div class="radio-group">
                     <label class="flex-label">
                         <span><input type="radio" name="zmax-mode" value="two_files" checked> 2 files per recording (e.g. EEG R.edf & EEG L.edf)</span>
                         <span class="placeholder"></span>
@@ -63,7 +63,7 @@
                         <span><input type="radio" name="zmax-mode" value="one_file"> 1 file per recording (multi-channel .edf)</span>
                         <button id="select-channels-btn" class="browse-btn">Select channels (optional)</button>
                     </label>
-                </div>
+                </div> -->
             </div>
 
             <hr>
@@ -71,9 +71,12 @@
             <div class="control-group">
                 <h2>{{ texts["OPTIONS_TITLE"] }}</h2>
                 <div class="options-group">
-                    <div class="checkbox-group">
-                        <label><input type="checkbox" id="gen-plot" checked> {{ texts["OPTIONS_PLOT"] }}</label>
-                        <label><input type="checkbox" id="gen-stats" checked> {{ texts["OPTIONS_STATS"] }}</label>
+                    <div class="options-left">
+                        <button id="select-channels-btn" class="browse-btn">Select channels (optional)</button>
+                        <div class="checkbox-group">
+                            <label><input type="checkbox" id="gen-plot" checked> {{ texts["OPTIONS_PLOT"] }}</label>
+                            <label><input type="checkbox" id="gen-stats" checked> {{ texts["OPTIONS_STATS"] }}</label>
+                        </div>
                     </div>
                     <div class="help-button-stack">
                         <button id="help-btn" class="help-btn">Open help & manual</button>

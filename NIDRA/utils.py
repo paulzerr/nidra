@@ -19,7 +19,7 @@ class BatchScorer:
     A class to handle batch scoring of a study directory.
     It finds all valid recordings in subdirectories and scores them in a single run.
     """
-    def __init__(self, input_dir, output_dir=None, scorer_type=None, model_name=None, dir_list=None, zmax_mode=None, ch_names=None):
+    def __init__(self, input_dir, output_dir=None, scorer_type=None, model_name=None, dir_list=None, ch_names=None):
         self.input_dir = Path(input_dir) if input_dir else None
 
         # Default output_dir to input_dir if not provided
@@ -37,80 +37,73 @@ class BatchScorer:
             raise ValueError("scorer_type must be specified: 'forehead' or 'psg'.")
         self.model_name = model_name
         self.dir_list = dir_list
-        self.zmax_mode = zmax_mode
         self.ch_names = ch_names
         self.files_to_process = self._find_files()
 
     def _find_files(self):
-        """Finds all valid recording files in the input directory."""
+        """
+        Finds all valid recording files and determines the ZMax mode automatically.
+        Returns a list of tuples: (file_path, zmax_mode), where zmax_mode is 'one_file', 'two_files', or None.
+        """
         if self.dir_list:
             logger.info(f"Searching for recordings in {len(self.dir_list)} specified directories...")
             dirs_to_search = [Path(d) for d in self.dir_list]
         else:
             logger.info(f"Searching for recordings in '{self.input_dir}'...")
-            # Exclude NIDRA-generated batch output folders to avoid spurious scans
             dirs_to_search = [
                 subdir for subdir in sorted(self.input_dir.iterdir())
-                if subdir.is_dir() and not subdir.name.startswith(('autoscorer_output')) and not subdir.name.startswith(('batch_'))
+                if subdir.is_dir() and not subdir.name.startswith(('autoscorer_output', 'batch_'))
             ]
 
-        files = []
-        for path_item in dirs_to_search:
-            if path_item.is_file():
-                if self.scorer_type == 'forehead' and self.zmax_mode in [None, 'two_files']:
-                    input_file_str = str(path_item)
-                    if re.search(r'(?i)[_ ]L\.edf$', input_file_str):
-                        l_file = path_item
-                        r_file = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', input_file_str))
-                    elif re.search(r'(?i)[_ ]R\.edf$', input_file_str):
-                        r_file = path_item
-                        l_file = Path(re.sub(r'(?i)([_ ])R\.edf$', r'\1L.edf', input_file_str))
-                    else:
-                        logger.warning(f"'{path_item}' is not a valid L or R file for two-file mode. Skipping.")
-                        continue
+        files_with_mode = []
+        processed_l_files = set()
 
-                    if not l_file.exists() or not r_file.exists():
-                        logger.warning(f"Could not find the corresponding pair for '{path_item}'. Skipping.")
-                        continue
-                    
-                    # Add the L file to be processed, ensuring we don't add duplicates
-                    if l_file not in files:
-                        files.append(l_file)
-                else:
-                    files.append(path_item)
-                continue
-            elif not path_item.is_dir():
-                logger.warning(f"'{path_item}' is not a valid file or directory. Skipping.")
-                continue
+        for path_item in dirs_to_search:
+            search_dir = path_item.parent if path_item.is_file() else path_item
             
-            # If it's a directory, search for recordings inside it
+            if not search_dir.is_dir():
+                logger.warning(f"'{search_dir}' is not a valid directory. Skipping.")
+                continue
+
             try:
                 if self.scorer_type == 'psg':
-                    file = next(path_item.glob('*.edf'))
-                    files.append(file)
-                else:  # 'forehead'
-                    if self.zmax_mode in [None, 'two_files']:
-                        l_file = next(path_item.glob('*[lL].edf'))
-                        next(path_item.glob('*[rR].edf'))  # Verify R file exists
-                        files.append(l_file)
-                    else:  # 'one_file'
-                        file = next(path_item.glob('*.edf'))
-                        files.append(file)
+                    file = next(search_dir.glob('*.edf'))
+                    files_with_mode.append((file, None))
+                else:  # 'forehead', auto-detect mode
+                    l_files = list(search_dir.glob('*[lL].edf'))
+                    r_files = list(search_dir.glob('*[rR].edf'))
+                    
+                    # Try to find a two-file pair
+                    if len(l_files) == 1 and len(r_files) == 1:
+                        r_file_expected = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', str(l_files)))
+                        if r_file_expected.resolve() == r_files.resolve():
+                            if l_files not in processed_l_files:
+                                files_with_mode.append((l_files, 'two_files'))
+                                processed_l_files.add(l_files)
+                            continue # Move to the next item in dirs_to_search
+
+                    # If not a clear pair, check for a single file
+                    all_edfs = list(search_dir.glob('*.edf'))
+                    if len(all_edfs) == 1:
+                        files_with_mode.append((all_edfs, 'one_file'))
+                    elif len(all_edfs) > 1 and not (len(l_files) == 1 and len(r_files) == 1):
+                        logger.warning(f"Found multiple EDF files in '{search_dir}' that do not form a clear L/R pair. Skipping.")
+                    elif not all_edfs:
+                        raise StopIteration # No files found
+
             except StopIteration:
-                logger.warning(f"Could not find a complete recording in subdirectory '{path_item}'. Skipping.")
+                logger.warning(f"Could not find a complete recording in '{search_dir}'. Skipping.")
                 continue
         
-        if not files:
-            if self.dir_list:
-                logger.warning(f"Could not find any suitable recordings in the provided list of directories.")
-            else:
-                logger.warning(f"Could not find any suitable recordings in subdirectories of '{self.input_dir}'.")
+        if not files_with_mode:
+            logger.warning(f"Could not find any suitable recordings in the specified locations.")
         else:
-            logger.info(f"Found {len(files)} recording(s) to process.")
+            logger.info(f"Found {len(files_with_mode)} recording(s) to process.")
             logger.info("The following recordings will be processed:")
-            for file in files:
-                logger.info(f"  - {file}")
-        return files
+            for file, mode in files_with_mode:
+                mode_str = f" (mode: {mode})" if mode else ""
+                logger.info(f"  - {file}{mode_str}")
+        return files_with_mode
 
     def score(self, plot=True, gen_stats=True):
         """
@@ -131,7 +124,7 @@ class BatchScorer:
         logger.info(f"Starting batch processing. Results will be saved to: {batch_output_dir}")
 
         processed_count = 0
-        for i, file in enumerate(self.files_to_process):
+        for i, (file, zmax_mode) in enumerate(self.files_to_process):
             logger.info("\n" + "-" * 80)
             logger.info(f"[{i + 1}/{len(self.files_to_process)}] Processing: {file}")
             logger.info("-" * 80)
@@ -150,7 +143,7 @@ class BatchScorer:
                     'ch_names': self.ch_names
                 }
                 if self.scorer_type == 'forehead':
-                    scorer_kwargs['zmax_mode'] = self.zmax_mode
+                    scorer_kwargs['zmax_mode'] = zmax_mode
                 
                 scorer = NIDRA.scorer(**scorer_kwargs)
                 hypnogram, _ = scorer.score(plot=plot)
@@ -183,7 +176,7 @@ class BatchScorer:
         
         return processed_count, len(self.files_to_process)
 
-def batch_scorer(input_dir, output_dir=None, scorer_type=None, model_name=None, dir_list=None, zmax_mode=None, ch_names=None):
+def batch_scorer(input_dir, output_dir=None, scorer_type=None, model_name=None, dir_list=None, ch_names=None):
     """
     Factory function to create a BatchScorer instance.
     This is the recommended entry point for batch processing.
@@ -194,14 +187,13 @@ def batch_scorer(input_dir, output_dir=None, scorer_type=None, model_name=None, 
         scorer_type (str): Type of data, either 'forehead' or 'psg'.
         model_name (str, optional): Name of the model to use.
         dir_list (list, optional): A list of specific directories to process instead of scanning all subdirectories.
-        zmax_mode (str, optional): The ZMax mode ('one_file' or 'two_files') for forehead data.
         ch_names (list, optional): A list of channel names to use.
 
     Returns:
         BatchScorer: Configured BatchScorer. Call .score() to run processing. A new timestamped folder 'autoscorer_output_run_YYYYmmdd_HHMMSS'
                      will be created inside output_dir to contain all per-recording outputs.
     """
-    return BatchScorer(input_dir, output_dir, scorer_type, model_name, dir_list=dir_list, zmax_mode=zmax_mode, ch_names=ch_names)
+    return BatchScorer(input_dir, output_dir, scorer_type, model_name, dir_list=dir_list, ch_names=ch_names)
 
 def calculate_font_size(screen_height, percentage, min_size, max_size):
     """Calculates font size as a percentage of screen height with min/max caps."""

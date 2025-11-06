@@ -155,7 +155,22 @@ class PSGScorer:
         """Preprocesses a raw PSG recording."""
         print("Setting up channels and preprocessing PSG data...")
         
-        channels_to_load, self.channel_groups, self.has_eog = self._get_load_and_group_channels(self.raw.ch_names)
+        # Respect user-selected channels if provided; otherwise use all channels
+        base_ch_names = list(self.raw.ch_names)
+        if self.ch_names:
+            # Normalize requested names, keep EDF order, and warn on missing
+            requested = [str(n).strip() for n in self.ch_names if n]
+            requested_set = set(requested)
+            filtered = [ch for ch in base_ch_names if ch in requested_set]
+            missing = [ch for ch in requested if ch not in base_ch_names]
+            if missing:
+                self.logger.warning(f"Requested channels not found in recording and will be ignored: {missing}")
+            if filtered:
+                base_ch_names = filtered
+            else:
+                self.logger.warning("None of the requested channels were found. Falling back to all channels in the EDF.")
+
+        channels_to_load, self.channel_groups, self.has_eog = self._get_load_and_group_channels(base_ch_names)
         print(f"Found {len(self.channel_groups)} channel groups.")
 
         self.raw.pick(channels_to_load)

@@ -30,27 +30,18 @@ TEXTS = {
     "ZMAX_OPTIONS_SELECT_CHANNELS": "Select channels (optional)"
 }
 
-
+# setup resource paths
 base_path, is_bundle = utils.get_app_dir()
 if is_bundle:
     docs_path = base_path / 'docs'
     instance_relative = False
-    # Running as PyInstaller bundle
-    #template_folder = str(base_path / 'neutralino' / 'resources' / 'templates')
-    #static_folder = str(base_path / 'neutralino' / 'resources' / 'static')
-    #app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
-    #app.docs_path = base_path / 'docs'
 else:
     docs_path = importlib.resources.files('docs')
     instance_relative = True
     base_path = Path(__file__).parent
-    #template_folder = str(base_path / 'neutralino' / 'resources' / 'templates')
-    #static_folder = str(base_path / 'neutralino' / 'resources' / 'static')
-    #app = Flask(__name__, instance_relative_config=True, template_folder=template_folder, static_folder=static_folder)
-    #app.docs_path = importlib.resources.files('docs')
-
 template_folder = str(base_path / 'neutralino' / 'resources' / 'templates')
 static_folder = str(base_path / 'neutralino' / 'resources' / 'static')
+# start flask server
 app = Flask(
     __name__, 
     instance_relative_config=instance_relative,
@@ -226,7 +217,7 @@ def open_recent_results():
             for line in f:
                 if "Results saved to:" in line:
                     # Extract the path after the colon and strip whitespace
-                    path_str = line.split("Results saved to:", 1)[1].strip()
+                    path_str = line.split("Results saved to:", 1).strip()
                     last_output_dir = Path(path_str)
 
         if last_output_dir and last_output_dir.exists():
@@ -276,7 +267,6 @@ def start_scoring():
             data['model_name'],
             data.get('plot', False),
             data.get('gen_stats', False),
-            data.get('zmax_mode'),
             data.get('ch_names')
         )
     )
@@ -318,43 +308,165 @@ def show_example():
 @app.route('/get-channels', methods=['POST'])
 def get_channels():
     """
-    Reads and returns the channel names from the first EDF file found.
-    If the input path is a .txt file, it reads the first directory from the file.
-    Otherwise, it assumes the input path is a directory.
+    Reads channel names from EDF files and determines the required channel selection mode
+    based on the data source and file structure (e.g., for ZMax recordings).
     """
     data = request.json
     input_path_str = data.get('input_dir')
+    data_source = data.get('data_source')
 
     if not input_path_str:
         return jsonify({'status': 'error', 'message': 'Input path not provided.'}), 400
+    if not data_source:
+        return jsonify({'status': 'error', 'message': 'Data source not provided.'}), 400
 
     try:
         input_path = Path(input_path_str)
         search_dir = None
+        search_file = None
 
         if input_path.is_file() and input_path.suffix.lower() == '.txt':
-            logger.info(f"Reading first directory from text file: {input_path}")
+            logger.info(f"Reading first path from text file: {input_path}")
             with open(input_path, 'r') as f:
                 first_line = f.readline().strip()
             if not first_line:
-                return jsonify({'status': 'error', 'message': 'The selected .txt file is empty or the first line is blank.'}), 400
-            search_dir = Path(first_line)
+                return jsonify({'status': 'error', 'message': 'The selected .txt file is empty.'}), 400
+            first_target = Path(first_line)
+            if first_target.is_dir():
+                search_dir = first_target
+            elif first_target.is_file():
+                search_file = first_target
+            else:
+                return jsonify({'status': 'error', 'message': f'Path from .txt not found: {first_target}'}), 404
         else:
-            search_dir = input_path
+            # Allow either a directory or a direct EDF file path
+            if input_path.is_dir():
+                search_dir = input_path
+            elif input_path.is_file():
+                search_file = input_path
+            else:
+                return jsonify({'status': 'error', 'message': f'Invalid input path: {input_path}'}), 404
 
-        if not search_dir or not search_dir.is_dir():
-            return jsonify({'status': 'error', 'message': f'Could not find a valid directory to search for recordings: {search_dir}'}), 404
+        if (search_dir is None and search_file is None):
+            return jsonify({'status': 'error', 'message': 'No valid directory or file resolved from input.'}), 404
 
-        # Search for .edf files case-insensitively
-        edf_files = list(search_dir.glob('*.edf')) + list(search_dir.glob('*.EDF'))
-        if not edf_files:
-            return jsonify({'status': 'error', 'message': f'No EDF files found in {search_dir}.'}), 404
+        scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
+        selection_mode = 'psg'  # Default for PSG
 
-        # Read the first EDF file found
-        raw = mne.io.read_raw_edf(edf_files[0], preload=False, verbose=False)
-        channels = raw.ch_names
-        
-        return jsonify({'status': 'success', 'channels': channels})
+        if scorer_type == 'forehead':
+            # If the input resolves to a specific EDF file (from .txt or direct file path), decide mode from file.
+            if search_file is not None:
+                import re
+                file_path = search_file
+                file_str = str(file_path)
+                # Detect two-file mode if filename indicates L/R and counterpart exists
+                if re.search(r'(?i)([_ ])L\.edf$', file_str):
+                    r_file = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', file_str))
+                    if r_file.exists():
+                        selection_mode = 'zmax_two_files'
+                        # Two-file mode: no channel selection needed
+                        channels = []
+                        return jsonify({'status': 'success', 'channels': channels, 'selection_mode': selection_mode})
+                if re.search(r'(?i)([_ ])R\.edf$', file_str):
+                    l_file = Path(re.sub(r'(?i)([_ ])R\.edf$', r'\1L.edf', file_str))
+                    if l_file.exists():
+                        selection_mode = 'zmax_two_files'
+                        channels = []
+                        return jsonify({'status': 'success', 'channels': channels, 'selection_mode': selection_mode})
+                # Otherwise, treat as single-file ZMax (multi-channel)
+                raw = mne.io.read_raw_edf(file_path, preload=False, verbose=False)
+                channels = raw.ch_names
+                selection_mode = 'zmax_one_file'
+                return jsonify({'status': 'success', 'channels': channels, 'selection_mode': selection_mode})
+
+            # Inspect only a single recording directory.
+            # First try the selected directory (non-recursive). If it doesn't contain a single recording,
+            # look for the first immediate subdirectory that does.
+            def _dedup(paths):
+                seen = set()
+                out = []
+                for p in paths:
+                    key = str(p).lower()
+                    if key not in seen:
+                        seen.add(key)
+                        out.append(p)
+                return out
+
+            def _detect_zmax_in_dir(d: Path):
+                l_files = sorted(d.glob('*[lL].edf'))
+                r_files = sorted(d.glob('*[rR].edf'))
+                all_edfs = sorted(d.glob('*.edf')) + sorted(d.glob('*.EDF'))
+
+                # Deduplicate to avoid duplicates on case-insensitive filesystems
+                all_edfs_loc = _dedup(all_edfs)
+                l_files_loc = _dedup(l_files)
+                r_files_loc = _dedup(r_files)
+
+                # Detect single-file ZMax first: exactly one EDF in this folder (name may contain L/R)
+                if len(all_edfs_loc) == 1:
+                    raw = mne.io.read_raw_edf(all_edfs_loc[0], preload=False, verbose=False)
+                    return 'zmax_one_file', raw.ch_names
+
+                # Detect two-file ZMax: exactly one L and one R file
+                if len(l_files_loc) == 1 and len(r_files_loc) == 1:
+                    # Two-file mode: no channel selection in UI; one channel per EDF is assumed
+                    return 'zmax_two_files', []
+
+                return None, None
+
+            selection_mode = None
+            channels = None
+
+            # Try selected directory first (non-recursive)
+            selection_mode, channels = _detect_zmax_in_dir(search_dir)
+
+            # If not determinable, try first immediate subdirectory with a determinable pattern
+            if selection_mode is None:
+                for sub in sorted(search_dir.iterdir()):
+                    if sub.is_dir():
+                        selection_mode, channels = _detect_zmax_in_dir(sub)
+                        if selection_mode is not None:
+                            break
+
+            # If still not determinable, recursively search deeper subfolders for the first determinable recording
+            if selection_mode is None:
+                for sub in sorted(search_dir.rglob('*')):
+                    if sub.is_dir():
+                        selection_mode, channels = _detect_zmax_in_dir(sub)
+                        if selection_mode is not None:
+                            break
+
+            if selection_mode is None:
+                # Build counts only for the selected directory (not recursive) for a clear error
+                l_top = list(search_dir.glob('*[lL].edf'))
+                r_top = list(search_dir.glob('*[rR].edf'))
+                all_top = list(search_dir.glob('*.edf')) + list(search_dir.glob('*.EDF'))
+                non_lr_top = [f for f in all_top if f not in l_top and f not in r_top]
+                message = (f'Could not determine ZMax recording type in {search_dir}. '
+                           f'Found {len(l_top)} L-files, {len(r_top)} R-files, and {len(non_lr_top)} other EDF files in this folder. '
+                           'If your recordings are in subfolders, please select one recording folder, '
+                           'or choose "Score all recordings (in subfolders)"; channel selection uses a single recording.')
+                return jsonify({'status': 'error', 'message': message}), 404
+
+        else:  # For PSG, read the first available EDF from this folder or the first immediate subfolder
+            if search_file is not None:
+                raw = mne.io.read_raw_edf(search_file, preload=False, verbose=False)
+                channels = raw.ch_names
+                return jsonify({'status': 'success', 'channels': channels, 'selection_mode': selection_mode})
+            edf_files = sorted(search_dir.glob('*.edf')) + sorted(search_dir.glob('*.EDF'))
+            if not edf_files:
+                # look into first immediate subdirectory that contains an EDF
+                for sub in sorted(search_dir.iterdir()):
+                    if sub.is_dir():
+                        edf_files = sorted(sub.glob('*.edf')) + sorted(sub.glob('*.EDF'))
+                        if edf_files:
+                            break
+            if not edf_files:
+                return jsonify({'status': 'error', 'message': f'No EDF files found in {search_dir} or its immediate subfolders.'}), 404
+            raw = mne.io.read_raw_edf(edf_files[0], preload=False, verbose=False)
+            channels = raw.ch_names
+
+        return jsonify({'status': 'success', 'channels': channels, 'selection_mode': selection_mode})
 
     except Exception as e:
         logger.error(f"Error reading channels from EDF file: {e}", exc_info=True)
@@ -362,7 +474,7 @@ def get_channels():
 
 
 # this enables reporting on successful/failed scorings
-def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, model_name, plot, gen_stats, zmax_mode=None, ch_names=None):
+def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, model_name, plot, gen_stats, ch_names=None):
     """
     Manages the global running state and executes the scoring process.
     This function is intended to be run in a separate thread.
@@ -390,7 +502,6 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
                 scorer_type=scorer_type,
                 model_name=model_name,
                 dir_list=dir_list,
-                zmax_mode=zmax_mode,
                 ch_names=ch_names
             )
             success_count, total_count = batch.score(plot=plot, gen_stats=gen_stats)
@@ -398,15 +509,24 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
             # Logic for single scoring.
             logger.info(f"Looking for recordings in '{input_dir}'...")
             input_path = Path(input_dir)
+            zmax_mode = None
             try:
                 if scorer_type == 'psg':
                     input_file = next(input_path.glob('*.edf'))
-                else:  # for zmax recordings
-                    if zmax_mode == 'one_file':
-                        input_file = next(input_path.glob('*.edf'))
-                    else:  # Default to 'two_files' mode
-                        input_file = next(input_path.glob('*[lL].edf'))
-                        next(input_path.glob('*[rR].edf')) # Verify zmax EEG_R file exists
+                else:  # for zmax recordings, auto-detect
+                    l_files = list(input_path.glob('*[lL].edf'))
+                    r_files = list(input_path.glob('*[rR].edf'))
+                    all_edfs = list(input_path.glob('*.edf'))
+
+                    if len(l_files) == 1 and len(r_files) == 1:
+                        zmax_mode = 'two_files'
+                        input_file = l_files[0]
+                    elif len(all_edfs) == 1:
+                        zmax_mode = 'one_file'
+                        input_file = all_edfs[0]
+                    else:
+                        raise StopIteration # Let the exception handling below deal with it
+
             except StopIteration:
                 if any(item.is_dir() for item in input_path.iterdir()):
                     raise ValueError(
@@ -453,11 +573,11 @@ def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plo
         scorer_kwargs = {
             'input_file': str(input_file),
             'output_dir': output_dir,
-            'model_name': model_name
+            'model_name': model_name,
+            'ch_names': ch_names
         }
         if scorer_type == 'forehead':
             scorer_kwargs['zmax_mode'] = zmax_mode
-            scorer_kwargs['ch_names'] = ch_names
 
         scorer = scorer_factory(scorer_type=scorer_type, **scorer_kwargs)
         
@@ -572,7 +692,3 @@ def goodbye():
 def alive_ping():
     """A lightweight endpoint for the backend to probe itself to see if the frontend is still responsive."""
     return jsonify({'status': 'ok'})
-
-
-
-
