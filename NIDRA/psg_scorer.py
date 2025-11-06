@@ -23,7 +23,7 @@ class PSGScorer:
     """
     Scores sleep stages from PSG data.
     """
-    def __init__(self, input: str = None, output: str = None, data: np.ndarray = None, channels: List[str] = None, sfreq: float = None, model: str = "u-sleep-nsrr-2024_eeg", epoch_sec: int = 30, create_output_files: bool = None):
+    def __init__(self, input: str = None, output: str = None, data: np.ndarray = None, channels: List[str] = None, sfreq: float = None, model: str = "u-sleep-nsrr-2024", epoch_sec: int = 30, hypnogram: bool = None, probabilities: bool = False, plot: bool = False):
         self.logger = logging.getLogger(__name__)
         if input is None and data is None:
             raise ValueError("Either 'input' or 'data' must be provided.")
@@ -47,22 +47,7 @@ class PSGScorer:
             self.input_file = None
             self.base_filename = "numpy_input"
 
-        if output is None:
-            if input_dir:
-                output = Path(input_dir) / "autoscorer_output"
-
-        # if no output file parameter given, and we're using numpy array data input, no outfiles should be written
-        # otherwise, if we're scoring edf's we do want to write output files by default
-        if create_output_files is None:
-            self.create_output_files = True if input else False
-        else:
-            # if we specified output file parameter, use that specification
-            self.create_output_files = create_output_files
-
-        if output is None and self.create_output_files:
-            raise ValueError("output must be specified when create_output_files is True and it cannot be inferred from input.")
- 
-        self.output_dir = Path(output) if output is not None else None
+        # output_dir will be resolved after flag configuration
         self.input_data = data
         self.ch_names = channels
         self.sfreq = sfreq
@@ -80,19 +65,41 @@ class PSGScorer:
         self.hypnogram = None
         self.probabilities = None
 
-        if self.create_output_files:
-            self.output_dir.mkdir(parents=True, exist_ok=True)
+        # Configure output generation flags (per-file-type)
+        if hypnogram is None:
+            self.save_hypnogram = False if data is not None else True
+        else:
+            self.save_hypnogram = bool(hypnogram)
+        self.save_probabilities = bool(probabilities)
+        self.gen_plot = bool(plot)
 
-    def score(self, plot: bool = False):
+        # Resolve output directory only if any artifact is requested
+        outputs_requested = self.save_hypnogram or self.save_probabilities or self.gen_plot
+        if outputs_requested:
+            if output is None:
+                if input_dir:
+                    output = Path(input_dir) / "autoscorer_output"
+                else:
+                    raise ValueError("output must be specified when saving hypnogram/probabilities/plot for in-memory data input.")
+            self.output_dir = Path(output)
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            self.output_dir = Path(output) if output is not None else None
+
+    def score(self):
         self._load_recording()
         self._preprocess()
         self._load_model()
         self._predict()
         self._postprocess()
-        if self.create_output_files:
+        if self.save_hypnogram or self.save_probabilities:
+            if self.output_dir is None:
+                raise ValueError("output must be specified to save hypnogram or probabilities.")
             self._save_results()
-            if plot:
-                self.plot()
+        if self.gen_plot:
+            if self.output_dir is None:
+                raise ValueError("output must be specified to save plot.")
+            self.plot()
         return self.hypnogram, self.probabilities
 
     def plot(self):
@@ -298,24 +305,23 @@ class PSGScorer:
         """Saves the hypnogram and probabilities to files."""
         print(f"Saving results to {self.output_dir}...")
         
-        # save hypnogram to file
-        hypnogram_csv_file = self.output_dir / f"{self.base_filename}_hypnogram.csv"
-        with open(hypnogram_csv_file, 'w') as f:
-            f.write("sleep_stage\n")
-            for stage in self.hypnogram:
-                f.write(f"{int(stage)}\n")
+        if self.save_hypnogram:
+            hypnogram_csv_file = self.output_dir / f"{self.base_filename}_hypnogram.csv"
+            with open(hypnogram_csv_file, 'w') as f:
+                f.write("sleep_stage\n")
+                for stage in self.hypnogram:
+                    f.write(f"{int(stage)}\n")
+            print(f"Hypnogram saved to {hypnogram_csv_file}")
 
-        # save probabilities
-        prob_csv_file = self.output_dir / f"{self.base_filename}_probabilities.csv"
-        with open(prob_csv_file, 'w') as f:
-            header = "Epoch,Wake,N1,N2,N3,REM,Art\n"
-            f.write(header)
-            for i, probs in enumerate(self.probabilities):
-                prob_str = ",".join(f"{p:.6f}" for p in probs)
-                f.write(f"{i},{prob_str},0.000000\n")
-        
-        print(f"Hypnogram saved to {hypnogram_csv_file}")
-        print(f"Probabilities saved to {prob_csv_file}")
+        if self.save_probabilities:
+            prob_csv_file = self.output_dir / f"{self.base_filename}_probabilities.csv"
+            with open(prob_csv_file, 'w') as f:
+                header = "Epoch,Wake,N1,N2,N3,REM,Art\n"
+                f.write(header)
+                for i, probs in enumerate(self.probabilities):
+                    prob_str = ",".join(f"{p:.6f}" for p in probs)
+                    f.write(f"{i},{prob_str},0.000000\n")
+            print(f"Probabilities saved to {prob_csv_file}")
 
     def _parse_channel(self, name: str) -> Dict[str, Any]:
         """

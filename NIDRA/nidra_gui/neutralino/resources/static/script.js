@@ -135,6 +135,7 @@ function initializeApp() {
             data_source: dataSourceSelect.value,
             model: modelNameSelect.value,
             plot: document.getElementById('gen-plot').checked,
+            probabilities: document.getElementById('gen-probs').checked,
             gen_stats: document.getElementById('gen-stats').checked,
             score_subdirs: scoringMode === 'subdirs',
             score_from_file: scoringMode === 'from_file',

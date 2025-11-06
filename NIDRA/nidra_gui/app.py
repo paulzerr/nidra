@@ -266,6 +266,7 @@ def start_scoring():
             data['data_source'],
             data['model'],
             data.get('plot', False),
+            data.get('probabilities', False),
             data.get('gen_stats', False),
             data.get('channels')
         )
@@ -474,7 +475,7 @@ def get_channels():
 
 
 # this enables reporting on successful/failed scorings
-def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model, plot, gen_stats, channels=None):
+def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model, plot, probabilities, gen_stats, channels=None):
     """
     Manages the global running state and executes the scoring process.
     This function is intended to be run in a separate thread.
@@ -502,9 +503,11 @@ def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model,
                 type=scorer_type,
                 model=model,
                 dir_list=dir_list,
-                channels=channels
+                channels=channels,
+                probabilities=probabilities,
+                plot=plot
             )
-            success_count, total_count = batch.score(plot=plot, gen_stats=gen_stats)
+            success_count, total_count = batch.score(gen_stats=gen_stats)
         else:
             # Logic for single scoring.
             logger.info(f"Looking for recordings in '{input_dir}'...")
@@ -540,7 +543,7 @@ def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model,
             logger.info(f"Processing: {input_file}")
             logger.info("-" * 80)
             total_count = 1
-            if _run_scoring(input_file, output, data_source, model, gen_stats, plot, zmax_mode, channels):
+            if _run_scoring(input_file, output, data_source, model, gen_stats, plot, probabilities, zmax_mode, channels):
                 success_count = 1
 
     except (FileNotFoundError, ValueError) as e:
@@ -560,7 +563,7 @@ def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model,
 
         logger.info("\n" + "="*80 + "\nScoring process finished.\n" + "="*80)
 
-def _run_scoring(input, output, data_source, model, gen_stats, plot, zmax_mode=None, channels=None):
+def _run_scoring(input, output, data_source, model, gen_stats, plot, probabilities, zmax_mode=None, channels=None):
     """
     Performs scoring on a single recording file.
     """
@@ -574,14 +577,16 @@ def _run_scoring(input, output, data_source, model, gen_stats, plot, zmax_mode=N
             'input': str(input),
             'output': output,
             'model': model,
-            'channels': channels
+            'channels': channels,
+            'probabilities': probabilities,
+            'plot': plot
         }
         if scorer_type == 'forehead':
             scorer_kwargs['zmax_mode'] = zmax_mode
 
         scorer = scorer_factory(type=scorer_type, **scorer_kwargs)
         
-        hypnogram, probabilities = scorer.score(plot=plot)
+        hypnogram, probabilities = scorer.score()
 
         if gen_stats:
             logger.info("Calculating sleep statistics...")

@@ -19,7 +19,7 @@ class BatchScorer:
     A class to handle batch scoring of a study directory.
     It finds all valid recordings in subdirectories and scores them in a single run.
     """
-    def __init__(self, input_dir, output=None, type=None, model=None, dir_list=None, channels=None):
+    def __init__(self, input_dir, output=None, type=None, model=None, dir_list=None, channels=None, hypnogram=None, probabilities=False, plot=False):
         self.input_dir = Path(input_dir) if input_dir else None
 
         # Default output to input_dir if not provided
@@ -40,6 +40,14 @@ class BatchScorer:
         self.ch_names = channels
         self.files_to_process = self._find_files()
 
+        # Output artifact flags for per-recording scorers
+        if hypnogram is None:
+            self.save_hypnogram = True
+        else:
+            self.save_hypnogram = bool(hypnogram)
+        self.save_probabilities = bool(probabilities)
+        self.gen_plot = bool(plot)
+
     def _find_files(self):
         """
         Finds all valid recording files and determines the ZMax mode automatically.
@@ -47,54 +55,79 @@ class BatchScorer:
         """
         if self.dir_list:
             logger.info(f"Searching for recordings in {len(self.dir_list)} specified directories...")
-            dirs_to_search = [Path(d) for d in self.dir_list]
+            candidates = [Path(d) for d in self.dir_list]
         else:
             logger.info(f"Searching for recordings in '{self.input_dir}'...")
-            dirs_to_search = [
+            if not self.input_dir or not self.input_dir.exists():
+                logger.warning("Input directory does not exist or was not provided.")
+                return []
+            candidates = [
                 subdir for subdir in sorted(self.input_dir.iterdir())
                 if subdir.is_dir() and not subdir.name.startswith(('autoscorer_output', 'batch_'))
             ]
 
         files_with_mode = []
-        processed_l_files = set()
 
-        for path_item in dirs_to_search:
-            search_dir = path_item.parent if path_item.is_file() else path_item
-            
-            if not search_dir.is_dir():
-                logger.warning(f"'{search_dir}' is not a valid directory. Skipping.")
-                continue
+        def first_file_matching(d: Path, patterns):
+            for pat in patterns:
+                for f in d.glob(pat):
+                    return f
+            raise StopIteration
 
+        for item in candidates:
             try:
+                # If a file path is given in the list, resolve mode directly
+                if item.is_file():
+                    if self.type == 'psg':
+                        if item.suffix.lower() in ('.edf', '.bdf'):
+                            files_with_mode.append((item, None))
+                        else:
+                            logger.warning(f"Skipping non-EDF/BDF file: {item}")
+                    else:
+                        fstr = str(item)
+                        if re.search(r'(?i)([_ ])L\.edf$', fstr):
+                            r_file = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', fstr))
+                            if r_file.exists():
+                                files_with_mode.append((item, 'two_files'))
+                                continue
+                        if re.search(r'(?i)([_ ])R\.edf$', fstr):
+                            l_file = Path(re.sub(r'(?i)([_ ])R\.edf$', r'\1L.edf', fstr))
+                            if l_file.exists():
+                                files_with_mode.append((l_file, 'two_files'))
+                                continue
+                        files_with_mode.append((item, 'one_file'))
+                    continue
+
+                # Otherwise treat as a directory containing a recording
+                search_dir = item
+                if not search_dir.is_dir():
+                    logger.warning(f"'{search_dir}' is not a valid directory. Skipping.")
+                    continue
+
                 if self.type == 'psg':
-                    file = next(search_dir.glob('*.edf'))
+                    # Prefer EDF; fall back to BDF
+                    try:
+                        file = first_file_matching(search_dir, ['*.edf', '*.EDF'])
+                    except StopIteration:
+                        file = first_file_matching(search_dir, ['*.bdf', '*.BDF'])
                     files_with_mode.append((file, None))
-                else:  # 'forehead', auto-detect mode
-                    l_files = list(search_dir.glob('*[lL].edf'))
-                    r_files = list(search_dir.glob('*[rR].edf'))
-                    
-                    # Try to find a two-file pair
+                else:
+                    l_files = sorted(search_dir.glob('*[lL].edf')) + sorted(search_dir.glob('*[lL].EDF'))
+                    r_files = sorted(search_dir.glob('*[rR].edf')) + sorted(search_dir.glob('*[rR].EDF'))
+                    all_edfs = sorted(search_dir.glob('*.edf')) + sorted(search_dir.glob('*.EDF'))
+
                     if len(l_files) == 1 and len(r_files) == 1:
-                        r_file_expected = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', str(l_files)))
-                        if r_file_expected.resolve() == r_files.resolve():
-                            if l_files not in processed_l_files:
-                                files_with_mode.append((l_files, 'two_files'))
-                                processed_l_files.add(l_files)
-                            continue # Move to the next item in dirs_to_search
-
-                    # If not a clear pair, check for a single file
-                    all_edfs = list(search_dir.glob('*.edf'))
-                    if len(all_edfs) == 1:
-                        files_with_mode.append((all_edfs, 'one_file'))
-                    elif len(all_edfs) > 1 and not (len(l_files) == 1 and len(r_files) == 1):
+                        files_with_mode.append((l_files[0], 'two_files'))
+                    elif len(all_edfs) == 1:
+                        files_with_mode.append((all_edfs[0], 'one_file'))
+                    elif len(all_edfs) > 1:
                         logger.warning(f"Found multiple EDF files in '{search_dir}' that do not form a clear L/R pair. Skipping.")
-                    elif not all_edfs:
-                        raise StopIteration # No files found
-
+                    else:
+                        raise StopIteration
             except StopIteration:
-                logger.warning(f"Could not find a complete recording in '{search_dir}'. Skipping.")
+                logger.warning(f"Could not find a complete recording in '{item}'. Skipping.")
                 continue
-        
+
         if not files_with_mode:
             logger.warning(f"Could not find any suitable recordings in the specified locations.")
         else:
@@ -105,14 +138,15 @@ class BatchScorer:
                 logger.info(f"  - {file}{mode_str}")
         return files_with_mode
 
-    def score(self, plot=True, gen_stats=True):
+    def score(self, gen_stats=True):
         """
         Runs the scoring process for all found recordings.
+
         Args:
-            plot (bool): Generate a dashboard plot for each recording.
             gen_stats (bool): Generate sleep statistics for each recording.
+
         Returns:
-            tuple: A tuple containing (number_of_files_successfully_processed, total_files_found).
+            tuple: (number_of_files_successfully_processed, total_files_found)
         """
         if not self.files_to_process:
             return 0, 0
@@ -140,13 +174,16 @@ class BatchScorer:
                     'input': str(file),
                     'output': str(recording_output_dir),
                     'model': self.model_name,
-                    'channels': self.ch_names
+                    'channels': self.ch_names,
+                    'hypnogram': self.save_hypnogram,
+                    'probabilities': self.save_probabilities,
+                    'plot': self.gen_plot,
                 }
                 if self.type == 'forehead':
                     scorer_kwargs['zmax_mode'] = zmax_mode
-                
+
                 scorer = NIDRA.scorer(**scorer_kwargs)
-                hypnogram, _ = scorer.score(plot=plot)
+                hypnogram, _ = scorer.score()
                 logger.info("Autoscoring completed.")
                 
                 if gen_stats:
@@ -176,11 +213,11 @@ class BatchScorer:
         
         return processed_count, len(self.files_to_process)
 
-def batch_scorer(input_dir, output=None, type=None, model=None, dir_list=None, channels=None):
+def batch_scorer(input_dir, output=None, type=None, model=None, dir_list=None, channels=None, hypnogram=None, probabilities=False, plot=False):
     """
     Factory function to create a BatchScorer instance.
     This is the recommended entry point for batch processing.
- 
+
     Args:
         input_dir (str): Path to the main study directory that contains one subfolder per recording.
         output (str, optional): Base directory where batch results will be saved. Defaults to input_dir when omitted.
@@ -188,12 +225,25 @@ def batch_scorer(input_dir, output=None, type=None, model=None, dir_list=None, c
         model (str, optional): Name of the model to use.
         dir_list (list, optional): A list of specific directories to process instead of scanning all subdirectories.
         channels (list, optional): A list of channel names to use.
- 
+        hypnogram (bool, optional): Save hypnogram CSV. Defaults to True for file inputs.
+        probabilities (bool, optional): Save classifier probabilities CSV. Defaults to False.
+        plot (bool, optional): Save dashboard plot. Defaults to False.
+
     Returns:
         BatchScorer: Configured BatchScorer. Call .score() to run processing. A new timestamped folder 'autoscorer_output_run_YYYYmmdd_HHMMSS'
                      will be created inside output to contain all per-recording outputs.
     """
-    return BatchScorer(input_dir, output=output, type=type, model=model, dir_list=dir_list, channels=channels)
+    return BatchScorer(
+        input_dir,
+        output=output,
+        type=type,
+        model=model,
+        dir_list=dir_list,
+        channels=channels,
+        hypnogram=hypnogram,
+        probabilities=probabilities,
+        plot=plot,
+    )
 
 def calculate_font_size(screen_height, percentage, min_size, max_size):
     """Calculates font size as a percentage of screen height with min/max caps."""
