@@ -131,17 +131,17 @@ function initializeApp() {
         const scoringMode = document.querySelector('input[name="scoring-mode"]:checked').value;
         const payload = {
             input_dir: document.getElementById('input-dir').value,
-            output_dir: document.getElementById('output-dir').value,
+            output: document.getElementById('output-dir').value,
             data_source: dataSourceSelect.value,
-            model_name: modelNameSelect.value,
+            model: modelNameSelect.value,
             plot: document.getElementById('gen-plot').checked,
             gen_stats: document.getElementById('gen-stats').checked,
             score_subdirs: scoringMode === 'subdirs',
             score_from_file: scoringMode === 'from_file',
-            ch_names: window.selectedChannels || null
+            channels: window.selectedChannels || null
         };
 
-        if (!payload.input_dir || !payload.output_dir) {
+        if (!payload.input_dir || !payload.output) {
             alert('Please provide both an Input and an Output directory path.');
             return;
         }

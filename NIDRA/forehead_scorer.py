@@ -10,17 +10,17 @@ class ForeheadScorer:
     """
     Scores sleep stages from forehead EEG data.
     """
-    def __init__(self, input_file: str = None, output_dir: str = None, data: np.ndarray = None,
-                 sfreq: float = None, model_name: str = "ez6moe",
-                 zmax_mode: str = 'two_files', ch_names: list = None,
+    def __init__(self, input: str = None, output: str = None, data: np.ndarray = None,
+                 sfreq: float = None, model: str = "ez6moe",
+                 zmax_mode: str = 'two_files', channels: list = None,
                  create_output_files: bool = None):
-        if input_file is None and data is None:
-            raise ValueError("Either 'input_file' or 'data' must be provided.")
+        if input is None and data is None:
+            raise ValueError("Either 'input' or 'data' must be provided.")
         if data is not None and sfreq is None:
             raise ValueError("'sfreq' must be provided when 'data' is given.")
-
-        if input_file:
-            input_path = Path(input_file)
+ 
+        if input:
+            input_path = Path(input)
             
             if zmax_mode == 'one_file':
                 if input_path.is_dir():
@@ -63,24 +63,24 @@ class ForeheadScorer:
             self.input_file = None
             self.base_filename = "numpy_input"
 
-        if output_dir is None:
+        if output is None:
             if input_dir:
-                output_dir = Path(input_dir) / "autoscorer_output"
+                output = Path(input_dir) / "autoscorer_output"
 
         if create_output_files is None:
-            self.create_output_files = True if input_file else False
+            self.create_output_files = True if input else False
         else:
             self.create_output_files = create_output_files
-
-        if output_dir is None and self.create_output_files:
-            raise ValueError("output_dir must be specified when create_output_files is True and it cannot be inferred from input_file.")
-
-        self.output_dir = Path(output_dir) if output_dir is not None else None
+ 
+        if output is None and self.create_output_files:
+            raise ValueError("output must be specified when create_output_files is True and it cannot be inferred from input.")
+ 
+        self.output_dir = Path(output) if output is not None else None
         self.input_data = data
         self.sfreq = sfreq
-        self.model_name = model_name
+        self.model_name = model
         self.zmax_mode = zmax_mode
-        self.ch_names = ch_names
+        self.ch_names = channels
         self.session = None
         self.input_name = None
         self.output_name = None
@@ -117,7 +117,7 @@ class ForeheadScorer:
             nclasses=self.probabilities.shape[1],
             figoutdir=self.output_dir,
             filename=plot_filename,
-            scorer_type='forehead'
+            type='forehead'
         )
         print(f"Dashboard plot saved to {self.output_dir / plot_filename}")
 

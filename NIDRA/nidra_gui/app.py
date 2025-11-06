@@ -249,7 +249,7 @@ def start_scoring():
         return jsonify({'status': 'error', 'message': 'Scoring is already in progress.'}), 409
 
     data = request.json
-    required_keys = ['input_dir', 'output_dir', 'data_source', 'model_name', 'score_subdirs']
+    required_keys = ['input_dir', 'output', 'data_source', 'model', 'score_subdirs']
     if not all(key in data for key in required_keys):
         return jsonify({'status': 'error', 'message': 'Missing required parameters.'}), 400
 
@@ -261,13 +261,13 @@ def start_scoring():
         target=scoring_thread_wrapper,
         args=(
             data['input_dir'],
-            data['output_dir'],
+            data['output'],
             data.get('score_subdirs', False) or data.get('score_from_file', False),
             data['data_source'],
-            data['model_name'],
+            data['model'],
             data.get('plot', False),
             data.get('gen_stats', False),
-            data.get('ch_names')
+            data.get('channels')
         )
     )
     worker_thread.start()
@@ -474,7 +474,7 @@ def get_channels():
 
 
 # this enables reporting on successful/failed scorings
-def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, model_name, plot, gen_stats, ch_names=None):
+def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model, plot, gen_stats, channels=None):
     """
     Manages the global running state and executes the scoring process.
     This function is intended to be run in a separate thread.
@@ -498,11 +498,11 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
 
             batch = utils.batch_scorer(
                 input_dir=input_dir,
-                output_dir=output_dir,
-                scorer_type=scorer_type,
-                model_name=model_name,
+                output=output,
+                type=scorer_type,
+                model=model,
                 dir_list=dir_list,
-                ch_names=ch_names
+                channels=channels
             )
             success_count, total_count = batch.score(plot=plot, gen_stats=gen_stats)
         else:
@@ -540,7 +540,7 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
             logger.info(f"Processing: {input_file}")
             logger.info("-" * 80)
             total_count = 1
-            if _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot, zmax_mode, ch_names):
+            if _run_scoring(input_file, output, data_source, model, gen_stats, plot, zmax_mode, channels):
                 success_count = 1
 
     except (FileNotFoundError, ValueError) as e:
@@ -560,26 +560,26 @@ def scoring_thread_wrapper(input_dir, output_dir, score_subdirs, data_source, mo
 
         logger.info("\n" + "="*80 + "\nScoring process finished.\n" + "="*80)
 
-def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plot, zmax_mode=None, ch_names=None):
+def _run_scoring(input, output, data_source, model, gen_stats, plot, zmax_mode=None, channels=None):
     """
     Performs scoring on a single recording file.
     """
-    if ch_names:
-        logger.info(f"Using custom channel selection: {ch_names}")
+    if channels:
+        logger.info(f"Using custom channel selection: {channels}")
     try:
         start_time = time.time()
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
         
         scorer_kwargs = {
-            'input_file': str(input_file),
-            'output_dir': output_dir,
-            'model_name': model_name,
-            'ch_names': ch_names
+            'input': str(input),
+            'output': output,
+            'model': model,
+            'channels': channels
         }
         if scorer_type == 'forehead':
             scorer_kwargs['zmax_mode'] = zmax_mode
 
-        scorer = scorer_factory(scorer_type=scorer_type, **scorer_kwargs)
+        scorer = scorer_factory(type=scorer_type, **scorer_kwargs)
         
         hypnogram, probabilities = scorer.score(plot=plot)
 
@@ -587,7 +587,7 @@ def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plo
             logger.info("Calculating sleep statistics...")
             try:
                 stats = utils.compute_sleep_stats(hypnogram.tolist())
-                stats_output_path = Path(output_dir) / f"{input_file.parent.name}_{input_file.stem}_sleep_statistics.csv"
+                stats_output_path = Path(output) / f"{input.parent.name}_{input.stem}_sleep_statistics.csv"
                 with open(stats_output_path, 'w') as f:
                     f.write("Metric,Value\n")
                     for key, value in stats.items():
@@ -597,16 +597,16 @@ def _run_scoring(input_file, output_dir, data_source, model_name, gen_stats, plo
                             f.write(f"{key},{value}\n")
                 logger.info(f"Sleep statistics saved.")
             except Exception as e:
-                logger.error(f"Could not generate sleep statistics for {input_file.name}: {e}", exc_info=True)
+                logger.error(f"Could not generate sleep statistics for {input.name}: {e}", exc_info=True)
         
         logger.info("Autoscoring process completed.")
 
         execution_time = time.time() - start_time
-        logger.info(f">> SUCCESS: Finished processing {input_file.name} in {execution_time:.2f} seconds.")
-        logger.info(f"  Results saved to: {output_dir}")
+        logger.info(f">> SUCCESS: Finished processing {input.name} in {execution_time:.2f} seconds.")
+        logger.info(f"  Results saved to: {output}")
         return True
     except Exception as e:
-        logger.error(f">> FAILED to process {input_file.name}: {e}", exc_info=True)
+        logger.error(f">> FAILED to process {input.name}: {e}", exc_info=True)
         return False
 
 

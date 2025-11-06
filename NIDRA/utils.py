@@ -19,25 +19,25 @@ class BatchScorer:
     A class to handle batch scoring of a study directory.
     It finds all valid recordings in subdirectories and scores them in a single run.
     """
-    def __init__(self, input_dir, output_dir=None, scorer_type=None, model_name=None, dir_list=None, ch_names=None):
+    def __init__(self, input_dir, output=None, type=None, model=None, dir_list=None, channels=None):
         self.input_dir = Path(input_dir) if input_dir else None
 
-        # Default output_dir to input_dir if not provided
-        if output_dir is None:
+        # Default output to input_dir if not provided
+        if output is None:
             if self.input_dir is not None:
                 self.output_dir = self.input_dir
-                logger.info(f"No output_dir specified. Using input_dir as output_dir: {self.output_dir}")
+                logger.info(f"No output specified. Using input_dir as output: {self.output_dir}")
             else:
-                raise ValueError("output_dir must be specified when input_dir is not provided.")
+                raise ValueError("output must be specified when input_dir is not provided.")
         else:
-            self.output_dir = Path(output_dir)
+            self.output_dir = Path(output)
 
-        self.scorer_type = scorer_type
-        if self.scorer_type is None:
-            raise ValueError("scorer_type must be specified: 'forehead' or 'psg'.")
-        self.model_name = model_name
+        self.type = type
+        if self.type is None:
+            raise ValueError("type must be specified: 'forehead' or 'psg'.")
+        self.model_name = model
         self.dir_list = dir_list
-        self.ch_names = ch_names
+        self.ch_names = channels
         self.files_to_process = self._find_files()
 
     def _find_files(self):
@@ -66,7 +66,7 @@ class BatchScorer:
                 continue
 
             try:
-                if self.scorer_type == 'psg':
+                if self.type == 'psg':
                     file = next(search_dir.glob('*.edf'))
                     files_with_mode.append((file, None))
                 else:  # 'forehead', auto-detect mode
@@ -136,13 +136,13 @@ class BatchScorer:
                 start_time = time.time()
                 
                 scorer_kwargs = {
-                    'scorer_type': self.scorer_type,
-                    'input_file': str(file),
-                    'output_dir': str(recording_output_dir),
-                    'model_name': self.model_name,
-                    'ch_names': self.ch_names
+                    'type': self.type,
+                    'input': str(file),
+                    'output': str(recording_output_dir),
+                    'model': self.model_name,
+                    'channels': self.ch_names
                 }
-                if self.scorer_type == 'forehead':
+                if self.type == 'forehead':
                     scorer_kwargs['zmax_mode'] = zmax_mode
                 
                 scorer = NIDRA.scorer(**scorer_kwargs)
@@ -176,24 +176,24 @@ class BatchScorer:
         
         return processed_count, len(self.files_to_process)
 
-def batch_scorer(input_dir, output_dir=None, scorer_type=None, model_name=None, dir_list=None, ch_names=None):
+def batch_scorer(input_dir, output=None, type=None, model=None, dir_list=None, channels=None):
     """
     Factory function to create a BatchScorer instance.
     This is the recommended entry point for batch processing.
-
+ 
     Args:
         input_dir (str): Path to the main study directory that contains one subfolder per recording.
-        output_dir (str, optional): Base directory where batch results will be saved. Defaults to input_dir when omitted.
-        scorer_type (str): Type of data, either 'forehead' or 'psg'.
-        model_name (str, optional): Name of the model to use.
+        output (str, optional): Base directory where batch results will be saved. Defaults to input_dir when omitted.
+        type (str): Type of data, either 'forehead' or 'psg'.
+        model (str, optional): Name of the model to use.
         dir_list (list, optional): A list of specific directories to process instead of scanning all subdirectories.
-        ch_names (list, optional): A list of channel names to use.
-
+        channels (list, optional): A list of channel names to use.
+ 
     Returns:
         BatchScorer: Configured BatchScorer. Call .score() to run processing. A new timestamped folder 'autoscorer_output_run_YYYYmmdd_HHMMSS'
-                     will be created inside output_dir to contain all per-recording outputs.
+                     will be created inside output to contain all per-recording outputs.
     """
-    return BatchScorer(input_dir, output_dir, scorer_type, model_name, dir_list=dir_list, ch_names=ch_names)
+    return BatchScorer(input_dir, output=output, type=type, model=model, dir_list=dir_list, channels=channels)
 
 def calculate_font_size(screen_height, percentage, min_size, max_size):
     """Calculates font size as a percentage of screen height with min/max caps."""

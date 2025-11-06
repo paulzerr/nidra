@@ -100,7 +100,7 @@ def _remap_hypnogram_for_plotting(hyp):
     return hyp_plot
 
 
-def plot_hypnodensity(hyp, ypred, raw, nclasses=6, figoutdir='./', filename='dashboard.png', titl="ezscore-f", scorer_type='forehead'):
+def plot_hypnodensity(hyp, ypred, raw, nclasses=6, figoutdir='./', filename='dashboard.png', titl="ezscore-f", type='forehead'):
     """
     Plots a hypnodensity graph, which is a combination of a hypnogram and the softmax probabilities of the sleep stage predictions.
 
@@ -116,7 +116,7 @@ def plot_hypnodensity(hyp, ypred, raw, nclasses=6, figoutdir='./', filename='das
         The directory where the figure will be saved.
     filename : str
         The filename for the saved plot (default: 'dashboard.png').
-    scorer_type : str
+    type : str
         The type of scorer ('forehead' or 'psg'), which determines the plot layout.
     """
     try:
@@ -188,7 +188,7 @@ def plot_hypnodensity(hyp, ypred, raw, nclasses=6, figoutdir='./', filename='das
         axs['a'].legend(loc="right")
 
         # --- Spectrogram plotting ---
-        if scorer_type == 'psg':
+        if type == 'psg':
             # Create a list of preferred channels (EEG but not EOG)
             preferred_chans = [ch for ch in raw.ch_names if 'EEG' in ch.upper() and 'EOG' not in ch.upper()]
             

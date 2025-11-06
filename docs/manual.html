@@ -213,21 +213,21 @@ psg_study/
             <h4><code>NIDRA.scorer(...)</code> Parameters</h4>
             <p>When creating a scorer, you must provide the following arguments:</p>
             <ul>
-                <li><code>scorer_type</code> (str): The type of data. Must be either <code>'forehead'</code> or <code>'psg'</code>.</li>
-                <li><code>output_dir</code> (str): The path to the directory where results will be saved.</li>
-                <li><code>input_file</code> (str, optional): The full path to the input EDF file. Required if not providing data as a NumPy array.</li>
-                <li><code>data</code> (np.ndarray, optional): An in-memory NumPy array of the EEG/PSG data. If you use this, <code>input_file</code> should be <code>None</code>.</li>
-                <li><code>model_name</code> (str, optional): The name of the model to use. If not provided, a default model will be selected.</li>
+                <li><code>type</code> (str): The type of data. Must be either <code>'forehead'</code> or <code>'psg'</code>.</li>
+                <li><code>output</code> (str): The path to the directory where results will be saved.</li>
+                <li><code>input</code> (str, optional): The full path to the input EDF file. Required if not providing data as a NumPy array.</li>
+                <li><code>data</code> (np.ndarray, optional): An in-memory NumPy array of the EEG/PSG data. If you use this, <code>input</code> should be <code>None</code>.</li>
+                <li><code>model</code> (str, optional): The name of the model to use. If not provided, a default model will be selected.</li>
                 <li><strong>For PSG data from NumPy array:</strong>
                     <ul>
                         <li><code>sfreq</code> (float): The sampling frequency of the data.</li>
-                        <li><code>ch_names</code> (list of str): A list of channel names.</li>
+                        <li><code>channels</code> (list of str): A list of channel names.</li>
                     </ul>
                 </li>
                 <li><strong>For Forehead EEG data from file:</strong>
                     <ul>
-                        <li><code>zmax_mode</code> (str, optional): How to treat the input file(s). Can be <code>'two_files'</code> (default) where NIDRA looks for a corresponding L/R file, or <code>'one_file'</code> where both channels are in the <code>input_file</code>.</li>
-                        <li><code>ch_names</code> (list of str, optional): When using <code>'one_file'</code> mode, you can specify the names of the two channels to use, e.g., <code>['EEG L', 'EEG R']</code>. If not provided, the first two channels in the file are used.</li>
+                        <li><code>zmax_mode</code> (str, optional): How to treat the input file(s). Can be <code>'two_files'</code> (default) where NIDRA looks for a corresponding L/R file, or <code>'one_file'</code> where both channels are in the <code>input</code>.</li>
+                        <li><code>channels</code> (list of str, optional): When using <code>'one_file'</code> mode, you can specify the names of the two channels to use, e.g., <code>['EEG L', 'EEG R']</code>. If not provided, the first two channels in the file are used.</li>
                     </ul>
                 </li>
             </ul>
@@ -244,24 +244,37 @@ psg_study/
                 <li><strong>probabilities</strong> (<code>numpy.ndarray</code>): A 2D array of shape (n_epochs, n_classes). Each row corresponds to an epoch, and each column contains the model's predicted probability for a specific sleep stage.</li>
             </ol>
 
-            <h3>Example 1: Scoring a Forehead EEG File</h3>
-            <p>This example shows how to score a single forehead EEG recording from an EDF file. This is the typical use case for ZMax data where the left and right channels are in a single file. You must specify the channel names using <code>ch_names</code>.</p>
+            <h3>Example 1: Scoring a single wearable-EEG recording (minimal example)</h3>
             <pre>
 import NIDRA
 
-# Initialize the scorer
 scorer = NIDRA.scorer(
-    scorer_type='forehead',
-    input_file='/path/to/your/data/zmax_recording.edf',
-    output_dir='/path/to/your/output',
-    model_name='ez6moe',
-    zmax_mode='one_file',
-    ch_names=['EEG L', 'EEG R']
+    type = 'forehead',
+    input = '/path/to/edf/or/folder/'
 )
 
-# Run scoring
-hypnogram, probabilities = scorer.score(plot=True)
+scorer.score()
 </pre>
+
+            <h3>Example 2: Scoring a single wearable-EEG recording (specifying optional parameters)</h3>
+            <pre>
+import NIDRA
+
+scorer = NIDRA.scorer(
+    type = 'forehead',
+    input = '/path/to/edf/',
+    output = '/path/to/output/folder/',
+    model = 'ez6moe',
+    channels = ['eegl','eegr'],
+
+
+)
+
+scorer.score()
+</pre>
+
+
+
 
             <h3>Example 2: Scoring a PSG File</h3>
             <p>This example shows how to score a single PSG recording from an EDF file.</p>
@@ -270,10 +283,10 @@ import NIDRA
 
 # Initialize the scorer
 scorer = NIDRA.scorer(
-    scorer_type='psg',
-    input_file='/path/to/your/data/sleep_recording.edf',
-    output_dir='/path/to/your/output',
-    model_name='u-sleep-nsrr-2024'
+    type='psg',
+    input='/path/to/your/data/sleep_recording.edf',
+    output='/path/to/your/output',
+    model='u-sleep-nsrr-2024'
 )
 
 # Run scoring
@@ -289,15 +302,16 @@ import numpy as np
 
 # Create some dummy PSG data
 sfreq = 256
-ch_names = ['F3-A2', 'C4-A1', 'O2-A1', 'EOG-L']
+channels = ['F3-A2', 'C4-A1', 'O2-A1', 'EOG-L']
 n_samples = sfreq * 60 * 60  # 1 hour of data
-dummy_data = np.random.randn(len(ch_names), n_samples)
-
+dummy_data = np.random.randn(len(channels), n_samples)
+ 
 scorer = NIDRA.scorer(
-    scorer_type='psg',
-    output_dir='/path/to/numpy_psg_output',
+    type='psg',
+    output='/path/to/numpy_psg_output',
     data=dummy_data,
-    sfreq=sfreq
+    sfreq=sfreq,
+    channels=channels
 )
 hypnogram, probabilities = scorer.score()
 
@@ -309,9 +323,9 @@ import NIDRA
 
 batch = NIDRA.batch_scorer(
     input_dir='/path/to/your/study_data',
-    output_dir='/path/to/your/study_output',
-    scorer_type='forehead',  # or 'psg'
-    model_name='ez6moe'
+    output='/path/to/your/study_output',
+    type='forehead',  # or 'psg'
+    model='ez6moe'
 )
 
 batch.score()

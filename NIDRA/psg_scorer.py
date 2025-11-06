@@ -23,15 +23,15 @@ class PSGScorer:
     """
     Scores sleep stages from PSG data.
     """
-    def __init__(self, input_file: str = None, output_dir: str = None, data: np.ndarray = None, ch_names: List[str] = None, sfreq: float = None, model_name: str = "u-sleep-nsrr-2024_eeg", epoch_sec: int = 30, create_output_files: bool = None):
+    def __init__(self, input: str = None, output: str = None, data: np.ndarray = None, channels: List[str] = None, sfreq: float = None, model: str = "u-sleep-nsrr-2024_eeg", epoch_sec: int = 30, create_output_files: bool = None):
         self.logger = logging.getLogger(__name__)
-        if input_file is None and data is None:
-            raise ValueError("Either 'input_file' or 'data' must be provided.")
+        if input is None and data is None:
+            raise ValueError("Either 'input' or 'data' must be provided.")
         if data is not None and sfreq is None:
             raise ValueError("'sfreq' must be provided when 'data' is given.")
 
-        if input_file:
-            input_path = Path(input_file)
+        if input:
+            input_path = Path(input)
             if input_path.is_dir():
                 input_dir = input_path
                 try:
@@ -47,26 +47,26 @@ class PSGScorer:
             self.input_file = None
             self.base_filename = "numpy_input"
 
-        if output_dir is None:
+        if output is None:
             if input_dir:
-                output_dir = Path(input_dir) / "autoscorer_output"
+                output = Path(input_dir) / "autoscorer_output"
 
         # if no output file parameter given, and we're using numpy array data input, no outfiles should be written
         # otherwise, if we're scoring edf's we do want to write output files by default
         if create_output_files is None:
-            self.create_output_files = True if input_file else False
+            self.create_output_files = True if input else False
         else:
             # if we specified output file parameter, use that specification
             self.create_output_files = create_output_files
 
-        if output_dir is None and self.create_output_files:
-            raise ValueError("output_dir must be specified when create_output_files is True and it cannot be inferred from input_file.")
-
-        self.output_dir = Path(output_dir) if output_dir is not None else None
+        if output is None and self.create_output_files:
+            raise ValueError("output must be specified when create_output_files is True and it cannot be inferred from input.")
+ 
+        self.output_dir = Path(output) if output is not None else None
         self.input_data = data
-        self.ch_names = ch_names
+        self.ch_names = channels
         self.sfreq = sfreq
-        self.model_name = model_name
+        self.model_name = model
         self.epoch_sec = 30 #epoch_sec # we ignore this input for now and enforce 30s epochs
         self.new_sample_rate = 128 # resample to 128 for usleep models
         self.auto_channel_grouping = ['EEG', 'EOG']
@@ -106,7 +106,7 @@ class PSGScorer:
                 nclasses=self.probabilities.shape[1],
                 figoutdir=self.output_dir,
                 filename=plot_filename,
-                scorer_type='psg'
+                type='psg'
             )
             print(f"Dashboard plot saved to {self.output_dir / plot_filename}")
         else:
