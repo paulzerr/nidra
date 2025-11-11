@@ -144,7 +144,6 @@ class PSGScorer:
         for i in range(psg_data.shape[1]):
             channel_data = psg_data[:, i]
             iqr = np.nanpercentile(channel_data, 75) - np.nanpercentile(channel_data, 25)
-            iqr[iqr == 0] = 1.0
             threshold = 20 * iqr
             psg_data[:, i] = np.clip(channel_data, -threshold, threshold)
 

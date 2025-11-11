@@ -250,7 +250,7 @@ batch = NIDRA.batch_scorer(
 batch.score()
 </pre>
             <h3>Example 4: Scoring in-memory data (e.g. real-time application)</h3>
-            <p>You can also score data that you already have in memory as a NumPy array. This is useful for real-time applications or custom data loading pipelines. When scoring PSG data from an array, you must provide the sampling frequency (<code>sfreq</code>). Providing channel names is recommended but optional; if not provided, they will be auto-generated. All channels are then assumed to contain EEG data. By default, no output files are generated, but this can be enabled if desired.</p>
+            <p>You can also score data that you already have in memory as an array. This is useful for real-time applications or custom data loading pipelines. When scoring PSG data from an array, you must provide the sampling frequency (<code>sfreq</code>). Providing channel names is recommended but optional; if not provided, they will be auto-generated. All channels are then assumed to contain EEG data. By default, no output files are generated, but this can be enabled if desired.</p>
             <pre>
 # Create some dummy PSG data
 import numpy as np
@@ -280,7 +280,7 @@ hypnogram, probabilities = scorer.score()
 <br>
 <h3>Reference</h3>
 
-<p>Single user-facing entry point <code>NIDRA.scorer(...)</code>. The concrete scorer is selected by <code>scorer_type</code>. Then call <code>.score()</code> to run inference. This unified reference clarifies which parameters are required, optional, and their defaults across PSG/Forehead and file/NumPy scenarios.</p>
+<p>Single user-facing entry point <code>NIDRA.scorer(...)</code>. The concrete scorer is selected by <code>scorer_type</code>. Then call <code>.score()</code> to run inference. This unified reference clarifies which parameters are required, optional, and their defaults across PSG/Forehead and file/array scenarios.</p>
 
 <h4>Entrypoint</h4>
 <pre><code>NIDRA.scorer(scorer_type: str, **kwargs) -> Scorer
@@ -337,7 +337,7 @@ Scorer.score(plot: bool = False) -> tuple[numpy.ndarray, numpy.ndarray]</code></
       <td>
         Path to input recording file.<br/>
         PSG: EDF/BDF file.<br/>
-        Forehead: EDF input. For <code>zmax_mode='two_files'</code>, pass the LEFT-channel file; the RIGHT-channel is inferred from the same folder. For <code>zmax_mode='one_file'</code>, both channels are in a single EDF.
+        Forehead: EDF input. For <code>zmax_mode='two_files'</code>, pass the LEFT or RIGHT channel file; the other file is inferred from the same folder. For <code>zmax_mode='one_file'</code>, both channels are in a single EDF.
       </td>
     </tr>
     <tr>
@@ -358,15 +358,15 @@ Scorer.score(plot: bool = False) -> tuple[numpy.ndarray, numpy.ndarray]</code></
       <td><em>optional</em></td>
       <td>Required when using <code>data</code></td>
       <td>PSG | Forehead</td>
-      <td>Sampling frequency (Hz) for NumPy input.</td>
+      <td>Sampling frequency (Hz) for array input.</td>
     </tr>
     <tr>
       <td><code>ch_names</code></td>
       <td><code>list[str]</code></td>
       <td><em>optional</em></td>
-      <td>Optional (NumPy PSG)</td>
+      <td>Optional (array PSG)</td>
       <td>PSG</td>
-      <td>Channel names for NumPy PSG input. Auto-generated if omitted.</td>
+      <td>Channel names for array input. Auto-generated if omitted.</td>
     </tr>
     <tr>
       <td><code>model_name</code></td>
@@ -399,7 +399,7 @@ Scorer.score(plot: bool = False) -> tuple[numpy.ndarray, numpy.ndarray]</code></
       <td>Forehead</td>
       <td>
         ZMax input layout.<br/>
-        <code>'two_files'</code>: pass LEFT EDF; RIGHT inferred in same folder.<br/>
+        <code>'two_files'</code>: pass LEFT or RIGHT EDF; RIGHT inferred in same folder.<br/>
         <code>'one_file'</code>: both channels in one EDF (optionally set <code>zmax_channels</code>).
       </td>
     </tr>
@@ -416,7 +416,7 @@ Scorer.score(plot: bool = False) -> tuple[numpy.ndarray, numpy.ndarray]</code></
       <td><code>bool | None</code></td>
       <td>
         <code>True</code> when <code>input_file</code> is provided;<br/>
-        <code>False</code> when scoring from <code>data</code> (NumPy)
+        <code>False</code> when scoring from <code>data</code> (array)
       </td>
       <td>Optional</td>
       <td>PSG | Forehead</td>
@@ -478,19 +478,19 @@ Scorer.score(plot: bool = False) -> tuple[numpy.ndarray, numpy.ndarray]</code></
 <h4>Minimal requirements by scenario (no examples)</h4>
 <ul>
   <li>PSG from file: <code>scorer_type='psg'</code>, <code>input_file</code>, <code>output_dir</code></li>
-  <li>PSG from NumPy: <code>scorer_type='psg'</code>, <code>data</code>, <code>sfreq</code>, <code>output_dir</code> (<code>ch_names</code> optional)</li>
-  <li>Forehead from file (two-file ZMax): <code>scorer_type='forehead'</code>, <code>input_file</code> (LEFT), <code>output_dir</code> (<code>zmax_mode</code> defaults to <code>two_files</code>)</li>
+  <li>PSG from array: <code>scorer_type='psg'</code>, <code>data</code>, <code>sfreq</code>, <code>output_dir</code> (<code>ch_names</code> optional)</li>
+  <li>Forehead from file (two-file ZMax): <code>scorer_type='forehead'</code>, <code>input_file</code>, <code>output_dir</code> (<code>zmax_mode</code> defaults to <code>two_files</code>)</li>
   <li>Forehead from file (one-file): <code>scorer_type='forehead'</code>, <code>input_file</code>, <code>output_dir</code>, <code>zmax_mode='one_file'</code> (<code>zmax_channels</code> optional)</li>
-  <li>Forehead from NumPy: <code>scorer_type='forehead'</code>, <code>data</code> (2×N), <code>sfreq</code>, <code>output_dir</code></li>
+  <li>Forehead from array: <code>scorer_type='forehead'</code>, <code>data</code> (2×N), <code>sfreq</code>, <code>output_dir</code></li>
 </ul>
 
 <h4>Additional semantics</h4>
 <ul>
   <li>Provide exactly one of <code>input_file</code> or (<code>data</code> + <code>sfreq</code>).</li>
-  <li>Forehead NumPy input must be exactly two channels (2×N).</li>
-  <li>ZMax two-file mode: pass the LEFT-channel EDF; RIGHT is inferred in the same folder via L/R naming.</li>
+  <li>Forehead array input must be exactly two channels (2×N).</li>
+  <li>ZMax two-file mode: pass the LEFT or RIGHT channel EDF; the other will be inferred in the same folder via L/R naming.</li>
   <li>ZMax one-file mode: optionally specify <code>zmax_channels</code>; otherwise the first two channels are used.</li>
-  <li>PSG NumPy accepts any channel count; <code>ch_names</code> optional and auto-generated if omitted.</li>
+  <li>PSG array accepts any channel count; <code>ch_names</code> optional and auto-generated if omitted.</li>
   <li>PSG default model is EEG-only (<code>..._eeg</code>). Specify a non-EEG-only name (e.g. <code>u-sleep-nsrr-2024</code>) for EOG-aware inference.</li>
   <li>All models operate on 30-second epochs; outputs align to full epochs.</li>
 </ul>

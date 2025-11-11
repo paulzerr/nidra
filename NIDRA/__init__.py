@@ -18,4 +18,4 @@ def scorer(type: str, **kwargs):
     else:
         raise ValueError(f"Unknown scorer type: {type}")
  
-from NIDRA.utils import batch_scorer
+from NIDRA.utils import batch_scorer, find_files

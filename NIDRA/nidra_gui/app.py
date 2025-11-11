@@ -267,7 +267,6 @@ def start_scoring():
             data['model'],
             data.get('plot', False),
             data.get('probabilities', False),
-            data.get('gen_stats', False),
             data.get('channels')
         )
     )
@@ -475,7 +474,7 @@ def get_channels():
 
 
 # this enables reporting on successful/failed scorings
-def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model, plot, probabilities, gen_stats, channels=None):
+def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model, plot, probabilities, channels=None):
     """
     Manages the global running state and executes the scoring process.
     This function is intended to be run in a separate thread.
@@ -507,43 +506,12 @@ def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model,
                 probabilities=probabilities,
                 plot=plot
             )
-            success_count, total_count = batch.score(gen_stats=gen_stats)
+            success_count, total_count = batch.score()
         else:
-            # Logic for single scoring.
-            logger.info(f"Looking for recordings in '{input_dir}'...")
-            input_path = Path(input_dir)
-            zmax_mode = None
-            try:
-                if scorer_type == 'psg':
-                    input_file = next(input_path.glob('*.edf'))
-                else:  # for zmax recordings, auto-detect
-                    l_files = list(input_path.glob('*[lL].edf'))
-                    r_files = list(input_path.glob('*[rR].edf'))
-                    all_edfs = list(input_path.glob('*.edf'))
-
-                    if len(l_files) == 1 and len(r_files) == 1:
-                        zmax_mode = 'two_files'
-                        input_file = l_files[0]
-                    elif len(all_edfs) == 1:
-                        zmax_mode = 'one_file'
-                        input_file = all_edfs[0]
-                    else:
-                        raise StopIteration # Let the exception handling below deal with it
-
-            except StopIteration:
-                if any(item.is_dir() for item in input_path.iterdir()):
-                    raise ValueError(
-                        f"No recordings found in '{input_dir}', but subdirectories were detected."
-                        "\n\n"
-                        "If your recordings are in separate subfolders, please select the 'Score all recordings (in subfolders)' option."
-                    )
-                raise FileNotFoundError(f"Could not find any suitable recordings in '{input_dir}'. Please check the input directory and data source settings.")
-
-            logger.info("\n" + "-" * 80)
-            logger.info(f"Processing: {input_file}")
-            logger.info("-" * 80)
+            # Single-recording scoring: resolve exactly one target and score it
+            logger.info(f"Processing single recording at '{input_dir}'...")
             total_count = 1
-            if _run_scoring(input_file, output, data_source, model, gen_stats, plot, probabilities, zmax_mode, channels):
+            if _run_scoring(input_dir, output, data_source, model, plot, probabilities, channels):
                 success_count = 1
 
     except (FileNotFoundError, ValueError) as e:
@@ -563,55 +531,54 @@ def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model,
 
         logger.info("\n" + "="*80 + "\nScoring process finished.\n" + "="*80)
 
-def _run_scoring(input, output, data_source, model, gen_stats, plot, probabilities, zmax_mode=None, channels=None):
+def _run_scoring(input, output, data_source, model, plot, probabilities, channels=None):
     """
-    Performs scoring on a single recording file.
+    Performs scoring on a single recording (file or directory).
+    Uses utils.find_files to resolve exactly one target and delegates to the scorer.
     """
     if channels:
         logger.info(f"Using custom channel selection: {channels}")
     try:
         start_time = time.time()
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
-        
+
+        # Resolve exactly one target (file or directory)
+        targets = utils.find_files(input_dir=input, type=scorer_type, dir_list=[input])
+        if not targets:
+            raise FileNotFoundError(f"Could not find any suitable recordings in '{input}'. Please check the input path and data source settings.")
+        if len(targets) > 1:
+            raise ValueError(
+                f"Multiple recordings were detected for '{input}'. "
+                "Please select a single recording folder/file, or choose 'Score all recordings (in subfolders)'."
+            )
+        target = targets[0]
+        logger.info("\n" + "-" * 80)
+        logger.info(f"Processing: {target}")
+        logger.info("-" * 80)
+
         scorer_kwargs = {
-            'input': str(input),
+            'input': target,
             'output': output,
             'model': model,
             'channels': channels,
-            'probabilities': probabilities,
-            'plot': plot
+            'hypnogram': True,
+            'hypnodensity': bool(probabilities),
+            'plot': bool(plot),
         }
-        if scorer_type == 'forehead':
-            scorer_kwargs['zmax_mode'] = zmax_mode
 
         scorer = scorer_factory(type=scorer_type, **scorer_kwargs)
-        
-        hypnogram, probabilities = scorer.score()
+        hypnogram, _ = scorer.score()
 
-        if gen_stats:
-            logger.info("Calculating sleep statistics...")
-            try:
-                stats = utils.compute_sleep_stats(hypnogram.tolist())
-                stats_output_path = Path(output) / f"{input.parent.name}_{input.stem}_sleep_statistics.csv"
-                with open(stats_output_path, 'w') as f:
-                    f.write("Metric,Value\n")
-                    for key, value in stats.items():
-                        if isinstance(value, float):
-                            f.write(f"{key},{value:.2f}\n")
-                        else:
-                            f.write(f"{key},{value}\n")
-                logger.info(f"Sleep statistics saved.")
-            except Exception as e:
-                logger.error(f"Could not generate sleep statistics for {input.name}: {e}", exc_info=True)
-        
         logger.info("Autoscoring process completed.")
 
         execution_time = time.time() - start_time
-        logger.info(f">> SUCCESS: Finished processing {input.name} in {execution_time:.2f} seconds.")
+        name = Path(target).name
+        logger.info(f">> SUCCESS: Finished processing {name} in {execution_time:.2f} seconds.")
         logger.info(f"  Results saved to: {output}")
         return True
     except Exception as e:
-        logger.error(f">> FAILED to process {input.name}: {e}", exc_info=True)
+        nm = Path(input).name if hasattr(input, '__str__') else 'input'
+        logger.error(f">> FAILED to process {nm}: {e}", exc_info=True)
         return False
 
 

@@ -10,240 +10,234 @@ from huggingface_hub import hf_hub_download, hf_hub_url
 from appdirs import user_data_dir
 import requests
 import importlib.util
+from types import SimpleNamespace
 import NIDRA
 
 logger = logging.getLogger(__name__)
 
-class BatchScorer:
+# Batch scorer refactor: class removed. A functional API is provided below.
+
+def find_files(input_dir, type, dir_list=None):
     """
-    A class to handle batch scoring of a study directory.
-    It finds all valid recordings in subdirectories and scores them in a single run.
+    Find valid recording targets for batch processing.
+
+    Args:
+        input_dir (str|Path|None): Path containing one subfolder per recording (ignored if dir_list provided).
+        type (str): 'forehead' or 'psg'.
+        dir_list (list[str|Path]|None): Specific directories or files to process instead of scanning subdirectories.
+    Returns:
+        list[pathlib.Path]: Items may be directories (forehead) or files (.edf/.bdf).
     """
-    def __init__(self, input_dir, output=None, type=None, model=None, dir_list=None, channels=None, hypnogram=None, probabilities=False, plot=False):
-        self.input_dir = Path(input_dir) if input_dir else None
+    if type not in ('forehead', 'psg'):
+        raise ValueError("type must be 'forehead' or 'psg'.")
 
-        # Default output to input_dir if not provided
-        if output is None:
-            if self.input_dir is not None:
-                self.output_dir = self.input_dir
-                logger.info(f"No output specified. Using input_dir as output: {self.output_dir}")
-            else:
-                raise ValueError("output must be specified when input_dir is not provided.")
-        else:
-            self.output_dir = Path(output)
+    input_dir_path = Path(input_dir) if input_dir else None
 
-        self.type = type
-        if self.type is None:
-            raise ValueError("type must be specified: 'forehead' or 'psg'.")
-        self.model_name = model
-        self.dir_list = dir_list
-        self.ch_names = channels
-        self.files_to_process = self._find_files()
+    if dir_list:
+        logger.info(f"Searching for recordings in {len(dir_list)} specified paths...")
+        candidates = [Path(d) for d in dir_list]
+    else:
+        logger.info(f"Searching for recordings in '{input_dir_path}'...")
+        if not input_dir_path or not input_dir_path.exists():
+            logger.warning("Input directory does not exist or was not provided.")
+            return []
+        candidates = [
+            subdir for subdir in sorted(input_dir_path.iterdir())
+            if subdir.is_dir() and not subdir.name.startswith(('autoscorer_output', 'batch_'))
+        ]
 
-        # Output artifact flags for per-recording scorers
-        if hypnogram is None:
-            self.save_hypnogram = True
-        else:
-            self.save_hypnogram = bool(hypnogram)
-        self.save_probabilities = bool(probabilities)
-        self.gen_plot = bool(plot)
+    def first_file_matching(d: Path, patterns):
+        for pat in patterns:
+            for f in d.glob(pat):
+                return f
+        raise StopIteration
 
-    def _find_files(self):
-        """
-        Finds all valid recording files and determines the ZMax mode automatically.
-        Returns a list of tuples: (file_path, zmax_mode), where zmax_mode is 'one_file', 'two_files', or None.
-        """
-        if self.dir_list:
-            logger.info(f"Searching for recordings in {len(self.dir_list)} specified directories...")
-            candidates = [Path(d) for d in self.dir_list]
-        else:
-            logger.info(f"Searching for recordings in '{self.input_dir}'...")
-            if not self.input_dir or not self.input_dir.exists():
-                logger.warning("Input directory does not exist or was not provided.")
-                return []
-            candidates = [
-                subdir for subdir in sorted(self.input_dir.iterdir())
-                if subdir.is_dir() and not subdir.name.startswith(('autoscorer_output', 'batch_'))
-            ]
-
-        files_with_mode = []
-
-        def first_file_matching(d: Path, patterns):
-            for pat in patterns:
-                for f in d.glob(pat):
-                    return f
-            raise StopIteration
-
-        for item in candidates:
-            try:
-                # If a file path is given in the list, resolve mode directly
-                if item.is_file():
-                    if self.type == 'psg':
-                        if item.suffix.lower() in ('.edf', '.bdf'):
-                            files_with_mode.append((item, None))
-                        else:
-                            logger.warning(f"Skipping non-EDF/BDF file: {item}")
+    files_to_process = []
+    for item in candidates:
+        try:
+            # Accept explicit file paths
+            if item.is_file():
+                if type == 'psg':
+                    if item.suffix.lower() in ('.edf', '.bdf'):
+                        files_to_process.append(item)
                     else:
-                        fstr = str(item)
-                        if re.search(r'(?i)([_ ])?L\.edf$', fstr):
-                            r_file = Path(re.sub(r'(?i)([_ ])?L\.edf$', r'\1R.edf', fstr))
-                            if r_file.exists():
-                                files_with_mode.append((item, 'two_files'))
-                                continue
-                        if re.search(r'(?i)([_ ])?R\.edf$', fstr):
-                            l_file = Path(re.sub(r'(?i)([_ ])?R\.edf$', r'\1L.edf', fstr))
-                            if l_file.exists():
-                                files_with_mode.append((l_file, 'two_files'))
-                                continue
-                        files_with_mode.append((item, 'one_file'))
-                    continue
-
-                # Otherwise treat as a directory containing a recording
-                search_dir = item
-                if not search_dir.is_dir():
-                    logger.warning(f"'{search_dir}' is not a valid directory. Skipping.")
-                    continue
-
-                if self.type == 'psg':
-                    # Prefer EDF; fall back to BDF
-                    try:
-                        file = first_file_matching(search_dir, ['*.edf', '*.EDF'])
-                    except StopIteration:
-                        file = first_file_matching(search_dir, ['*.bdf', '*.BDF'])
-                    files_with_mode.append((file, None))
+                        logger.warning(f"Skipping non-EDF/BDF file: {item}")
                 else:
-                    l_files = sorted(search_dir.glob('*[lL].edf')) + sorted(search_dir.glob('*[lL].EDF'))
-                    r_files = sorted(search_dir.glob('*[rR].edf')) + sorted(search_dir.glob('*[rR].EDF'))
-                    all_edfs = sorted(search_dir.glob('*.edf')) + sorted(search_dir.glob('*.EDF'))
-
-                    if len(l_files) == 1 and len(r_files) == 1:
-                        files_with_mode.append((l_files[0], 'two_files'))
-                    elif len(all_edfs) == 1:
-                        files_with_mode.append((all_edfs[0], 'one_file'))
-                    elif len(all_edfs) > 1:
-                        logger.warning(f"Found multiple EDF files in '{search_dir}' that do not form a clear L/R pair. Skipping.")
+                    if item.suffix.lower() in ('.edf', '.EDF'):
+                        files_to_process.append(item)
                     else:
-                        raise StopIteration
-            except StopIteration:
-                logger.warning(f"Could not find a complete recording in '{item}'. Skipping.")
+                        logger.warning(f"Skipping non-EDF file: {item}")
                 continue
 
-        if not files_with_mode:
-            logger.warning(f"Could not find any suitable recordings in the specified locations.")
+            # Treat as directory containing a recording
+            search_dir = item
+            if not search_dir.is_dir():
+                logger.warning(f"'{search_dir}' is not a valid directory. Skipping.")
+                continue
+
+            if type == 'psg':
+                try:
+                    file = first_file_matching(search_dir, ['*.edf', '*.EDF'])
+                except StopIteration:
+                    file = first_file_matching(search_dir, ['*.bdf', '*.BDF'])
+                files_to_process.append(file)
+            else:
+                # Forehead: let the scorer auto-detect mode; pass the directory if it contains at least one EDF
+                edf_files = sorted(search_dir.glob('*.edf')) + sorted(search_dir.glob('*.EDF'))
+                if edf_files:
+                    files_to_process.append(search_dir)
+                else:
+                    raise StopIteration
+        except StopIteration:
+            logger.warning(f"Could not find a complete recording in '{item}'. Skipping.")
+            continue
+
+    if not files_to_process:
+        logger.warning("Could not find any suitable recordings in the specified locations.")
+        return []
+
+    logger.info(f"Found {len(files_to_process)} recording(s) to process.")
+    logger.info("The following recordings will be processed:")
+    for path in files_to_process:
+        logger.info(f"  - {path}")
+
+    return files_to_process
+
+def resolve_output_dir(input_dir, output):
+    """
+    Resolve and return the base output directory as a Path.
+    If output is None and input_dir is provided, defaults to input_dir.
+    """
+    input_dir_path = Path(input_dir) if input_dir else None
+    if output is None:
+        if input_dir_path is not None:
+            output_dir = input_dir_path
+            logger.info(f"No output specified. Using input_dir as output: {output_dir}")
         else:
-            logger.info(f"Found {len(files_with_mode)} recording(s) to process.")
-            logger.info("The following recordings will be processed:")
-            for file, mode in files_with_mode:
-                mode_str = f" (mode: {mode})" if mode else ""
-                logger.info(f"  - {file}{mode_str}")
-        return files_with_mode
+            raise ValueError("output must be specified when input_dir is not provided.")
+    else:
+        output_dir = Path(output)
+    return output_dir
 
-    def score(self, gen_stats=True):
-        """
-        Runs the scoring process for all found recordings.
 
-        Args:
-            gen_stats (bool): Generate sleep statistics for each recording.
+def process_target(target, batch_output_dir, type, model, channels, hypnogram, probabilities, plot):
+    """
+    Process a single target (file or directory) within a batch run.
 
-        Returns:
-            tuple: (number_of_files_successfully_processed, total_files_found)
-        """
-        if not self.files_to_process:
+    Args:
+        target (str|Path): Path to EDF/BDF file (PSG) or to directory/file (forehead).
+        batch_output_dir (Path): Base batch run output directory.
+        type (str): 'forehead' or 'psg'.
+        model (str|None): Model name to use.
+        channels (list[str]|None): Channels selection.
+        hypnogram (bool|None): Whether to save hypnogram; defaults handled in scorer call.
+        probabilities (bool): Whether to save hypnodensity (legacy 'probabilities' flag).
+        plot (bool): Whether to save dashboard plot.
+
+    Returns:
+        bool: True on success, False on failure.
+    """
+    target_path = Path(target)
+    rec_name = target_path.name if target_path.is_dir() else target_path.parent.name
+    base_name = target_path.name if target_path.is_dir() else target_path.stem
+    recording_output_dir = batch_output_dir / rec_name
+    recording_output_dir.mkdir(exist_ok=True)
+
+    try:
+        start_time = time.time()
+
+        scorer_kwargs = {
+            'type': type,
+            'input': target_path,
+            'output': str(recording_output_dir),
+            'model': model,
+            'channels': channels,
+            'hypnogram': True if hypnogram is None else bool(hypnogram),
+            'hypnodensity': bool(probabilities),
+            'plot': bool(plot),
+        }
+
+        scorer = NIDRA.scorer(**scorer_kwargs)
+        hypnogram_out, _ = scorer.score()
+        logger.info("Autoscoring completed.")
+
+
+        execution_time = time.time() - start_time
+        logger.info(f">> SUCCESS: Finished processing {target_path} in {execution_time:.2f} seconds.")
+        logger.info(f"  Results saved to: {recording_output_dir}")
+        return True
+    except Exception as e:
+        logger.error(f">> FAILED to process {target_path}: {e}", exc_info=True)
+        return False
+    
+def batch_scorer(input_dir, output=None, type=None, model=None, dir_list=None, channels=None, hypnogram=None, probabilities=False, plot=False):
+    """
+    Run batch scoring over a study directory or explicit list of targets.
+
+    Args:
+        input_dir (str|Path|None): Path containing one subfolder per recording (ignored if dir_list provided).
+        output (str|Path|None): Base directory where batch results will be saved. Defaults to input_dir if omitted.
+        type (str): 'forehead' or 'psg'.
+        model (str|None): Name of the model to use.
+        dir_list (list[str|Path]|None): Specific directories or files to process instead of scanning subdirectories.
+        channels (list[str]|None): Channel names selection (PSG) or two channel names (forehead one-file mode).
+        hypnogram (bool|None): Save hypnogram CSVs. Defaults to True for file inputs.
+        probabilities (bool): Save classifier probabilities (hypnodensity) CSVs. Deprecated name; forwarded to scorers as hypnodensity.
+        plot (bool): Save dashboard plot.
+
+    Returns:
+        An object exposing .score(). Call .score() to execute and receive (processed_count, total_files_found).
+    """
+    if type not in ('forehead', 'psg'):
+        raise ValueError("type must be specified: 'forehead' or 'psg'.")
+
+    # Resolve output directory and discover files now; execution deferred to .score()
+    output_dir = resolve_output_dir(input_dir, output)
+    files_to_process = find_files(input_dir, type, dir_list)
+
+    def score():
+        if not files_to_process:
+            logger.warning("Could not find any suitable recordings in the specified locations.")
             return 0, 0
 
         batch_start_time = time.time()
-        batch_output_dir = self.output_dir / f"autoscorer_output_run_{time.strftime('%Y%m%d_%H%M%S')}"
+        batch_output_dir = output_dir / f"autoscorer_output_run_{time.strftime('%Y%m%d_%H%M%S')}"
         batch_output_dir.mkdir(parents=True, exist_ok=True)
         logger.info("\n" + "-" * 80)
         logger.info(f"Starting batch processing. Results will be saved to: {batch_output_dir}")
 
         processed_count = 0
-        for i, (file, zmax_mode) in enumerate(self.files_to_process):
+        total = len(files_to_process)
+
+        for i, target in enumerate(files_to_process):
             logger.info("\n" + "-" * 80)
-            logger.info(f"[{i + 1}/{len(self.files_to_process)}] Processing: {file}")
+            logger.info(f"[{i + 1}/{total}] Processing: {target}")
             logger.info("-" * 80)
-            
-            recording_output_dir = batch_output_dir / file.parent.name
-            recording_output_dir.mkdir(exist_ok=True)
 
-            try:
-                start_time = time.time()
-                
-                scorer_kwargs = {
-                    'type': self.type,
-                    'input': str(file),
-                    'output': str(recording_output_dir),
-                    'model': self.model_name,
-                    'channels': self.ch_names,
-                    'hypnogram': self.save_hypnogram,
-                    'probabilities': self.save_probabilities,
-                    'plot': self.gen_plot,
-                }
-                if self.type == 'forehead':
-                    scorer_kwargs['zmax_mode'] = zmax_mode
-
-                scorer = NIDRA.scorer(**scorer_kwargs)
-                hypnogram, _ = scorer.score()
-                logger.info("Autoscoring completed.")
-                
-                if gen_stats:
-                    logger.info("Calculating sleep statistics...")
-                    stats = compute_sleep_stats(hypnogram.tolist())
-                    stats_output_path = recording_output_dir / f"{file.stem}_sleep_statistics.csv"
-                    with open(stats_output_path, 'w') as f:
-                        f.write("Metric,Value\n")
-                        for key, value in stats.items():
-                            f.write(f"{key},{value:.2f}\n" if isinstance(value, float) else f"{key},{value}\n")
-                    logger.info(f"Sleep statistics saved to {stats_output_path}")
-
-                execution_time = time.time() - start_time
-                logger.info(f">> SUCCESS: Finished processing {file} in {execution_time:.2f} seconds.")
-                logger.info(f"  Results saved to: {recording_output_dir}")
+            success = process_target(
+                target=target,
+                batch_output_dir=batch_output_dir,
+                type=type,
+                model=model,
+                channels=channels,
+                hypnogram=hypnogram,
+                probabilities=probabilities,
+                plot=plot,
+            )
+            if success:
                 processed_count += 1
-            except Exception as e:
-                logger.error(f">> FAILED to process {file}: {e}", exc_info=True)
 
         total_execution_time = time.time() - batch_start_time
         logger.info("\n" + "-" * 80)
         logger.info("BATCH PROCESSING COMPLETE")
-        logger.info(f"Successfully processed {processed_count} of {len(self.files_to_process)} recordings.")
+        logger.info(f"Successfully processed {processed_count} of {total} recordings.")
         logger.info(f"Total execution time: {total_execution_time:.2f} seconds.")
         logger.info(f"All results saved in: {batch_output_dir}")
         logger.info("-" * 80)
-        
-        return processed_count, len(self.files_to_process)
 
-def batch_scorer(input_dir, output=None, type=None, model=None, dir_list=None, channels=None, hypnogram=None, probabilities=False, plot=False):
-    """
-    Factory function to create a BatchScorer instance.
-    This is the recommended entry point for batch processing.
+        return processed_count, total
 
-    Args:
-        input_dir (str): Path to the main study directory that contains one subfolder per recording.
-        output (str, optional): Base directory where batch results will be saved. Defaults to input_dir when omitted.
-        type (str): Type of data, either 'forehead' or 'psg'.
-        model (str, optional): Name of the model to use.
-        dir_list (list, optional): A list of specific directories to process instead of scanning all subdirectories.
-        channels (list, optional): A list of channel names to use.
-        hypnogram (bool, optional): Save hypnogram CSV. Defaults to True for file inputs.
-        probabilities (bool, optional): Save classifier probabilities CSV. Defaults to False.
-        plot (bool, optional): Save dashboard plot. Defaults to False.
-
-    Returns:
-        BatchScorer: Configured BatchScorer. Call .score() to run processing. A new timestamped folder 'autoscorer_output_run_YYYYmmdd_HHMMSS'
-                     will be created inside output to contain all per-recording outputs.
-    """
-    return BatchScorer(
-        input_dir,
-        output=output,
-        type=type,
-        model=model,
-        dir_list=dir_list,
-        channels=channels,
-        hypnogram=hypnogram,
-        probabilities=probabilities,
-        plot=plot,
-    )
+    return SimpleNamespace(score=score)
 
 def calculate_font_size(screen_height, percentage, min_size, max_size):
     """Calculates font size as a percentage of screen height with min/max caps."""
