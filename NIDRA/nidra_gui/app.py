@@ -361,15 +361,15 @@ def get_channels():
                 file_path = search_file
                 file_str = str(file_path)
                 # Detect two-file mode if filename indicates L/R and counterpart exists
-                if re.search(r'(?i)([_ ])L\.edf$', file_str):
-                    r_file = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', file_str))
+                if re.search(r'(?i)([_ ])?L\.edf$', file_str):
+                    r_file = Path(re.sub(r'(?i)([_ ])?L\.edf$', r'\1R.edf', file_str))
                     if r_file.exists():
                         selection_mode = 'zmax_two_files'
                         # Two-file mode: no channel selection needed
                         channels = []
                         return jsonify({'status': 'success', 'channels': channels, 'selection_mode': selection_mode})
-                if re.search(r'(?i)([_ ])R\.edf$', file_str):
-                    l_file = Path(re.sub(r'(?i)([_ ])R\.edf$', r'\1L.edf', file_str))
+                if re.search(r'(?i)([_ ])?R\.edf$', file_str):
+                    l_file = Path(re.sub(r'(?i)([_ ])?R\.edf$', r'\1L.edf', file_str))
                     if l_file.exists():
                         selection_mode = 'zmax_two_files'
                         channels = []

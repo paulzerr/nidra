@@ -85,13 +85,13 @@ class BatchScorer:
                             logger.warning(f"Skipping non-EDF/BDF file: {item}")
                     else:
                         fstr = str(item)
-                        if re.search(r'(?i)([_ ])L\.edf$', fstr):
-                            r_file = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', fstr))
+                        if re.search(r'(?i)([_ ])?L\.edf$', fstr):
+                            r_file = Path(re.sub(r'(?i)([_ ])?L\.edf$', r'\1R.edf', fstr))
                             if r_file.exists():
                                 files_with_mode.append((item, 'two_files'))
                                 continue
-                        if re.search(r'(?i)([_ ])R\.edf$', fstr):
-                            l_file = Path(re.sub(r'(?i)([_ ])R\.edf$', r'\1L.edf', fstr))
+                        if re.search(r'(?i)([_ ])?R\.edf$', fstr):
+                            l_file = Path(re.sub(r'(?i)([_ ])?R\.edf$', r'\1L.edf', fstr))
                             if l_file.exists():
                                 files_with_mode.append((l_file, 'two_files'))
                                 continue

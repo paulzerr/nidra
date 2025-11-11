@@ -71,28 +71,27 @@ class PSGScorer:
         return self.sleep_stages, self.probabilities
 
     def _load_recording(self):
-        print("Loading recording...")
+        print(f"Loading data...")
         if self.data:
             if self.input.ndim != 2:
                 raise ValueError("Input data must be a 2D array.")
             if self.sfreq is None:
                 raise ValueError("'sfreq' must be provided when 'data' is given.")
+            self.input = np.asarray(self.input, dtype=np.float64)
             # name channels if no names given
-
-            ## TODO: fix this
-            print("###### ")
-            print(self.input.shape[0])
             n_channels = self.input.shape[0]
             if self.channels is None: 
                 self.channels = [f"Ch{i+1:02d}" for i in range(n_channels)]
             # make raw mne object from the numpy array
             info = mne.create_info(channels=self.channels, sfreq=self.sfreq, ch_types='eeg', verbose=False)
             self.raw = mne.io.RawArray(self.input, info, verbose=False)
+            print(f"Array data loaded.")
         else:
             try:
                 self.raw = mne.io.read_raw_edf(self.input, preload=False, verbose=False, stim_channel=None)
             except ValueError:
                 self.raw = mne.io.read_raw_bdf(self.input, preload=False, verbose=False, stim_channel=None)
+            print(f"Data loaded from {self.input}...")
 
     def _load_model(self):
         if self.has_eog:
@@ -107,6 +106,7 @@ class PSGScorer:
             self.session = ort.InferenceSession(model_path)
             self.input_name = self.session.get_inputs()[0].name
             self.output_name = self.session.get_outputs()[0].name
+            print(f"Model loaded: '{model_path}")
         except Exception as e:
             print(f"Error: Failed to load ONNX model from '{model_path}'. Original error: {e}")
             raise
@@ -140,8 +140,7 @@ class PSGScorer:
         n_epochs = len(psg_data) // n_samples_in_epoch_original
         psg_data = psg_data[:n_epochs * n_samples_in_epoch_original]
 
-
-        # TODO: wait, isn't this implemented elsewhere as well?
+        # clip noisy values
         for i in range(psg_data.shape[1]):
             channel_data = psg_data[:, i]
             iqr = np.nanpercentile(channel_data, 75) - np.nanpercentile(channel_data, 25)
@@ -151,21 +150,20 @@ class PSGScorer:
 
         psg_data_resampled = resample_poly(psg_data, self.target_sample_rate, int(original_sample_rate), axis=0)
 
-        # yes, here... 
-        # TODO: check sleepyland/utime whether robust scale comes before or after resampling... 
+        # scale data
         psg_data_scaled = np.empty_like(psg_data_resampled, dtype=np.float64)
         for i in range(psg_data_resampled.shape[1]):
             psg_data_scaled[:, i] = self._robust_scale_channel(psg_data_resampled[:, i])
         
-
         n_samples_in_epoch_final = self.epoch_sec * self.target_sample_rate
         n_epochs_final = len(psg_data_scaled) // n_samples_in_epoch_final
         psg_data_scaled = psg_data_scaled[:n_epochs_final * n_samples_in_epoch_final]
         
         self.preprocessed_psg = psg_data_scaled.reshape(n_epochs_final, n_samples_in_epoch_final, -1).astype(np.float32)
         
+
     def _predict(self):
-        
+        print(f"Prediction started.")
         window_size = int(self.session.get_inputs()[0].shape[1])      # L (epochs per window; fixed to 35)
         n_epochs_total = int(self.preprocessed_psg.shape[0])          # N (total epochs)
         samples_per_epoch = int(self.preprocessed_psg.shape[1])       # S
@@ -227,6 +225,7 @@ class PSGScorer:
         # Ensemble average across channel groups
         self.probabilities = np.mean(np.stack(group_probabilities, axis=0), axis=0)  # [N, C]
         self.sleep_stages = self.probabilities.argmax(-1)
+        print(f"Prediction successful.")
         return self.sleep_stages, self.probabilities
 
     def _postprocess(self):
@@ -235,23 +234,24 @@ class PSGScorer:
 
 
     def _save_results(self):
+        hypnogram_path = self.output / f"{self.base_filename}_hypnogram.csv"
+        hypnodensity_path = self.output / f"{self.base_filename}_hypnodensity.csv"
+    
         if self.hypnogram:
-            hypnogram_csv_file = self.output / f"{self.base_filename}_hypnogram.csv"
-            with open(hypnogram_csv_file, 'w') as f:
+            with open(hypnogram_path, 'w') as f:
                 f.write("sleep_stage\n")
                 for stage in self.sleep_stages:
                     f.write(f"{int(stage)}\n")
-            print(f"Hypnogram saved to {hypnogram_csv_file}")
+            print(f"Sleep stages saved to: '{hypnogram_path}")
 
         if self.hypnodensity:
-            prob_csv_file = self.output / f"{self.base_filename}_hypnodensity.csv"
-            with open(prob_csv_file, 'w') as f:
+            with open(hypnodensity_path, 'w') as f:
                 header = "Epoch,Wake,N1,N2,N3,REM,Art\n"
                 f.write(header)
                 for i, probs in enumerate(self.probabilities):
                     prob_str = ",".join(f"{p:.6f}" for p in probs)
                     f.write(f"{i},{prob_str},0.000000\n")
-            print(f"Hypnodensity saved to {prob_csv_file}")
+            print(f"Sleep stages saved to: '{hypnodensity_path}")
 
     def _make_plot(self):
         if self.plot:
@@ -265,7 +265,7 @@ class PSGScorer:
                 filename=plot_filename,
                 type='psg'
             )
-            print(f"Figure saved to {self.output / plot_filename}")
+            print(f"Graph saved to {self.output / plot_filename}")
 
 
     def _parse_channel(self, name: str) -> Dict[str, Any]:

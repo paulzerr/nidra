@@ -24,13 +24,13 @@ class ForeheadScorer:
             if isinstance(input, str):
                 input = Path(input)
             if isinstance(input, Path) and input.is_dir():
-                mode, single_edf = self._detect_zmax_mode(input)
+                mode, single_edf = self._detect_forehead_mode(input)
                 self.input = single_edf
-                self.zmax_mode = mode
+                self.forehead_mode = mode
             elif isinstance(input, Path) and input.is_file():
-                mode, single_edf = self._detect_zmax_mode(input)
+                mode, single_edf = self._detect_forehead_mode(input)
                 self.input = single_edf
-                self.zmax_mode = mode
+                self.forehead_mode = mode
             else:
                 raise ValueError("No valid input provided")
             self.base_filename = f"{self.input.parent.name}_{self.input.stem}"
@@ -38,7 +38,7 @@ class ForeheadScorer:
         # Core configuration
         self.model_name   = model
         self.sfreq        = sfreq
-        self.ch_names     = channels
+        self.channels     = channels
         self.epoch_size   = 30 # we ignore this input for now and enforce 30s epochs
         self.target_fs    = 64 # has to stay hardcoded!
         self.hypnodensity = hypnodensity
@@ -70,49 +70,51 @@ class ForeheadScorer:
         self._make_plot()
         return self.sleep_stages, self.probabilities
 
-    def _detect_zmax_mode(self, input_path: Path):
+    def _detect_forehead_mode(self, input_path: Path):
         if input_path.is_dir():
             edf_files = sorted(input_path.glob("*.edf"))
             if not edf_files:
                 raise FileNotFoundError(f"Could not find an EDF file in directory '{input_path}'.")
             for f in edf_files:
-                if re.search(r'(?i)([_\s])L\.edf$', f.name):
-                    candidate_r = f.with_name(re.sub(r'(?i)([_\s])L\.edf$', r'\1R.edf', f.name))
+                if re.search(r'(?i)([_\s]?)L\.edf$', f.name):
+                    candidate_r = f.with_name(re.sub(r'(?i)([_\s]?)L\.edf$', r'\1R.edf', f.name))
                     if candidate_r.exists():
                         return 'two_files', f
             return 'one_file', edf_files[0]
         else:
             name_str = str(input_path)
-            if re.search(r'(?i)[_ ]L\.edf$', name_str):
-                candidate_r = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', name_str))
+            if re.search(r'(?i)([_ ])?L\.edf$', name_str):
+                candidate_r = Path(re.sub(r'(?i)([_ ])?L\.edf$', r'\1R.edf', name_str))
                 if candidate_r.exists():
                     return 'two_files', input_path
-            if re.search(r'(?i)[_ ]R\.edf$', name_str):
-                candidate_l = Path(re.sub(r'(?i)([_ ])R\.edf$', r'\1L.edf', name_str))
+            if re.search(r'(?i)([_ ])?R\.edf$', name_str):
+                candidate_l = Path(re.sub(r'(?i)([_ ])?R\.edf$', r'\1L.edf', name_str))
                 if candidate_l.exists():
                     return 'two_files', candidate_l
             return 'one_file', input_path
 
     def _load_recording(self):
+        print(f"Loading data...")
         # array input mode
         if self.data:
-            data = np.asarray(self.input, dtype=np.float64)
             if data.ndim != 2 or data.shape[0] != 2:
                 raise ValueError("Input data must be a 2D array with 2 channels.")
             if self.sfreq is None:
                 raise ValueError("'sfreq' must be provided when array input is given.")
+            data = np.asarray(self.input, dtype=np.float64)
             info = mne.create_info(['eegl', 'eegr'], sfreq=float(self.sfreq),
                                    ch_types=['eeg', 'eeg'], verbose=False)
             raw = mne.io.RawArray(data, info, verbose=False)
             raw.resample(self.target_fs, verbose=False)
             raw.filter(l_freq=0.5, h_freq=None, verbose=False)
             self.raw = raw
+            print(f"Array data loaded.")
             return
 
         # Two-file mode, expects *R.edf and *L.edf in same folder 
-        if self.zmax_mode == 'two_files':
+        if self.forehead_mode == 'two_files':
             rawL = mne.io.read_raw_edf(self.input, preload=True, verbose=False)
-            rawR_path = Path(re.sub(r'(?i)([_ ])L\.edf$', r'\1R.edf', str(self.input)))
+            rawR_path = Path(re.sub(r'(?i)([_ ])?L\.edf$', r'\1R.edf', str(self.input)))
             if not rawR_path.exists():
                 raise FileNotFoundError(f"Could not find corresponding RIGHT channel file at {rawR_path}")
             rawR = mne.io.read_raw_edf(rawR_path, preload=True, verbose=False)
@@ -123,18 +125,25 @@ class ForeheadScorer:
             info = mne.create_info(['eegl', 'eegr'], sfreq=self.target_fs,
                                    ch_types=['eeg', 'eeg'], verbose=False)
             self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
+            print(f"Loading data from: '{self.input}")
             return
 
         # one-file mode , expects single edf with 2+ channels 
-        if self.zmax_mode == 'one_file':
+        if self.forehead_mode == 'one_file':
             raw = mne.io.read_raw_edf(self.input, preload=True, verbose=False)
 
-            # if channel names are not provided, default to the first two
+            # if channel names are not provided, 
+            # default to the first two channels with 'eeg' in the name
+            # otherwise, default to the first two
             if self.channels is None:
-                self.channels = raw.ch_names[:2]
-                if len(self.channels) < 2:
+                chs = raw.ch_names
+                eeg_like = [ch for ch in chs if 'eeg' in ch.lower()]
+                chosen = eeg_like[:2] if len(eeg_like) >= 2 else chs[:2]
+                if len(chosen) < 2:
                     raise ValueError("Could not find at least two channels in the EDF file.")
-            
+                self.channels = chosen
+
+            # if not exactly two channel names are provided, return error
             if len(self.channels) != 2:
                 raise ValueError("Please provide exactly two channel names for one-file mode.")
 
@@ -144,8 +153,9 @@ class ForeheadScorer:
             raw.filter(l_freq=0.5, h_freq=None, verbose=False)
 
             self.raw = raw
+            print(f"Loading data from: '{self.input}")
             return
-                
+            
     def _load_model(self):
         model_filename = f"{self.model_name}.onnx"
         model_path = utils.get_model_path(model_filename)
@@ -153,6 +163,7 @@ class ForeheadScorer:
             self.session = ort.InferenceSession(model_path)
             self.input_name = self.session.get_inputs()[0].name
             self.output_name = self.session.get_outputs()[0].name
+            print(f"Model loaded: '{model_path}")
         except Exception as e:
             print(f"Error: Failed to load ONNX model from '{model_path}'. Original error: {e}")
             raise
@@ -192,6 +203,7 @@ class ForeheadScorer:
         self.processed_data, self.num_full_seqs = seqdat, num_full_seqs
 
     def _predict(self):
+        print(f"Prediction started.")
         seq_length = 100
         last_seq = self.processed_data[-1]
         last_seq_valid_epochs = int(np.sum(~np.isnan(last_seq.sum(axis=(1, 2)))))
@@ -204,6 +216,7 @@ class ForeheadScorer:
             ypred_tail = self.session.run(None, {self.input_name: valid_last_seq.astype(np.float32)})[0].reshape(-1, 6)
             raw_predictions = np.concatenate([ypred_main, ypred_tail], axis=0)
         self.raw_predictions = raw_predictions
+        print(f"Prediction successful.")
 
     def _postprocess(self):
         # get number of complete 30-second epochs that exist in the raw EEG recording
@@ -226,6 +239,7 @@ class ForeheadScorer:
             with open(hypnogram_path, 'w') as f:
                 f.write("sleep_stage\n")
                 np.savetxt(f, self.sleep_stages, delimiter=",", fmt="%d")
+                print(f"Sleep stages saved to: '{hypnogram_path}")
         if self.hypnodensity:
             with open(hypnodensity_path, 'w') as f:
                 header = "Epoch,Wake,N1,N2,N3,REM,Art\n"
@@ -233,6 +247,7 @@ class ForeheadScorer:
                 for i, probs in enumerate(self.probabilities):
                     prob_str = ",".join(f"{p:.6f}" for p in probs)
                     f.write(f"{i},{prob_str}\n")
+                    print(f"Sleep stages saved to: '{hypnogram_path}")
                 
     def _make_plot(self):
         if self.plot:
@@ -246,5 +261,5 @@ class ForeheadScorer:
                 filename=plot_filename,
                 type='forehead'
             )
-            print(f"Figure plot saved to {self.output / plot_filename}")
+            print(f"Graph saved to {self.output / plot_filename}")
 
