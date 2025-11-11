@@ -11,80 +11,54 @@ from typing import List, Tuple, Dict, Any
 from NIDRA.plotting import plot_hypnodensity
 from NIDRA import utils
 
-
-# --- Channel Definitions ---
-MASTOIDS = {'A1', 'A2', 'M1', 'M2'}
-EEG_BASES = {'FP1', 'FP2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T3', 'T4', 'T5', 'T6', 'FZ', 'CZ', 'PZ', 'F1', 'F2'}
-UNAMBIGUOUS_EOG_PATTERNS = {'EOG', 'LOC', 'ROC', 'E1', 'E2'}
-EOG_BASES = ('EOG', 'OC', 'E1', 'E2')
-OTHER_NON_EEG = {'EMG', 'ECG', 'EKG'}
-
 class PSGScorer:
-    """
-    Scores sleep stages from PSG data.
-    """
-    def __init__(self, input: str = None, output: str = None, data: np.ndarray = None, channels: List[str] = None, sfreq: float = None, model: str = "u-sleep-nsrr-2024", epoch_sec: int = 30, hypnogram: bool = None, probabilities: bool = False, plot: bool = False):
+    def __init__(self, input = None, output: str = None, channels: list = None, 
+                 sfreq: float = None, model: str = "u-sleep-nsrr-2024",
+                 hypnogram: bool = None, hypnodensity: bool = False, plot: bool = False):
+        
         self.logger = logging.getLogger(__name__)
-        if input is None and data is None:
-            raise ValueError("Either 'input' or 'data' must be provided.")
-        if data is not None and sfreq is None:
-            raise ValueError("'sfreq' must be provided when 'data' is given.")
-
-        if input:
-            input_path = Path(input)
-            if input_path.is_dir():
-                input_dir = input_path
+        self.data = False
+        if hasattr(input, "__array__"):
+            self.input = input
+            self.data = True
+            self.base_filename = "array_input"
+        else:
+            if input is None:
+                raise ValueError("No valid input provided")
+            if isinstance(input, (str, Path)) and input.is_dir():
                 try:
-                    self.input_file = next(input_path.glob('*.edf'))
+                    self.input = next(input.glob('*.edf'))
                 except StopIteration:
-                    raise FileNotFoundError(f"Could not find an EDF file in directory '{input_path}'.")
+                    raise FileNotFoundError(f"Could not find an EDF file in directory '{input}'.")   
+            elif isinstance(input, (str, Path)) and input.is_file():
+                self.input = input
             else:
-                input_dir = input_path.parent
-                self.input_file = input_path
-            self.base_filename = f"{self.input_file.parent.name}_{self.input_file.stem}"
-        else:
-            input_dir = None
-            self.input_file = None
-            self.base_filename = "numpy_input"
+                raise ValueError("No valid input provided")
+            self.base_filename = f"{self.input.parent.name}_{self.input.stem}"
 
-        # output_dir will be resolved after flag configuration
-        self.input_data = data
-        self.ch_names = channels
-        self.sfreq = sfreq
-        self.model_name = model
-        self.epoch_sec = 30 #epoch_sec # we ignore this input for now and enforce 30s epochs
-        self.new_sample_rate = 128 # resample to 128 for usleep models
-        self.auto_channel_grouping = ['EEG', 'EOG']
-        self.onnx_model_path = None
-        self.preprocessed_psg = None
-        self.channel_groups = None
-        self.has_eog = None
-        self.session = None
-        self.input_name = None
-        self.output_name = None
-        self.hypnogram = None
-        self.probabilities = None
+        self.model           = model
+        self.channels        = channels
+        self.sfreq           = sfreq
+        self.epoch_sec       = 30 # we ignore this input for now and enforce 30s epochs
+        self.target_sample_rate = 128 # resample to 128 for usleep models
+        self.hypnodensity    = hypnodensity
+        self.plot            = plot
 
-        # Configure output generation flags (per-file-type)
+        # if hypnogram was not specifically requested and input is data, then don't create it
         if hypnogram is None:
-            self.save_hypnogram = False if data is not None else True
+            self.hypnogram = False if self.data else True
         else:
-            self.save_hypnogram = bool(hypnogram)
-        self.save_probabilities = bool(probabilities)
-        self.gen_plot = bool(plot)
-
-        # Resolve output directory only if any artifact is requested
-        outputs_requested = self.save_hypnogram or self.save_probabilities or self.gen_plot
-        if outputs_requested:
+            self.hypnogram = hypnogram
+        
+        # if output file is requested, but no output folder is given, use input folder
+        if self.hypnogram or self.hypnodensity or self.plot:
             if output is None:
-                if input_dir:
-                    output = Path(input_dir) / "autoscorer_output"
+                if not self.data:
+                    output = self.input.parent / "autoscorer_output"
                 else:
-                    raise ValueError("output must be specified when saving hypnogram/probabilities/plot for in-memory data input.")
-            self.output_dir = Path(output)
-            self.output_dir.mkdir(parents=True, exist_ok=True)
-        else:
-            self.output_dir = Path(output) if output is not None else None
+                    raise ValueError("output must be specified when saving files for in-memory data input.")
+            self.output = Path(output)
+            self.output.mkdir(parents=True, exist_ok=True)
 
     def score(self):
         self._load_recording()
@@ -92,44 +66,44 @@ class PSGScorer:
         self._load_model()
         self._predict()
         self._postprocess()
-        if self.save_hypnogram or self.save_probabilities:
-            if self.output_dir is None:
-                raise ValueError("output must be specified to save hypnogram or probabilities.")
-            self._save_results()
-        if self.gen_plot:
-            if self.output_dir is None:
-                raise ValueError("output must be specified to save plot.")
-            self.plot()
-        return self.hypnogram, self.probabilities
+        self._save_results()
+        self._make_plot()
+        return self.sleep_stages, self.probabilities
 
-    def plot(self):
-        """Generates and saves a dashboard plot."""
-        if self.hypnogram is not None and self.probabilities is not None and self.raw is not None:
-            plot_filename = f"{self.base_filename}_dashboard.png"
-            plot_hypnodensity(
-                hyp=self.hypnogram,
-                ypred=self.probabilities,
-                raw=self.raw,
-                nclasses=self.probabilities.shape[1],
-                figoutdir=self.output_dir,
-                filename=plot_filename,
-                type='psg'
-            )
-            print(f"Dashboard plot saved to {self.output_dir / plot_filename}")
+    def _load_recording(self):
+        print("Loading recording...")
+        if self.data:
+            if self.input.ndim != 2:
+                raise ValueError("Input data must be a 2D array.")
+            if self.sfreq is None:
+                raise ValueError("'sfreq' must be provided when 'data' is given.")
+            # name channels if no names given
+
+            ## TODO: fix this
+            print("###### ")
+            print(self.input.shape[0])
+            n_channels = self.input.shape[0]
+            if self.channels is None: 
+                self.channels = [f"Ch{i+1:02d}" for i in range(n_channels)]
+            # make raw mne object from the numpy array
+            info = mne.create_info(channels=self.channels, sfreq=self.sfreq, ch_types='eeg', verbose=False)
+            self.raw = mne.io.RawArray(self.input, info, verbose=False)
         else:
-            print("Scoring must be run before plotting.")
+            try:
+                self.raw = mne.io.read_raw_edf(self.input, preload=False, verbose=False, stim_channel=None)
+            except ValueError:
+                self.raw = mne.io.read_raw_bdf(self.input, preload=False, verbose=False, stim_channel=None)
 
     def _load_model(self):
         if self.has_eog:
-            model_filename = self.model_name + ".onnx"
+            model_filename = self.model + ".onnx"
             print(f"EOG channels found, loading model {model_filename}...")
         else:
-            model_filename = self.model_name + "_eeg.onnx"
+            model_filename = self.model + "_eeg.onnx"
             print(f"No EOG channels found, loading EEG-only model: {model_filename}")
         
         model_path = utils.get_model_path(model_filename)
         try:
-            
             self.session = ort.InferenceSession(model_path)
             self.input_name = self.session.get_inputs()[0].name
             self.output_name = self.session.get_outputs()[0].name
@@ -137,47 +111,23 @@ class PSGScorer:
             print(f"Error: Failed to load ONNX model from '{model_path}'. Original error: {e}")
             raise
 
-    def _load_recording(self):
-        """Loads a PSG file or creates a raw object from numpy data."""
-        print("Loading recording...")
-        if self.input_data is not None:
-            if self.input_data.ndim != 2:
-                raise ValueError("Input data must be a 2D array.")
-            
-            # name channels if no names given
-            n_channels = self.input_data.shape[0]
-            if self.ch_names is None: 
-                self.ch_names = [f"Ch{i+1:02d}" for i in range(n_channels)]
-
-            info = mne.create_info(ch_names=self.ch_names, sfreq=self.sfreq, ch_types='eeg', verbose=False)
-            self.raw = mne.io.RawArray(self.input_data, info, verbose=False)
-        else:
-            try:
-                self.raw = mne.io.read_raw_edf(self.input_file, preload=False, verbose=False, stim_channel=None)
-            except ValueError:
-                self.raw = mne.io.read_raw_bdf(self.input_file, preload=False, verbose=False, stim_channel=None)
-
-
     def _preprocess(self):
-        """Preprocesses a raw PSG recording."""
-        print("Setting up channels and preprocessing PSG data...")
-        
         # Respect user-selected channels if provided; otherwise use all channels
-        base_ch_names = list(self.raw.ch_names)
-        if self.ch_names:
+        base_channels = list(self.raw.ch_names)
+        if self.channels:
             # Normalize requested names, keep EDF order, and warn on missing
-            requested = [str(n).strip() for n in self.ch_names if n]
+            requested = [str(n).strip() for n in self.channels if n]
             requested_set = set(requested)
-            filtered = [ch for ch in base_ch_names if ch in requested_set]
-            missing = [ch for ch in requested if ch not in base_ch_names]
+            filtered = [ch for ch in base_channels if ch in requested_set]
+            missing = [ch for ch in requested if ch not in base_channels]
             if missing:
                 self.logger.warning(f"Requested channels not found in recording and will be ignored: {missing}")
             if filtered:
-                base_ch_names = filtered
+                base_channels = filtered
             else:
                 self.logger.warning("None of the requested channels were found. Falling back to all channels in the EDF.")
 
-        channels_to_load, self.channel_groups, self.has_eog = self._get_load_and_group_channels(base_ch_names)
+        channels_to_load, self.channel_groups, self.has_eog = self._get_load_and_group_channels(base_channels)
         print(f"Found {len(self.channel_groups)} channel groups.")
 
         self.raw.pick(channels_to_load)
@@ -190,48 +140,37 @@ class PSGScorer:
         n_epochs = len(psg_data) // n_samples_in_epoch_original
         psg_data = psg_data[:n_epochs * n_samples_in_epoch_original]
 
+
+        # TODO: wait, isn't this implemented elsewhere as well?
         for i in range(psg_data.shape[1]):
             channel_data = psg_data[:, i]
-            p_25 = np.percentile(channel_data, 25)
-            p_75 = np.percentile(channel_data, 75)
-            iqr = p_75 - p_25
+            iqr = np.nanpercentile(channel_data, 75) - np.nanpercentile(channel_data, 25)
+            iqr[iqr == 0] = 1.0
             threshold = 20 * iqr
             psg_data[:, i] = np.clip(channel_data, -threshold, threshold)
 
-        psg_data_resampled = resample_poly(psg_data, self.new_sample_rate, int(original_sample_rate), axis=0)
+        psg_data_resampled = resample_poly(psg_data, self.target_sample_rate, int(original_sample_rate), axis=0)
 
+        # yes, here... 
+        # TODO: check sleepyland/utime whether robust scale comes before or after resampling... 
         psg_data_scaled = np.empty_like(psg_data_resampled, dtype=np.float64)
         for i in range(psg_data_resampled.shape[1]):
             psg_data_scaled[:, i] = self._robust_scale_channel(psg_data_resampled[:, i])
         
-        n_samples_in_epoch_final = self.epoch_sec * self.new_sample_rate
+
+        n_samples_in_epoch_final = self.epoch_sec * self.target_sample_rate
         n_epochs_final = len(psg_data_scaled) // n_samples_in_epoch_final
         psg_data_scaled = psg_data_scaled[:n_epochs_final * n_samples_in_epoch_final]
         
         self.preprocessed_psg = psg_data_scaled.reshape(n_epochs_final, n_samples_in_epoch_final, -1).astype(np.float32)
         
-        print(f"Study preprocessed successfully. Shape: {self.preprocessed_psg.shape}")
-
-
-
-
-    def _predict(self, batch_size: int = 64):
-        """
-        Sleepyland-aligned prediction:
-        - Window size = model input length (e.g., 35 epochs)
-        - Stride (margin) = window_size // 2 (e.g., 17)  → 50% overlap
-        - Always include a final window starting at N - L to ensure full tail coverage
-        - Coverage-based averaging over overlapping window predictions
-        """
-
-        input_name = self.session.get_inputs()[0].name
-        output_name = self.session.get_outputs()[0].name
-
+    def _predict(self):
+        
         window_size = int(self.session.get_inputs()[0].shape[1])      # L (epochs per window; fixed to 35)
         n_epochs_total = int(self.preprocessed_psg.shape[0])          # N (total epochs)
         samples_per_epoch = int(self.preprocessed_psg.shape[1])       # S
         n_classes = int(self.session.get_outputs()[0].shape[-1])      # C_out
-
+        batch_size = 64
         margin = window_size // 2
         group_probabilities = []
 
@@ -252,7 +191,7 @@ class PSGScorer:
                 pad = np.zeros((diff, samples_per_epoch, n_channels), dtype=np.float32) if diff > 0 else None
                 window = psg_subset if diff == 0 else np.concatenate([psg_subset, pad], axis=0)
                 batch = np.expand_dims(window, 0)  # [1, L, S, C]
-                pred = self.session.run([output_name], {input_name: batch})[0][0]  # [L, C]
+                pred = self.session.run([self.output_name], {self.input_name: batch})[0][0]  # [L, C]
                 pred = pred[:n_epochs_total]  # trim padding
                 prob_sum += pred
                 coverage += 1
@@ -261,12 +200,10 @@ class PSGScorer:
                 last_start = n_epochs_total - window_size
                 starts = list(range(0, last_start + 1, margin))
                 if starts[-1] != last_start:
-                    starts.append(last_start)  # ensure tail coverage exactly like sleepyland
-
+                    starts.append(last_start)
                 n_windows = len(starts)
-                print(f"Total windows to process: {n_windows} (stride={margin}); forcing final start at {last_start}")
 
-                # Build windows as a dense stack (safer than strided view when stride!=1)
+                # Build windows as a dense stack 
                 # Shape: [n_windows, L, S, C]
                 windows = np.stack([psg_subset[s:s + window_size] for s in starts], axis=0)
 
@@ -274,7 +211,7 @@ class PSGScorer:
                 for start_idx in range(0, n_windows, batch_size):
                     end_idx = min(start_idx + batch_size, n_windows)
                     batch = windows[start_idx:end_idx]  # [B, L, S, C]
-                    pred_batch = self.session.run([output_name], {input_name: batch})[0]  # [B, L, C]
+                    pred_batch = self.session.run([self.output_name], {self.input_name: batch})[0]  # [B, L, C]
 
                     # Accumulate predictions into epoch space with coverage counts
                     for j in range(end_idx - start_idx):
@@ -289,44 +226,63 @@ class PSGScorer:
 
         # Ensemble average across channel groups
         self.probabilities = np.mean(np.stack(group_probabilities, axis=0), axis=0)  # [N, C]
-        self.hypnogram = self.probabilities.argmax(-1)
-
-        return self.hypnogram, self.probabilities
-
+        self.sleep_stages = self.probabilities.argmax(-1)
+        return self.sleep_stages, self.probabilities
 
     def _postprocess(self):
         # Remap stages: 4 -> 5 (REM)
-        hypnogram_intermediate = self.hypnogram
-        hypnogram_final = np.copy(hypnogram_intermediate)
-        hypnogram_final[hypnogram_intermediate == 4] = 5
-        self.hypnogram = hypnogram_final
+        self.sleep_stages[self.sleep_stages == 4] = 5
+
 
     def _save_results(self):
-        """Saves the hypnogram and probabilities to files."""
-        print(f"Saving results to {self.output_dir}...")
-        
-        if self.save_hypnogram:
-            hypnogram_csv_file = self.output_dir / f"{self.base_filename}_hypnogram.csv"
+        if self.hypnogram:
+            hypnogram_csv_file = self.output / f"{self.base_filename}_hypnogram.csv"
             with open(hypnogram_csv_file, 'w') as f:
                 f.write("sleep_stage\n")
-                for stage in self.hypnogram:
+                for stage in self.sleep_stages:
                     f.write(f"{int(stage)}\n")
             print(f"Hypnogram saved to {hypnogram_csv_file}")
 
-        if self.save_probabilities:
-            prob_csv_file = self.output_dir / f"{self.base_filename}_probabilities.csv"
+        if self.hypnodensity:
+            prob_csv_file = self.output / f"{self.base_filename}_hypnodensity.csv"
             with open(prob_csv_file, 'w') as f:
                 header = "Epoch,Wake,N1,N2,N3,REM,Art\n"
                 f.write(header)
                 for i, probs in enumerate(self.probabilities):
                     prob_str = ",".join(f"{p:.6f}" for p in probs)
                     f.write(f"{i},{prob_str},0.000000\n")
-            print(f"Probabilities saved to {prob_csv_file}")
+            print(f"Hypnodensity saved to {prob_csv_file}")
+
+    def _make_plot(self):
+        if self.plot:
+            plot_filename = f"{self.base_filename}_graph.png"
+            plot_hypnodensity(
+                hyp=self.sleep_stages,
+                ypred=self.probabilities,
+                raw=self.raw,
+                nclasses=self.probabilities.shape[1],
+                figoutdir=self.output,
+                filename=plot_filename,
+                type='psg'
+            )
+            print(f"Figure saved to {self.output / plot_filename}")
+
 
     def _parse_channel(self, name: str) -> Dict[str, Any]:
         """
         Parses a channel name and extracts its core properties into a dictionary.
         """
+
+        # --- Channel Definitions ---
+        MASTOIDS      = {'A1', 'A2', 'M1', 'M2'}
+        EEG_BASES     = {'FP1', 'FP2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 
+                        'O1', 'O2', 'F7', 'F8', 'T3', 'T4', 'T5', 'T6', 'FZ', 
+                        'CZ', 'PZ', 'F1', 'F2'}
+        EOG_PATTERNS  = {'EOG', 'LOC', 'ROC', 'E1', 'E2'}
+        EOG_BASES     = ('EOG', 'OC', 'E1', 'E2')
+        OTHER_NON_EEG = {'EMG', 'ECG', 'EKG'}
+
+        # TODO: one line?
         name_stripped = name.strip()
         upper = name_stripped.upper()
         
@@ -339,7 +295,7 @@ class PSGScorer:
         ch_type = 'OTHER'
 
         # Classify based on unambiguous patterns. Selection logic will handle fallbacks.
-        if any(p in search_name for p in UNAMBIGUOUS_EOG_PATTERNS):
+        if any(p in search_name for p in EOG_PATTERNS):
             ch_type = 'EOG'
         elif base in EEG_BASES or ('EEG' in search_name and not any(o in search_name for o in OTHER_NON_EEG)):
             ch_type = 'EEG'
@@ -348,12 +304,14 @@ class PSGScorer:
 
         return {'name': name_stripped, 'base': base, 'type': ch_type, 'has_mastoid_ref': bool(subs)}
 
-    def _get_load_and_group_channels(self, ch_names: List[str]) -> Tuple[List[str], List[namedtuple], bool]:
+    def _get_load_and_group_channels(self, channels: List[str]) -> Tuple[List[str], List[namedtuple], bool]:
         """
         Identifies, selects, and groups channels from a list of channel names.
         """
+        EOG_BASES     = ('EOG', 'OC', 'E1', 'E2')
+
         ChannelSet = namedtuple("ChannelSet", ["channel_names", "channel_indices"])
-        parsed_channels = [self._parse_channel(name) for name in ch_names]
+        parsed_channels = [self._parse_channel(name) for name in channels]
         
         channels_by_base = OrderedDict()
         for ch in parsed_channels:
@@ -401,32 +359,29 @@ class PSGScorer:
         eog_detected = bool(selected_eog)
 
         # --- Grouping Logic ---
-        if self.auto_channel_grouping:
-            spec = [s.upper() for s in self.auto_channel_grouping if s.upper() != 'MASTOID']
-            
-            ch_by_type = {}
-            # Re-classify channels for grouping now that selection is done
-            for ch in scoring_channels:
-                final_type = 'EOG' if ch['name'] in selected_eog_names else 'EEG'
-                ch_by_type.setdefault(final_type, []).append(ch['name'])
+        spec = [s.upper() for s in ['EEG', 'EOG'] if s.upper() != 'MASTOID']
+        
+        ch_by_type = {}
+        # Re-classify channels for grouping now that selection is done
+        for ch in scoring_channels:
+            final_type = 'EOG' if ch['name'] in selected_eog_names else 'EEG'
+            ch_by_type.setdefault(final_type, []).append(ch['name'])
 
-            if not eog_detected:
-                spec = ['EEG']
+        if not eog_detected:
+            spec = ['EEG']
 
-            groups_to_combine = [ch_by_type[t] for t in spec if t in ch_by_type]
-            
-            if not groups_to_combine:
-                print(f"Warning: Could not find any channels of types {spec} for grouping. Defaulting to all available channels as individual groups.")
-                channel_groups = [[ch['name']] for ch in scoring_channels]
-            else:
-                channel_groups = list(product(*groups_to_combine))
-            
-            # Remove duplicate groups if spec has repeated types (e.g., ['EEG', 'EEG'])
-            if len(set(spec)) < len(spec):
-                unique_combs = {tuple(sorted(c)) for c in channel_groups}
-                channel_groups = sorted(list(unique_combs))
+        groups_to_combine = [ch_by_type[t] for t in spec if t in ch_by_type]
+        
+        if not groups_to_combine:
+            print(f"Warning: Could not find any channels of types {spec} for grouping. Defaulting to all available channels as individual groups.")
+            channel_groups = [[ch['name']] for ch in scoring_channels]
         else:
-            channel_groups = [[ch['name'] for ch in scoring_channels]] if scoring_channels else []
+            channel_groups = list(product(*groups_to_combine))
+        
+        # Remove duplicate groups if spec has repeated types (e.g., ['EEG', 'EEG'])
+        if len(set(spec)) < len(spec):
+            unique_combs = {tuple(sorted(c)) for c in channel_groups}
+            channel_groups = sorted(list(unique_combs))
 
         if not channel_groups:
             return [], [], eog_detected
