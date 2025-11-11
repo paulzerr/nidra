@@ -239,7 +239,7 @@ class ForeheadScorer:
             with open(hypnogram_path, 'w') as f:
                 f.write("sleep_stage\n")
                 np.savetxt(f, self.sleep_stages, delimiter=",", fmt="%d")
-                print(f"Sleep stages saved to: '{hypnogram_path}")
+            print(f"Sleep stages saved to: '{hypnogram_path}")
         if self.hypnodensity:
             with open(hypnodensity_path, 'w') as f:
                 header = "Epoch,Wake,N1,N2,N3,REM,Art\n"
@@ -247,7 +247,7 @@ class ForeheadScorer:
                 for i, probs in enumerate(self.probabilities):
                     prob_str = ",".join(f"{p:.6f}" for p in probs)
                     f.write(f"{i},{prob_str}\n")
-                    print(f"Sleep stages saved to: '{hypnogram_path}")
+            print(f"Sleep stages saved to: '{hypnogram_path}")
                 
     def _make_plot(self):
         if self.plot:
