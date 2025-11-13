@@ -40,7 +40,6 @@ class PSGScorer:
         self.channels        = channels
         self.sfreq           = sfreq
         self.epoch_sec       = 30 # we ignore this input for now and enforce 30s epochs
-        self.target_sample_rate = 128 # resample to 128 for usleep models
         self.hypnodensity    = hypnodensity
         self.plot            = plot
 
@@ -106,12 +105,13 @@ class PSGScorer:
             self.session = ort.InferenceSession(model_path)
             self.input_name = self.session.get_inputs()[0].name
             self.output_name = self.session.get_outputs()[0].name
-            print(f"Model loaded: '{model_path}")
+            print(f"Model loaded: '{model_path}'")
         except Exception as e:
             print(f"Error: Failed to load ONNX model from '{model_path}'. Original error: {e}")
             raise
 
     def _preprocess(self):
+        target_sf = 128
         # Respect user-selected channels if provided; otherwise use all channels
         base_channels = list(self.raw.ch_names)
         if self.channels:
@@ -147,14 +147,14 @@ class PSGScorer:
             threshold = 20 * iqr
             psg_data[:, i] = np.clip(channel_data, -threshold, threshold)
 
-        psg_data_resampled = resample_poly(psg_data, self.target_sample_rate, int(original_sample_rate), axis=0)
+        psg_data_resampled = resample_poly(psg_data, target_sf, int(original_sample_rate), axis=0)
 
         # scale data
         psg_data_scaled = np.empty_like(psg_data_resampled, dtype=np.float64)
         for i in range(psg_data_resampled.shape[1]):
             psg_data_scaled[:, i] = self._robust_scale_channel(psg_data_resampled[:, i])
         
-        n_samples_in_epoch_final = self.epoch_sec * self.target_sample_rate
+        n_samples_in_epoch_final = self.epoch_sec * target_sf
         n_epochs_final = len(psg_data_scaled) // n_samples_in_epoch_final
         psg_data_scaled = psg_data_scaled[:n_epochs_final * n_samples_in_epoch_final]
         
@@ -233,24 +233,24 @@ class PSGScorer:
 
 
     def _save_results(self):
-        hypnogram_path = self.output / f"{self.base_filename}_hypnogram.csv"
-        hypnodensity_path = self.output / f"{self.base_filename}_hypnodensity.csv"
-    
+        
         if self.hypnogram:
+            hypnogram_path = self.output / f"{self.base_filename}_hypnogram.csv"
             with open(hypnogram_path, 'w') as f:
                 f.write("sleep_stage\n")
                 for stage in self.sleep_stages:
                     f.write(f"{int(stage)}\n")
-            print(f"Sleep stages saved to: '{hypnogram_path}")
+            print(f"Sleep stages saved to: '{hypnogram_path}'")
 
         if self.hypnodensity:
+            hypnodensity_path = self.output / f"{self.base_filename}_hypnodensity.csv"
             with open(hypnodensity_path, 'w') as f:
                 header = "Epoch,Wake,N1,N2,N3,REM,Art\n"
                 f.write(header)
                 for i, probs in enumerate(self.probabilities):
                     prob_str = ",".join(f"{p:.6f}" for p in probs)
                     f.write(f"{i},{prob_str},0.000000\n")
-            print(f"Sleep stages saved to: '{hypnodensity_path}")
+            print(f"Classifier probabilities (hypnodensity) saved to: '{hypnodensity_path}'")
 
     def _make_plot(self):
         if self.plot:

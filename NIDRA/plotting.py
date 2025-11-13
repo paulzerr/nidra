@@ -245,10 +245,8 @@ def plot_hypnodensity(hyp, ypred, raw, nclasses=6, figoutdir='./', filename='das
             axs[ax_key].set_xlabel("Time (hrs)")
 
         figsavgname = f'{figoutdir}/{filename}'
-        logger.debug(f"Saving dashboard plot to: {figsavgname}")
         fig.savefig(figsavgname, format='png', dpi=150, bbox_inches='tight')
-        plt.close(fig) # Close the figure to free memory
-        logger.info("Dashboard plot saved successfully")
+        plt.close(fig) 
 
     except Exception as e:
         logger.error(f"Error generating dashboard plot: {e}", exc_info=True)

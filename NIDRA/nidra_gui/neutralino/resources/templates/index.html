@@ -13,15 +13,12 @@
         <div class="panel left-panel">
             <div class="control-group">
                 <h2>{{ texts["INPUT_TITLE"] }}</h2>
-                <div class="file-input-group">
-                    <button id="browse-input-btn" class="browse-btn">{{ texts["BROWSE_BUTTON"] }}</button>
-                    <input type="text" id="input-dir" placeholder="Select input folder...">
+                <div class="input-button-row">
+                    <button id="browse-input-folder-btn" class="browse-btn">{{ texts["SELECT_INPUT_FOLDER_BUTTON"] }}</button>
+                    <span class="or-text">or</span>
+                    <button id="browse-input-file-btn" class="browse-btn">{{ texts["SELECT_INPUT_FILE_BUTTON"] }}</button>
                 </div>
-                <div class="radio-group">
-                    <label><input type="radio" name="scoring-mode" value="single" checked> {{ texts["OPTIONS_SCORE_SINGLE"] }}</label>
-                    <label><input type="radio" name="scoring-mode" value="subdirs"> {{ texts["OPTIONS_SCORE_SUBDIRS"] }}</label>
-                    <label><input type="radio" name="scoring-mode" value="from_file" id="score-from-file"> Score all recordings (paths in .txt file)</label>
-                </div>
+                <input type="text" id="input-dir" placeholder="{{ texts['INPUT_PLACEHOLDER'] }}">
             </div>
 
             <hr>
@@ -30,8 +27,8 @@
                 <h2>{{ texts["OUTPUT_TITLE"] }}</h2>
                 <div class="file-input-group">
                     <button id="browse-output-btn" class="browse-btn">{{ texts["BROWSE_BUTTON"] }}</button>
-                    <input type="text" id="output-dir" placeholder="Select output folder...">
                 </div>
+                <input type="text" id="output-dir" placeholder="{{ texts['OUTPUT_PLACEHOLDER'] }}">
             </div>
 
             <hr>
@@ -53,18 +50,7 @@
                 </div>
             </div>
 
-            <div id="zmax-options" class="control-group" style="display: none;">
-                <!-- <div class="radio-group">
-                    <label class="flex-label">
-                        <span><input type="radio" name="zmax-mode" value="two_files" checked> 2 files per recording (e.g. EEG R.edf & EEG L.edf)</span>
-                        <span class="placeholder"></span>
-                    </label>
-                    <label class="flex-label">
-                        <span><input type="radio" name="zmax-mode" value="one_file"> 1 file per recording (multi-channel .edf)</span>
-                        <button id="select-channels-btn" class="browse-btn">Select channels (optional)</button>
-                    </label>
-                </div> -->
-            </div>
+            <div id="zmax-options" class="control-group" style="display: none;"></div>
 
             <hr>
 

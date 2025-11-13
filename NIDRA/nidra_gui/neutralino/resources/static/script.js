@@ -51,17 +51,17 @@ function initializeApp() {
     const consoleOutput = document.getElementById('console');
     const dataSourceSelect = document.getElementById('data-source');
     const modelNameSelect = document.getElementById('model-name');
-    const browseInputDirBtn = document.getElementById('browse-input-btn');
+    const browseInputFolderBtn = document.getElementById('browse-input-folder-btn');
+    const browseInputFileBtn = document.getElementById('browse-input-file-btn');
     const browseOutputDirBtn = document.getElementById('browse-output-btn');
     const helpBtn = document.getElementById('help-btn');
     const showExampleBtn = document.getElementById('show-example-btn');
     const openRecentBtn = document.getElementById('open-recent-btn');
-    // const zmaxOptions = document.getElementById('zmax-options');
     const selectChannelsBtn = document.getElementById('select-channels-btn');
-    const zmaxModeRadios = document.querySelectorAll('input[name="zmax-mode"]');
 
     let logInterval;
     let statusInterval;
+    window.scoringMode = 'subdirs'; // 'subdirs', 'single_file', or 'from_file'
 
     // Handle Data Source change to update model list and per-mode defaults
     dataSourceSelect.addEventListener('change', () => {
@@ -83,19 +83,6 @@ function initializeApp() {
     // Trigger the change event on load to set the initial state
     dataSourceSelect.dispatchEvent(new Event('change'));
 
-    // Handle ZMax mode change to show/hide the "Select Channels" button
-    // Handle ZMax mode change to show/hide the "Select Channels" button
-    // zmaxModeRadios.forEach(radio => {
-    //     radio.addEventListener('change', () => {
-    //         if (radio.value === 'one_file' && radio.checked) {
-    //             selectChannelsBtn.classList.add('visible');
-    //             // Automatically pre-select channels when this option is chosen
-    //             preselectDefaultChannels();
-    //         } else {
-    //             selectChannelsBtn.classList.remove('visible');
-    //         }
-    //     });
-    // });
 
     // Handle "Select Channels" button click
     selectChannelsBtn.addEventListener('click', async () => {
@@ -128,17 +115,16 @@ function initializeApp() {
 
     // Handle Run Button click
     runBtn.addEventListener('click', async () => {
-        const scoringMode = document.querySelector('input[name="scoring-mode"]:checked').value;
         const payload = {
             input_dir: document.getElementById('input-dir').value,
             output: document.getElementById('output-dir').value,
             data_source: dataSourceSelect.value,
             model: modelNameSelect.value,
             plot: document.getElementById('gen-plot').checked,
-            probabilities: document.getElementById('gen-probs').checked,
+            hypnodensity: document.getElementById('gen-probs').checked,
             gen_stats: document.getElementById('gen-stats').checked,
-            score_subdirs: scoringMode === 'subdirs',
-            score_from_file: scoringMode === 'from_file',
+            score_subdirs: window.scoringMode === 'subdirs',
+            score_from_file: window.scoringMode === 'from_file',
             channels: window.selectedChannels || null
         };
 
@@ -172,70 +158,76 @@ function initializeApp() {
         }
     });
 
-    // "Browse" button functionality
-    const handleBrowseClick = async (targetInputId) => {
-        const scoringMode = document.querySelector('input[name="scoring-mode"]:checked').value;
-        const isFileSelection = (scoringMode === 'from_file' && targetInputId === 'input-dir');
+    const handleBrowseFolder = async (targetInputId) => {
+        try {
+            const response = await fetch('/select-directory');
+            const result = await response.json();
 
-        if (isFileSelection) {
-            // Handle file selection for .txt mode
-            try {
-                const response = await fetch('/select-file');
-                const result = await response.json();
+            if (response.ok && result.status === 'success') {
+                const path = result.path;
+                document.getElementById(targetInputId).value = path;
 
-                if (response.ok && result.status === 'success') {
-                    const filePath = result.path;
-                    document.getElementById('input-dir').value = filePath;
-
-                    // Set default output directory based on the file's location
+                if (targetInputId === 'input-dir') {
+                    window.scoringMode = 'subdirs';
                     const outputDirInput = document.getElementById('output-dir');
-                    const separatorIndex = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
-                    const dirPath = filePath.substring(0, separatorIndex);
-
-                    if (dirPath) {
-                        outputDirInput.value = dirPath + '/autoscorer_output';
+                    if (!outputDirInput.value) { // Set default output if not already set
+                        outputDirInput.value = path + '/autoscorer_output';
                     }
-
-                } else if (result.status === 'cancelled') {
-                    console.log('File selection was cancelled.');
-                } else {
-                    alert(`Error selecting file: ${result.message}`);
                 }
-            } catch (error) {
-                console.error('Failed to open file dialog:', error);
-                alert('An error occurred while trying to open the file dialog.');
+            } else if (result.status === 'cancelled') {
+                console.log('Folder selection was cancelled.');
+            } else {
+                alert(`Error selecting folder: ${result.message}`);
             }
-        } else {
-            // Handle directory selection for all other cases
-            try {
-                const response = await fetch('/select-directory');
-                const result = await response.json();
-
-                if (response.ok && result.status === 'success') {
-                    document.getElementById(targetInputId).value = result.path;
-                    if (targetInputId === 'input-dir') {
-                        const outputDirInput = document.getElementById('output-dir');
-                        if (!outputDirInput.value) {
-                            outputDirInput.value = result.path + '/autoscorer_output';
-                        }
-                    }
-                } else if (result.status === 'cancelled') {
-                    console.log('Directory selection was cancelled.');
-                } else {
-                    alert(`Error selecting directory: ${result.message}`);
-                }
-            } catch (error) {
-                console.error('Failed to open directory dialog:', error);
-                alert('An error occurred while trying to open the directory dialog.');
-            }
+        } catch (error) {
+            console.error('Failed to open folder dialog:', error);
+            alert('An error occurred while trying to open the folder dialog.');
         }
     };
 
-    browseInputDirBtn.addEventListener('click', () => handleBrowseClick('input-dir'));
+    const handleBrowseFile = async () => {
+        try {
+            const response = await fetch('/select-input-file');
+            const result = await response.json();
+
+            if (response.ok && result.status === 'success') {
+                const filePath = result.path;
+                document.getElementById('input-dir').value = filePath;
+
+                // Set scoring mode based on file extension
+                if (filePath.toLowerCase().endsWith('.txt')) {
+                    window.scoringMode = 'from_file';
+                } else {
+                    window.scoringMode = 'single_file';
+                }
+
+                // Set default output directory based on the file's location
+                const outputDirInput = document.getElementById('output-dir');
+                if (!outputDirInput.value) {
+                    const separatorIndex = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+                    const dirPath = filePath.substring(0, separatorIndex);
+                    if (dirPath) {
+                        outputDirInput.value = dirPath + '/autoscorer_output';
+                    }
+                }
+            } else if (result.status === 'cancelled') {
+                console.log('File selection was cancelled.');
+            } else {
+                alert(`Error selecting file: ${result.message}`);
+            }
+        } catch (error) {
+            console.error('Failed to open file dialog:', error);
+            alert('An error occurred while trying to open the file dialog.');
+        }
+    };
+
+    browseInputFolderBtn.addEventListener('click', () => handleBrowseFolder('input-dir'));
+    browseInputFileBtn.addEventListener('click', handleBrowseFile);
+    browseOutputDirBtn.addEventListener('click', () => handleBrowseFolder('output-dir'));
+    
     helpBtn.addEventListener('click', () => {
         window.open('/docs/manual.html', '_blank');
     });
-    browseOutputDirBtn.addEventListener('click', () => handleBrowseClick('output-dir'));
 
     showExampleBtn.addEventListener('click', async () => {
         startPolling();
@@ -247,8 +239,7 @@ function initializeApp() {
             if (response.ok && result.status === 'success') {
                 document.getElementById('input-dir').value = result.path;
                 document.getElementById('output-dir').value = result.path + '/autoscorer_output';
-                document.querySelector('input[name="scoring-mode"][value="single"]').checked = true;
-                
+                window.scoringMode = 'subdirs';
                 runBtn.click();
             } else {
                 alert(`Error showing example: ${result.message}`);

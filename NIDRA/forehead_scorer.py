@@ -97,7 +97,7 @@ class ForeheadScorer:
         print(f"Loading data...")
         # array input mode
         if self.data:
-            if data.ndim != 2 or data.shape[0] != 2:
+            if self.input.ndim != 2 or self.input.shape[0] != 2:
                 raise ValueError("Input data must be a 2D array with 2 channels.")
             if self.sfreq is None:
                 raise ValueError("'sfreq' must be provided when array input is given.")
@@ -125,7 +125,7 @@ class ForeheadScorer:
             info = mne.create_info(['eegl', 'eegr'], sfreq=self.target_fs,
                                    ch_types=['eeg', 'eeg'], verbose=False)
             self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
-            print(f"Loading data from: '{self.input}")
+            print(f"Loading data from: '{self.input}'")
             return
 
         # one-file mode , expects single edf with 2+ channels 
@@ -153,7 +153,7 @@ class ForeheadScorer:
             raw.filter(l_freq=0.5, h_freq=None, verbose=False)
 
             self.raw = raw
-            print(f"Loading data from: '{self.input}")
+            print(f"Loading data from: '{self.input}'")
             return
             
     def _load_model(self):
@@ -163,7 +163,7 @@ class ForeheadScorer:
             self.session = ort.InferenceSession(model_path)
             self.input_name = self.session.get_inputs()[0].name
             self.output_name = self.session.get_outputs()[0].name
-            print(f"Model loaded: '{model_path}")
+            print(f"Model loaded: '{model_path}'")
         except Exception as e:
             print(f"Error: Failed to load ONNX model from '{model_path}'. Original error: {e}")
             raise
@@ -232,22 +232,23 @@ class ForeheadScorer:
         self.sleep_stages[self.sleep_stages == 4] = 5 # REM 
     
     def _save_results(self):
-        hypnogram_path = self.output / f"{self.base_filename}_hypnogram.csv"
-        hypnodensity_path = self.output / f"{self.base_filename}_hypnodensity.csv"
-
+        
         if self.hypnogram:
+            hypnogram_path = self.output / f"{self.base_filename}_hypnogram.csv"
             with open(hypnogram_path, 'w') as f:
                 f.write("sleep_stage\n")
                 np.savetxt(f, self.sleep_stages, delimiter=",", fmt="%d")
-            print(f"Sleep stages saved to: '{hypnogram_path}")
+            print(f"Sleep stages saved to: '{hypnogram_path}'")
+
         if self.hypnodensity:
+            hypnodensity_path = self.output / f"{self.base_filename}_hypnodensity.csv"
             with open(hypnodensity_path, 'w') as f:
                 header = "Epoch,Wake,N1,N2,N3,REM,Art\n"
                 f.write(header)
                 for i, probs in enumerate(self.probabilities):
                     prob_str = ",".join(f"{p:.6f}" for p in probs)
                     f.write(f"{i},{prob_str}\n")
-            print(f"Sleep stages saved to: '{hypnogram_path}")
+            print(f"Classifier probabilities (hypnodensity) saved to: '{hypnodensity_path}'")
                 
     def _make_plot(self):
         if self.plot:

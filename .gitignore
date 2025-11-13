@@ -15,6 +15,7 @@ autoscorer_output/
 build/
 dist/
 NIDRA_build/
+old/
 
 .tmp/
 NIDRA.egg-info/

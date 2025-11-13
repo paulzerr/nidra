@@ -93,9 +93,23 @@ label {
 }
 
 .file-input-group {
+    display: block;
+}
+
+.file-input-group .browse-btn {
+    margin-bottom: calc(var(--unit) * 0.75);
+}
+.input-button-row {
     display: flex;
     align-items: center;
     gap: calc(var(--unit) * 0.75);
+    margin-bottom: calc(var(--unit) * 0.75);
+}
+
+.or-text {
+    font-size: var(--font-size);
+    font-weight: 500;
+    color: var(--text-color);
 }
 
 input[type="text"], select {

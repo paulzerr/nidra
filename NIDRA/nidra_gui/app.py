@@ -17,17 +17,19 @@ from NIDRA import utils
 LOG_FILE, logger = utils.setup_logging()
 
 TEXTS = {
-    "WINDOW_TITLE": "NIDRA", "INPUT_TITLE": "Input Folder", "MODEL_TITLE": "Model",
-    "OPTIONS_TITLE": "Options", "OPTIONS_PROBS": "Generate probabilities", "OPTIONS_PLOT": "Generate graph",
-    "OPTIONS_STATS": "Generate sleep statistics", "OPTIONS_SCORE_SINGLE": "Score single recording",
-    "OPTIONS_SCORE_SUBDIRS": "Score all recordings (in subfolders)", "DATA_SOURCE_TITLE": "Data Source",
+    "WINDOW_TITLE": "NIDRA", "INPUT_TITLE": "Sleep recordings", "MODEL_TITLE": "Model",
+    "OPTIONS_TITLE": "Options", "OPTIONS_PROBS": "Generate hypnodensity", "OPTIONS_PLOT": "Generate graph",
+    "OPTIONS_STATS": "Generate sleep statistics",
+    "DATA_SOURCE_TITLE": "Data Source",
     "DATA_SOURCE_FEE": "EEG wearable (e.g. ZMax)   ", "DATA_SOURCE_PSG": "PSG (EEG/EOG)   ",
-    "OUTPUT_TITLE": "Output Folder", "RUN_BUTTON": "Run autoscoring", "BROWSE_BUTTON": "Browse files...",
+    "OUTPUT_TITLE": "Output location", "RUN_BUTTON": "Run autoscoring",
+    "SELECT_INPUT_FILE_BUTTON": "Select input file", "SELECT_INPUT_FOLDER_BUTTON": "Select input folder",
+    "BROWSE_BUTTON": "Select output folder",
+    "INPUT_PLACEHOLDER": "Select a recording, a folder containing recordings, or a .txt file containing paths...",
+    "OUTPUT_PLACEHOLDER": "Select where to save results...",
     "HELP_TITLE": "Help & Info (opens in browser)",
-    "CONSOLE_INIT_MESSAGE": "\n\nWelcome to NIDRA, the easy-to-use sleep autoscorer.\n\nSpecify input folder (location of your sleep recordings) to begin.\n\nTo shutdown NIDRA, simply close this window or tab.",
-    "ZMAX_OPTIONS_2_FILES": "2 files per recording (e.g. EEG R.edf & EEG L.edf)",
-    "ZMAX_OPTIONS_1_FILE": "1 file per recording (2+ channels)",
-    "ZMAX_OPTIONS_SELECT_CHANNELS": "Select channels (optional)"
+    "CONSOLE_INIT_MESSAGE": "\n\nWelcome to NIDRA, the easy-to-use sleep autoscorer.\n\nSelect your sleep recordings to begin.\n\nTo shutdown NIDRA, simply close this window or tab.",
+
 }
 
 # setup resource paths
@@ -103,10 +105,15 @@ def _choose_folder_mac(prompt="Select a folder"):
         logger.error(f"AppleScript folder selection failed: {e}", exc_info=True)
         return None
 
-def _choose_file_mac(prompt="Select a file", file_type='txt'):
+def _choose_file_mac(prompt="Select a file", file_types=None):
     """Opens a file selection dialog on macOS using AppleScript."""
     try:
-        script = f'POSIX path of (choose file with prompt "{prompt}" of type {{"{file_type}"}})'
+        if file_types:
+            type_str = "of type {" + ", ".join(f'"{t}"' for t in file_types) + "}"
+            script = f'POSIX path of (choose file with prompt "{prompt}" {type_str})'
+        else:
+            script = f'POSIX path of (choose file with prompt "{prompt}")'
+
         out = subprocess.check_output(["osascript", "-e", script], text=True)
         return out.strip()
     except subprocess.CalledProcessError:  # User cancelled
@@ -158,15 +165,20 @@ def select_directory():
     else:
         return jsonify({'status': 'cancelled'})
 
-@app.route('/select-file')
-def select_file():
+@app.route('/select-input-file')
+def select_input_file():
     """
-    Opens a native file selection dialog on the server, filtered for .txt files.
-    This function runs the dialog in a separate thread to avoid blocking the Flask server.
-    On macOS, it uses a thread-safe AppleScript dialog.
+    Opens a native file selection dialog on the server for input files.
+    Supports .edf, .bdf, and .txt files.
     """
+    file_types_supported = [
+        ("Supported Files", "*.edf *.bdf *.txt"),
+    ]
     if platform.system() == "Darwin":
-        path = _choose_file_mac(prompt="Select a .txt file with recording paths", file_type='txt')
+        path = _choose_file_mac(
+            prompt="Select an input file (EDF, BDF, or TXT)",
+            file_types=['edf', 'bdf', 'txt']
+        )
         if path:
             return jsonify({'status': 'success', 'path': path})
         else:
@@ -178,17 +190,17 @@ def select_file():
         from tkinter import filedialog
         try:
             root = tk.Tk()
-            root.withdraw()  # Hide the main window
-            root.attributes('-topmost', True)  # Bring the dialog to the front
+            root.withdraw()
+            root.attributes('-topmost', True)
             path = filedialog.askopenfilename(
-                title="Select a .txt file with recording paths",
-                filetypes=[("Text files", "*.txt")]
+                title="Select an input file",
+                filetypes=file_types_supported
             )
             if path:
                 result['path'] = path
         except Exception as e:
             logger.error(f"An error occurred in the tkinter dialog thread: {e}", exc_info=True)
-            result['error'] = "Could not open the file dialog. Please ensure you have a graphical environment configured."
+            result['error'] = "Could not open the file dialog."
         finally:
             if 'root' in locals() and root:
                 root.destroy()
@@ -217,7 +229,7 @@ def open_recent_results():
             for line in f:
                 if "Results saved to:" in line:
                     # Extract the path after the colon and strip whitespace
-                    path_str = line.split("Results saved to:", 1).strip()
+                    path_str = line.split("Results saved to:", 1)[1].strip()
                     last_output_dir = Path(path_str)
 
         if last_output_dir and last_output_dir.exists():
@@ -266,7 +278,7 @@ def start_scoring():
             data['data_source'],
             data['model'],
             data.get('plot', False),
-            data.get('probabilities', False),
+            data.get('hypnodensity', False),
             data.get('channels')
         )
     )
@@ -473,37 +485,20 @@ def get_channels():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-# this enables reporting on successful/failed scorings
-def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model, plot, probabilities, channels=None):
-    """
-    Manages the global running state and executes the scoring process.
-    This function is intended to be run in a separate thread.
-    """
+def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model, plot, hypnodensity, channels=None):
+
     global is_scoring_running
     success_count, total_count = 0, 0
     try:
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
         if score_subdirs:
-            dir_list = None
-            # If the input is a text file, read the directories from it
-            if Path(input_dir).suffix.lower() == '.txt':
-                try:
-                    with open(input_dir, 'r') as f:
-                        dir_list = [line.strip() for line in f if line.strip()]
-                    logger.info(f"Found {len(dir_list)} directories to process from {input_dir}.")
-                except Exception as e:
-                    logger.error(f"Error reading directory list from {input_dir}: {e}", exc_info=True)
-                    is_scoring_running = False
-                    return
-
             batch = utils.batch_scorer(
-                input_dir=input_dir,
+                input=input_dir,
                 output=output,
                 type=scorer_type,
                 model=model,
-                dir_list=dir_list,
                 channels=channels,
-                probabilities=probabilities,
+                hypnodensity=hypnodensity,
                 plot=plot
             )
             success_count, total_count = batch.score()
@@ -511,27 +506,18 @@ def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model,
             # Single-recording scoring: resolve exactly one target and score it
             logger.info(f"Processing single recording at '{input_dir}'...")
             total_count = 1
-            if _run_scoring(input_dir, output, data_source, model, plot, probabilities, channels):
+            if _run_scoring(input_dir, output, data_source, model, plot, hypnodensity, channels):
                 success_count = 1
 
-    except (FileNotFoundError, ValueError) as e:
-        logger.error(str(e))
     except Exception as e:
         logger.error(f"A critical error occurred in the scoring thread: {e}", exc_info=True)
     finally:
         is_scoring_running = False
-        if total_count > 0:
-            if success_count == total_count:
-                logger.info(f"Successfully processed {total_count} recording(s).")
-            elif 0 < success_count < total_count:
-                logger.info(f"Autoscoring completed with {total_count - success_count} failure(s): "
-                            f"Successfully processed {success_count} of {total_count} recording(s).")
-            elif success_count == 0:
-                logger.info("Autoscoring failed for all recordings.")
+        logger.info(f"{success_count} of {total_count} recording(s) processed successfully.")
+        logger.info("\n" + "="*80 + "\n")
 
-        logger.info("\n" + "="*80 + "\nScoring process finished.\n" + "="*80)
 
-def _run_scoring(input, output, data_source, model, plot, probabilities, channels=None):
+def _run_scoring(input, output, data_source, model, plot, hypnodensity, channels=None):
     """
     Performs scoring on a single recording (file or directory).
     Uses utils.find_files to resolve exactly one target and delegates to the scorer.
@@ -543,7 +529,7 @@ def _run_scoring(input, output, data_source, model, plot, probabilities, channel
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
 
         # Resolve exactly one target (file or directory)
-        targets = utils.find_files(input_dir=input, type=scorer_type, dir_list=[input])
+        targets, _ = utils.find_files(input=input, type=scorer_type)
         if not targets:
             raise FileNotFoundError(f"Could not find any suitable recordings in '{input}'. Please check the input path and data source settings.")
         if len(targets) > 1:
@@ -562,12 +548,12 @@ def _run_scoring(input, output, data_source, model, plot, probabilities, channel
             'model': model,
             'channels': channels,
             'hypnogram': True,
-            'hypnodensity': bool(probabilities),
+            'hypnodensity': bool(hypnodensity),
             'plot': bool(plot),
         }
 
         scorer = scorer_factory(type=scorer_type, **scorer_kwargs)
-        hypnogram, _ = scorer.score()
+        scorer.score()
 
         logger.info("Autoscoring process completed.")
 
@@ -584,12 +570,10 @@ def _run_scoring(input, output, data_source, model, plot, probabilities, channel
 
 @app.route('/status')
 def status():
-    """Returns the current running status."""
     return jsonify({'is_running': is_scoring_running})
 
 @app.route('/log')
 def log_stream():
-    """Streams the content of the log file."""
     try:
         if not LOG_FILE.exists() or LOG_FILE.stat().st_size == 0:
             return TEXTS["CONSOLE_INIT_MESSAGE"]
@@ -598,8 +582,6 @@ def log_stream():
     except Exception as e:
         return f"Error reading log file: {e}"
 
-
-
 # heartbeat to ensure NIDRA is shutdown when tab is closed (ping disappears).
 def probe_frontend_loop():
     """
@@ -607,13 +589,10 @@ def probe_frontend_loop():
     If the frontend is unresponsive for a grace period, the backend shuts down.
     """
     global last_frontend_contact
-    # logger.info("Starting frontend probe loop...")
-
     while True:
         if frontend_url and last_frontend_contact:
             try:
                 # The frontend doesn't need to respond to this, we just need to see if the server is up.
-                # A simple HEAD request is lighter than GET.
                 requests.head(f"{frontend_url}/alive-ping", timeout=3)
                 last_frontend_contact = time.time()
             except requests.exceptions.RequestException:
@@ -624,8 +603,17 @@ def probe_frontend_loop():
                 logger.warning(f"Frontend has been unresponsive for {frontend_grace_period} seconds. Shutting down backend.")
                 os._exit(0)
 
-        time.sleep(5) # Probe every 5 seconds
+        time.sleep(5)
 
+@app.route('/alive-ping')
+def alive_ping():
+    return jsonify({'status': 'ok'})
+
+@app.route('/goodbye', methods=['POST'])
+def goodbye():
+    logger.info("Received /goodbye signal from frontend. Shutting down.")
+    threading.Thread(target=lambda: (time.sleep(1), os._exit(0))).start()
+    return jsonify({'status': 'ok'})
 
 @app.route('/register', methods=['POST'])
 def register_frontend():
@@ -640,8 +628,6 @@ def register_frontend():
 
     frontend_url = url
     last_frontend_contact = time.time()
-    # logger.info(f"Frontend registered from URL: {frontend_url}")
-
     if probe_thread is None:
         probe_thread = threading.Thread(target=probe_frontend_loop, daemon=True)
         probe_thread.start()
@@ -649,18 +635,4 @@ def register_frontend():
     return jsonify({'status': 'success'})
 
 
-@app.route('/goodbye', methods=['POST'])
-def goodbye():
-    """
-    Provides a way for the frontend to signal a clean shutdown.
-    """
-    logger.info("Received /goodbye signal from frontend. Shutting down in 0.3 seconds.")
-    # Short delay to allow the beacon to be sent successfully
-    threading.Thread(target=lambda: (time.sleep(0.3), os._exit(0))).start()
-    return jsonify({'status': 'ok'})
 
-
-@app.route('/alive-ping')
-def alive_ping():
-    """A lightweight endpoint for the backend to probe itself to see if the frontend is still responsive."""
-    return jsonify({'status': 'ok'})

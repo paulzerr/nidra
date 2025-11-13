@@ -15,36 +15,75 @@ import NIDRA
 
 logger = logging.getLogger(__name__)
 
-# Batch scorer refactor: class removed. A functional API is provided below.
-
-def find_files(input_dir, type, dir_list=None):
+def find_files(input, type):
     """
-    Find valid recording targets for batch processing.
+    Find valid recording targets for batch processing and determine a base output directory.
 
     Args:
-        input_dir (str|Path|None): Path containing one subfolder per recording (ignored if dir_list provided).
+        input (str | Path | list[str | Path]): The input to process. Can be:
+            - A directory path: Scans for subdirectories, each containing one recording.
+            - A .txt file path: Reads a list of recording paths (directories or files).
+            - A list of paths: Each item is treated as a recording path (directory or file).
         type (str): 'forehead' or 'psg'.
-        dir_list (list[str|Path]|None): Specific directories or files to process instead of scanning subdirectories.
+
     Returns:
-        list[pathlib.Path]: Items may be directories (forehead) or files (.edf/.bdf).
+        tuple[list[pathlib.Path], pathlib.Path | None]:
+            - A list of resolved recording paths.
+            - A suggested base directory for outputs, or None if not determinable.
     """
     if type not in ('forehead', 'psg'):
         raise ValueError("type must be 'forehead' or 'psg'.")
 
-    input_dir_path = Path(input_dir) if input_dir else None
+    candidates = []
+    output_base_dir = None
 
-    if dir_list:
-        logger.info(f"Searching for recordings in {len(dir_list)} specified paths...")
-        candidates = [Path(d) for d in dir_list]
+    if isinstance(input, list):
+        logger.info(f"Searching for recordings in {len(input)} specified paths...")
+        candidates = [Path(p) for p in input]
+        # If all paths share a common parent, use that as the output base.
+        if candidates:
+            first_path = candidates[0].resolve()
+            common_parent = first_path.parent
+            if all(p.resolve().parent == common_parent for p in candidates):
+                output_base_dir = common_parent
+
+    elif isinstance(input, (str, Path)):
+        input_path = Path(input)
+        if not input_path.exists():
+            raise FileNotFoundError(f"Input not found: {input_path}")
+
+        if input_path.is_file() and input_path.suffix.lower() == '.txt':
+            with open(input_path, 'r') as f:
+                candidates = [Path(line.strip()) for line in f if line.strip()]
+            logger.info(f"Found {len(candidates)} paths to process from {input_path.name}.")
+            output_base_dir = input_path.parent
+        elif input_path.is_dir():
+            logger.info(f"Searching for recordings in '{input_path}' and its subdirectories...")
+            candidates = []
+            
+            # First, find any recording files directly in the input directory.
+            direct_files = sorted(input_path.glob('*.edf')) + sorted(input_path.glob('*.EDF')) + \
+                           sorted(input_path.glob('*.bdf')) + sorted(input_path.glob('*.BDF'))
+            if direct_files:
+                candidates.extend(direct_files)
+
+            # Second, find any subdirectories that might contain recordings.
+            subdirs = [
+                subdir for subdir in sorted(input_path.iterdir())
+                if subdir.is_dir() and not subdir.name.startswith(('autoscorer_output', 'batch_'))
+            ]
+            if subdirs:
+                candidates.extend(subdirs)
+
+            output_base_dir = input_path
+        else: # Assumed to be a single file recording
+            logger.info(f"Processing recording: '{input_path}'")
+            candidates = [input_path]
+            output_base_dir = input_path.parent
+
     else:
-        logger.info(f"Searching for recordings in '{input_dir_path}'...")
-        if not input_dir_path or not input_dir_path.exists():
-            logger.warning("Input directory does not exist or was not provided.")
-            return []
-        candidates = [
-            subdir for subdir in sorted(input_dir_path.iterdir())
-            if subdir.is_dir() and not subdir.name.startswith(('autoscorer_output', 'batch_'))
-        ]
+        raise TypeError("input must be a file or folder path or a list of paths.")
+
 
     def first_file_matching(d: Path, patterns):
         for pat in patterns:
@@ -55,72 +94,36 @@ def find_files(input_dir, type, dir_list=None):
     files_to_process = []
     for item in candidates:
         try:
-            # Accept explicit file paths
             if item.is_file():
-                if type == 'psg':
-                    if item.suffix.lower() in ('.edf', '.bdf'):
-                        files_to_process.append(item)
-                    else:
-                        logger.warning(f"Skipping non-EDF/BDF file: {item}")
-                else:
-                    if item.suffix.lower() in ('.edf', '.EDF'):
-                        files_to_process.append(item)
-                    else:
-                        logger.warning(f"Skipping non-EDF file: {item}")
+                if item.suffix.lower() in ('.edf', '.bdf'):
+                    files_to_process.append(item)
                 continue
-
-            # Treat as directory containing a recording
-            search_dir = item
-            if not search_dir.is_dir():
-                logger.warning(f"'{search_dir}' is not a valid directory. Skipping.")
-                continue
-
-            if type == 'psg':
-                try:
-                    file = first_file_matching(search_dir, ['*.edf', '*.EDF'])
-                except StopIteration:
-                    file = first_file_matching(search_dir, ['*.bdf', '*.BDF'])
-                files_to_process.append(file)
-            else:
-                # Forehead: let the scorer auto-detect mode; pass the directory if it contains at least one EDF
-                edf_files = sorted(search_dir.glob('*.edf')) + sorted(search_dir.glob('*.EDF'))
-                if edf_files:
-                    files_to_process.append(search_dir)
-                else:
-                    raise StopIteration
+            if item.is_dir():
+                files_to_process.append(first_file_matching(item, ['*.edf', '*.bdf', '*.EDF', '*.BDF']))
         except StopIteration:
-            logger.warning(f"Could not find a complete recording in '{item}'. Skipping.")
             continue
 
-    if not files_to_process:
-        logger.warning("Could not find any suitable recordings in the specified locations.")
-        return []
-
-    logger.info(f"Found {len(files_to_process)} recording(s) to process.")
-    logger.info("The following recordings will be processed:")
+    # Skip right-channel EDF file if its left-channel pair exists
+    files = {str(p).lower() for p in files_to_process}
+    filtered_files = []
     for path in files_to_process:
-        logger.info(f"  - {path}")
+        file_name = str(path).lower()
+        if file_name.endswith('r.edf') and file_name[:-5] + 'l.edf' in files:
+            continue
+        filtered_files.append(path)
+    files_to_process = filtered_files
 
-    return files_to_process
-
-def resolve_output_dir(input_dir, output):
-    """
-    Resolve and return the base output directory as a Path.
-    If output is None and input_dir is provided, defaults to input_dir.
-    """
-    input_dir_path = Path(input_dir) if input_dir else None
-    if output is None:
-        if input_dir_path is not None:
-            output_dir = input_dir_path
-            logger.info(f"No output specified. Using input_dir as output: {output_dir}")
-        else:
-            raise ValueError("output must be specified when input_dir is not provided.")
+    if not files_to_process:
+        logger.warning(f"Could not find any sleep recordings in '{input}'.")
     else:
-        output_dir = Path(output)
-    return output_dir
+        logger.info(f"The following {len(files_to_process)} recordings will be scored:")
+        for path in files_to_process:
+            logger.info(f"  ::: {path} :::")
+
+    return files_to_process, output_base_dir
 
 
-def process_target(target, batch_output_dir, type, model, channels, hypnogram, probabilities, plot):
+def process_target(target, batch_output_dir, type, model, channels, hypnogram, hypnodensity, plot):
     """
     Process a single target (file or directory) within a batch run.
 
@@ -131,7 +134,7 @@ def process_target(target, batch_output_dir, type, model, channels, hypnogram, p
         model (str|None): Model name to use.
         channels (list[str]|None): Channels selection.
         hypnogram (bool|None): Whether to save hypnogram; defaults handled in scorer call.
-        probabilities (bool): Whether to save hypnodensity (legacy 'probabilities' flag).
+        hypnodensity (bool): Whether to save hypnodensity (legacy 'probabilities' flag).
         plot (bool): Whether to save dashboard plot.
 
     Returns:
@@ -153,36 +156,34 @@ def process_target(target, batch_output_dir, type, model, channels, hypnogram, p
             'model': model,
             'channels': channels,
             'hypnogram': True if hypnogram is None else bool(hypnogram),
-            'hypnodensity': bool(probabilities),
+            'hypnodensity': bool(hypnodensity),
             'plot': bool(plot),
         }
 
         scorer = NIDRA.scorer(**scorer_kwargs)
-        hypnogram_out, _ = scorer.score()
-        logger.info("Autoscoring completed.")
+        scorer.score()
 
 
         execution_time = time.time() - start_time
-        logger.info(f">> SUCCESS: Finished processing {target_path} in {execution_time:.2f} seconds.")
+        logger.info(f">> SUCCESS: Finished scoring {target_path} in {execution_time:.2f} seconds.")
         logger.info(f"  Results saved to: {recording_output_dir}")
         return True
     except Exception as e:
-        logger.error(f">> FAILED to process {target_path}: {e}", exc_info=True)
+        logger.error(f">> FAILED to score {target_path}: {e}", exc_info=True)
         return False
     
-def batch_scorer(input_dir, output=None, type=None, model=None, dir_list=None, channels=None, hypnogram=None, probabilities=False, plot=False):
+def batch_scorer(input, output=None, type=None, model=None, channels=None, hypnogram=None, hypnodensity=False, plot=False):
     """
-    Run batch scoring over a study directory or explicit list of targets.
+    Run batch scoring over a study directory, a list of targets, or a .txt file.
 
     Args:
-        input_dir (str|Path|None): Path containing one subfolder per recording (ignored if dir_list provided).
-        output (str|Path|None): Base directory where batch results will be saved. Defaults to input_dir if omitted.
+        input (str | Path | list): Path to recordings (directory, .txt file) or a list of paths.
+        output (str|Path|None): Base directory for results. Defaults to the input's directory.
         type (str): 'forehead' or 'psg'.
         model (str|None): Name of the model to use.
-        dir_list (list[str|Path]|None): Specific directories or files to process instead of scanning subdirectories.
         channels (list[str]|None): Channel names selection (PSG) or two channel names (forehead one-file mode).
-        hypnogram (bool|None): Save hypnogram CSVs. Defaults to True for file inputs.
-        probabilities (bool): Save classifier probabilities (hypnodensity) CSVs. Deprecated name; forwarded to scorers as hypnodensity.
+        hypnogram (bool|None): Save hypnogram CSVs. Defaults to True.
+        hypnodensity (bool): Save classifier probabilities (hypnodensity) CSVs.
         plot (bool): Save dashboard plot.
 
     Returns:
@@ -191,20 +192,27 @@ def batch_scorer(input_dir, output=None, type=None, model=None, dir_list=None, c
     if type not in ('forehead', 'psg'):
         raise ValueError("type must be specified: 'forehead' or 'psg'.")
 
-    # Resolve output directory and discover files now; execution deferred to .score()
-    output_dir = resolve_output_dir(input_dir, output)
-    files_to_process = find_files(input_dir, type, dir_list)
+    files_to_process, output_base_dir = find_files(input, type)
+
+    # Resolve output directory
+    if output:
+        output_dir = Path(output)
+    elif output_base_dir:
+        output_dir = output_base_dir
+    else:
+        # Fallback if find_files couldn't determine a base (e.g., empty list)
+        output_dir = Path.cwd()
+        logger.warning(f"Could not determine a base directory for outputs. Defaulting to current working directory: {output_dir}")
+
 
     def score():
         if not files_to_process:
-            logger.warning("Could not find any suitable recordings in the specified locations.")
+            # The warning is already logged by find_files
             return 0, 0
 
         batch_start_time = time.time()
         batch_output_dir = output_dir / f"autoscorer_output_run_{time.strftime('%Y%m%d_%H%M%S')}"
         batch_output_dir.mkdir(parents=True, exist_ok=True)
-        logger.info("\n" + "-" * 80)
-        logger.info(f"Starting batch processing. Results will be saved to: {batch_output_dir}")
 
         processed_count = 0
         total = len(files_to_process)
@@ -221,7 +229,7 @@ def batch_scorer(input_dir, output=None, type=None, model=None, dir_list=None, c
                 model=model,
                 channels=channels,
                 hypnogram=hypnogram,
-                probabilities=probabilities,
+                hypnodensity=hypnodensity,
                 plot=plot,
             )
             if success:
@@ -229,8 +237,7 @@ def batch_scorer(input_dir, output=None, type=None, model=None, dir_list=None, c
 
         total_execution_time = time.time() - batch_start_time
         logger.info("\n" + "-" * 80)
-        logger.info("BATCH PROCESSING COMPLETE")
-        logger.info(f"Successfully processed {processed_count} of {total} recordings.")
+        logger.info("PROCESSING COMPLETE")
         logger.info(f"Total execution time: {total_execution_time:.2f} seconds.")
         logger.info(f"All results saved in: {batch_output_dir}")
         logger.info("-" * 80)
@@ -548,15 +555,42 @@ def get_model_path(model_name=None):
     return models_dir / model_name if model_name else models_dir
 
 
+
+def get_app_dir():
+    """
+    Returns (base_path, is_bundle)
+      - base_path: Path object for the application's root directory
+      - is_bundle: 1 if running as a PyInstaller bundle, 0 otherwise
+    """
+    # PyInstaller bundle (one-dir)
+    if getattr(sys, 'frozen', False):
+        exe_dir = Path(sys.executable).resolve().parent
+        internal_dir = exe_dir / "_internal"
+        if internal_dir.exists():
+            return internal_dir, 1
+        return exe_dir, 1
+
+    # Running from source
+    this_file = Path(__file__).resolve()
+    if this_file.is_file():
+        return this_file.parent, 0
+
+    # Installed as pip package
+    spec = importlib.util.find_spec("NIDRA")
+    if spec and spec.origin:
+        return Path(spec.origin).resolve().parent, 0
+
+    return None, 0
+
+
+
+
+
+
 def download_models(logger):
     """
     Checks for models in the user's data directory and downloads them if missing.
-    Logs progress to the provided logger instance.
-    Returns True if a download was attempted, False otherwise.
     """
-    app_dir, is_bundle = get_app_dir()
-    if is_bundle:
-        return False
 
     # make local models folder
     repo_id = "pzerr/NIDRA_models"
@@ -570,6 +604,10 @@ def download_models(logger):
     if not models_to_download:
         logger.info(f"Models found at: {models_dir}")
         return False
+
+    # app_dir, is_bundle = get_app_dir() # no longer needed
+    #     if is_bundle:
+    #         return False
 
     # download models
     logger.info("--- Downloading model files ---")
@@ -598,46 +636,18 @@ def download_models(logger):
         except Exception as e:
             logger.error(f"Error downloading {model_name}: {e}", exc_info=True)
             repo_url = "https://huggingface.co/pzerr/NIDRA_models"
-            download_dir = get_model_path(model_name)
             error_message = (
                 "\n--- MODEL DOWNLOAD FAILED ---\n"
                 f"Automatic download of the required model '{model_name}' failed.\n"
                 "Please try one of the following solutions:\n"
-                "1. Use the single-file executable version of NIDRA, which includes all models.\n"
+                "1. Use the standalone version of NIDRA, which includes all models.\n"
                 f"2. Manually download the model from: {repo_url}\n"
-                f"   And place it in the following directory: {os.path.dirname(download_dir)}\n"
+                f"   And place it in the following directory: {models_dir}\n"
             )
             logger.error(error_message)
     
     logger.info("--- Model download complete ---")
     return True
-
-def get_app_dir():
-    """
-    Returns (base_path, is_bundle)
-      - base_path: Path object for the application's root directory
-      - is_bundle: 1 if running as a PyInstaller bundle, 0 otherwise
-    """
-    # PyInstaller bundle (one-dir)
-    if getattr(sys, 'frozen', False):
-        exe_dir = Path(sys.executable).resolve().parent
-        internal_dir = exe_dir / "_internal"
-        if internal_dir.exists():
-            return internal_dir, 1
-        return exe_dir, 1
-
-    # Running from source
-    this_file = Path(__file__).resolve()
-    if this_file.is_file():
-        return this_file.parent, 0
-
-    # Installed as pip package
-    spec = importlib.util.find_spec("NIDRA")
-    if spec and spec.origin:
-        return Path(spec.origin).resolve().parent, 0
-
-    return None, 0
-
 
 def download_example_data(logger):
     """
@@ -671,12 +681,10 @@ def download_example_data(logger):
             download_dir = example_data_dir / filename
             error_message = (
                 "\n--- EXAMPLE DATA DOWNLOAD FAILED ---\n"
-                f"Automatic download of the example data file '{filename}' failed.\n"
-                f"Please try manually downloading the file from: {repo_url}\n"
-                f"And place it in the following directory: {example_data_dir}\n"
+                f"Please try to manually download the files from: {repo_url}\n"
+                f"And place them in this directory: {example_data_dir}\n"
             )
             logger.error(error_message)
-            # If a download fails, return None to indicate an error
             return None
 
     logger.info("--- Example data download complete ---")
