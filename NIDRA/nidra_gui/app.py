@@ -11,7 +11,6 @@ import subprocess
 import mne
 import requests
 
-from NIDRA import scorer as scorer_factory
 from NIDRA import utils
 
 LOG_FILE, logger = utils.setup_logging()
@@ -82,8 +81,7 @@ def index():
     logger.info(f"User Agent: {request.headers.get('User-Agent', 'N/A')}")
     logger.info("--------------------------------------------------------------------------\n")
 
-    logger.info("\nChecking if autoscoring model files are available...")
-    utils.download_models(logger=logger)
+    utils.download_assets("models",logger)
     logger.info(TEXTS.get("CONSOLE_INIT_MESSAGE", "Welcome to NIDRA."))
 
     return render_template('index.html', texts=TEXTS)
@@ -216,6 +214,121 @@ def select_input_file():
     else:
         return jsonify({'status': 'cancelled'})
 
+@app.route('/start-scoring', methods=['POST'])
+def start_scoring():
+    """Starts the scoring process in a background thread."""
+    global is_scoring_running, worker_thread
+
+    if is_scoring_running:
+        return jsonify({'status': 'error', 'message': 'Scoring is already in progress.'}), 409
+
+    data = request.json
+    required_keys = ['input_dir', 'output', 'data_source', 'model', 'score_subdirs']
+    if not all(key in data for key in required_keys):
+        return jsonify({'status': 'error', 'message': 'Missing required parameters.'}), 400
+
+    is_scoring_running = True
+    logger.info("\n" + "="*80 + "\nStarting new scoring process on python backend...\n" + "="*80)
+
+    # call scorer
+    worker_thread = threading.Thread(
+        target=scoring_thread_wrapper,
+        args=(
+            data['input_dir'],
+            data['output'],
+            data.get('score_subdirs', False) or data.get('score_from_file', False),
+            data['data_source'],
+            data['model'],
+            data.get('plot', False),
+            data.get('hypnodensity', False),
+            data.get('channels')
+        )
+    )
+    worker_thread.start()
+    return jsonify({'status': 'success', 'message': 'Scoring process initiated.'})
+
+
+def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model, plot, hypnodensity, channels=None):
+
+    global is_scoring_running
+    try:
+        scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
+        #if score_subdirs:
+        batch = utils.batch_scorer(
+            input=input_dir,
+            output=output,
+            type=scorer_type,
+            model=model,
+            channels=channels,
+            hypnodensity=hypnodensity,
+            plot=plot
+        )
+        batch.score()
+        # else:
+        #     # Single-recording scoring: resolve exactly one target and score it
+        #     logger.info(f"Processing single recording at '{input_dir}'...")
+        #     total_count = 1
+        #     if _run_scoring(input_dir, output, data_source, model, plot, hypnodensity, channels):
+        #         success_count = 1
+
+    except Exception as e:
+        logger.error(f"A critical error occurred in the scoring thread: {e}", exc_info=True)
+    finally:
+        is_scoring_running = False
+
+
+
+# def _run_scoring(input, output, data_source, model, plot, hypnodensity, channels=None):
+#     """
+#     Performs scoring on a single recording (file or directory).
+#     Uses utils.find_files to resolve exactly one target and delegates to the scorer.
+#     """
+#     if channels:
+#         logger.info(f"Using custom channel selection: {channels}")
+#     try:
+#         start_time = time.time()
+#         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
+
+#         # Resolve exactly one target (file or directory)
+#         targets, _ = utils.find_files(input)
+#         if not targets:
+#             raise FileNotFoundError(f"Could not find any suitable recordings in '{input}'. Please check the input path and data source settings.")
+#         if len(targets) > 1:
+#             raise ValueError(
+#                 f"Multiple recordings were detected for '{input}'. "
+#                 "Please select a single recording folder/file, or choose 'Score all recordings (in subfolders)'."
+#             )
+#         target = targets[0]
+#         logger.info("\n" + "-" * 80)
+#         logger.info(f"Processing: {target}")
+#         logger.info("-" * 80)
+
+#         scorer_kwargs = {
+#             'input': target,
+#             'output': output,
+#             'model': model,
+#             'channels': channels,
+#             'hypnogram': True,
+#             'hypnodensity': bool(hypnodensity),
+#             'plot': bool(plot),
+#         }
+
+#         scorer = scorer_factory(type=scorer_type, **scorer_kwargs)
+#         scorer.score()
+
+#         logger.info("Autoscoring process completed.")
+
+#         execution_time = time.time() - start_time
+#         name = Path(target).name
+#         logger.info(f">> SUCCESS: Finished processing {name} in {execution_time:.2f} seconds.")
+#         logger.info(f"  Results saved to: {output}")
+#         return True
+#     except Exception as e:
+#         nm = Path(input).name if hasattr(input, '__str__') else 'input'
+#         logger.error(f">> FAILED to process {nm}: {e}", exc_info=True)
+#         return False
+
+
 
 @app.route('/open-recent-results', methods=['POST'])
 def open_recent_results():
@@ -252,39 +365,6 @@ def open_recent_results():
         logger.error(f"An error occurred while trying to open the recent results folder: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': 'An unexpected error occurred.'}), 500
 
-@app.route('/start-scoring', methods=['POST'])
-def start_scoring():
-    """Starts the scoring process in a background thread."""
-    global is_scoring_running, worker_thread
-
-    if is_scoring_running:
-        return jsonify({'status': 'error', 'message': 'Scoring is already in progress.'}), 409
-
-    data = request.json
-    required_keys = ['input_dir', 'output', 'data_source', 'model', 'score_subdirs']
-    if not all(key in data for key in required_keys):
-        return jsonify({'status': 'error', 'message': 'Missing required parameters.'}), 400
-
-    is_scoring_running = True
-    logger.info("\n" + "="*80 + "\nStarting new scoring process on python backend...\n" + "="*80)
-
-    # call scorer
-    worker_thread = threading.Thread(
-        target=scoring_thread_wrapper,
-        args=(
-            data['input_dir'],
-            data['output'],
-            data.get('score_subdirs', False) or data.get('score_from_file', False),
-            data['data_source'],
-            data['model'],
-            data.get('plot', False),
-            data.get('hypnodensity', False),
-            data.get('channels')
-        )
-    )
-    worker_thread.start()
-    return jsonify({'status': 'success', 'message': 'Scoring process initiated.'})
-
 
 @app.route('/show-example', methods=['POST'])
 def show_example():
@@ -304,9 +384,8 @@ def show_example():
                 return jsonify({'status': 'error', 'message': 'Could not find local example data.'}), 500
         else:
             # Otherwise, download it
-            example_data_path = utils.download_example_data(logger=logger)
+            example_data_path = utils.download_assets("example_data",logger)
             if example_data_path:
-                logger.info(f"Example data is ready at: {example_data_path}")
                 return jsonify({'status': 'success', 'path': example_data_path})
             else:
                 logger.error("Failed to download or locate the example data.")
@@ -485,87 +564,7 @@ def get_channels():
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model, plot, hypnodensity, channels=None):
 
-    global is_scoring_running
-    success_count, total_count = 0, 0
-    try:
-        scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
-        if score_subdirs:
-            batch = utils.batch_scorer(
-                input=input_dir,
-                output=output,
-                type=scorer_type,
-                model=model,
-                channels=channels,
-                hypnodensity=hypnodensity,
-                plot=plot
-            )
-            success_count, total_count = batch.score()
-        else:
-            # Single-recording scoring: resolve exactly one target and score it
-            logger.info(f"Processing single recording at '{input_dir}'...")
-            total_count = 1
-            if _run_scoring(input_dir, output, data_source, model, plot, hypnodensity, channels):
-                success_count = 1
-
-    except Exception as e:
-        logger.error(f"A critical error occurred in the scoring thread: {e}", exc_info=True)
-    finally:
-        is_scoring_running = False
-        logger.info(f"{success_count} of {total_count} recording(s) processed successfully.")
-        logger.info("\n" + "="*80 + "\n")
-
-
-def _run_scoring(input, output, data_source, model, plot, hypnodensity, channels=None):
-    """
-    Performs scoring on a single recording (file or directory).
-    Uses utils.find_files to resolve exactly one target and delegates to the scorer.
-    """
-    if channels:
-        logger.info(f"Using custom channel selection: {channels}")
-    try:
-        start_time = time.time()
-        scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
-
-        # Resolve exactly one target (file or directory)
-        targets, _ = utils.find_files(input=input, type=scorer_type)
-        if not targets:
-            raise FileNotFoundError(f"Could not find any suitable recordings in '{input}'. Please check the input path and data source settings.")
-        if len(targets) > 1:
-            raise ValueError(
-                f"Multiple recordings were detected for '{input}'. "
-                "Please select a single recording folder/file, or choose 'Score all recordings (in subfolders)'."
-            )
-        target = targets[0]
-        logger.info("\n" + "-" * 80)
-        logger.info(f"Processing: {target}")
-        logger.info("-" * 80)
-
-        scorer_kwargs = {
-            'input': target,
-            'output': output,
-            'model': model,
-            'channels': channels,
-            'hypnogram': True,
-            'hypnodensity': bool(hypnodensity),
-            'plot': bool(plot),
-        }
-
-        scorer = scorer_factory(type=scorer_type, **scorer_kwargs)
-        scorer.score()
-
-        logger.info("Autoscoring process completed.")
-
-        execution_time = time.time() - start_time
-        name = Path(target).name
-        logger.info(f">> SUCCESS: Finished processing {name} in {execution_time:.2f} seconds.")
-        logger.info(f"  Results saved to: {output}")
-        return True
-    except Exception as e:
-        nm = Path(input).name if hasattr(input, '__str__') else 'input'
-        logger.error(f">> FAILED to process {nm}: {e}", exc_info=True)
-        return False
 
 
 @app.route('/status')

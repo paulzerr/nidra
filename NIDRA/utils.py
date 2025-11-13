@@ -1,5 +1,4 @@
 import os
-import re
 import sys
 import logging
 import time
@@ -15,269 +14,159 @@ import NIDRA
 
 logger = logging.getLogger(__name__)
 
-def find_files(input, type):
-    """
-    Find valid recording targets for batch processing and determine a base output directory.
+def find_files(input_path):
 
-    Args:
-        input (str | Path | list[str | Path]): The input to process. Can be:
-            - A directory path: Scans for subdirectories, each containing one recording.
-            - A .txt file path: Reads a list of recording paths (directories or files).
-            - A list of paths: Each item is treated as a recording path (directory or file).
-        type (str): 'forehead' or 'psg'.
+    input_path = Path(input_path)
+    exts = {".edf", ".bdf"}
+    files = []
 
-    Returns:
-        tuple[list[pathlib.Path], pathlib.Path | None]:
-            - A list of resolved recording paths.
-            - A suggested base directory for outputs, or None if not determinable.
-    """
-    if type not in ('forehead', 'psg'):
-        raise ValueError("type must be 'forehead' or 'psg'.")
+    def collect_from_dir(d: Path):
+        for f in d.rglob("*"):
+            if f.is_file() and f.suffix.lower() in exts:
+                files.append(f)
 
-    candidates = []
-    output_base_dir = None
+    def collect_from_txt(txt: Path):
+        with open(txt, "r") as f:
+            for line in f:
+                p = Path(line.strip())
+                if not p.exists():
+                    continue
+                resolve_input(p)
 
-    if isinstance(input, list):
-        logger.info(f"Searching for recordings in {len(input)} specified paths...")
-        candidates = [Path(p) for p in input]
-        # If all paths share a common parent, use that as the output base.
-        if candidates:
-            first_path = candidates[0].resolve()
-            common_parent = first_path.parent
-            if all(p.resolve().parent == common_parent for p in candidates):
-                output_base_dir = common_parent
+    def resolve_input(p: Path):
+        if p.is_file():
+            if p.suffix.lower() == ".txt":
+                collect_from_txt(p)
+            elif p.suffix.lower() in exts:
+                files.append(p)
+        elif p.is_dir():
+            collect_from_dir(p)
 
-    elif isinstance(input, (str, Path)):
-        input_path = Path(input)
-        if not input_path.exists():
-            raise FileNotFoundError(f"Input not found: {input_path}")
+    resolve_input(input_path)
 
-        if input_path.is_file() and input_path.suffix.lower() == '.txt':
-            with open(input_path, 'r') as f:
-                candidates = [Path(line.strip()) for line in f if line.strip()]
-            logger.info(f"Found {len(candidates)} paths to process from {input_path.name}.")
-            output_base_dir = input_path.parent
-        elif input_path.is_dir():
-            logger.info(f"Searching for recordings in '{input_path}' and its subdirectories...")
-            candidates = []
-            
-            # First, find any recording files directly in the input directory.
-            direct_files = sorted(input_path.glob('*.edf')) + sorted(input_path.glob('*.EDF')) + \
-                           sorted(input_path.glob('*.bdf')) + sorted(input_path.glob('*.BDF'))
-            if direct_files:
-                candidates.extend(direct_files)
-
-            # Second, find any subdirectories that might contain recordings.
-            subdirs = [
-                subdir for subdir in sorted(input_path.iterdir())
-                if subdir.is_dir() and not subdir.name.startswith(('autoscorer_output', 'batch_'))
-            ]
-            if subdirs:
-                candidates.extend(subdirs)
-
-            output_base_dir = input_path
-        else: # Assumed to be a single file recording
-            logger.info(f"Processing recording: '{input_path}'")
-            candidates = [input_path]
-            output_base_dir = input_path.parent
-
-    else:
-        raise TypeError("input must be a file or folder path or a list of paths.")
-
-
-    def first_file_matching(d: Path, patterns):
-        for pat in patterns:
-            for f in d.glob(pat):
-                return f
-        raise StopIteration
-
+    # Remove *r.edf when matching *l.edf exists
+    lowercase_set = {str(f).lower() for f in files}
     files_to_process = []
-    for item in candidates:
-        try:
-            if item.is_file():
-                if item.suffix.lower() in ('.edf', '.bdf'):
-                    files_to_process.append(item)
+    for f in files:
+        lf = str(f).lower()
+        if lf.endswith("r.edf"):
+            l_version = lf[:-5] + "l.edf"
+            if l_version in lowercase_set:
                 continue
-            if item.is_dir():
-                files_to_process.append(first_file_matching(item, ['*.edf', '*.bdf', '*.EDF', '*.BDF']))
-        except StopIteration:
-            continue
+        files_to_process.append(f)
 
-    # Skip right-channel EDF file if its left-channel pair exists
-    files = {str(p).lower() for p in files_to_process}
-    filtered_files = []
-    for path in files_to_process:
-        file_name = str(path).lower()
-        if file_name.endswith('r.edf') and file_name[:-5] + 'l.edf' in files:
-            continue
-        filtered_files.append(path)
-    files_to_process = filtered_files
+    if input_path.is_file():
+        output_base = input_path.parent
+    else:
+        output_base = input_path
 
     if not files_to_process:
-        logger.warning(f"Could not find any sleep recordings in '{input}'.")
+        logger.warning(f"Could not find any sleep recordings in '{input_path}'.")
     else:
         logger.info(f"The following {len(files_to_process)} recordings will be scored:")
-        for path in files_to_process:
-            logger.info(f"  ::: {path} :::")
+        for f in files_to_process:
+            logger.info(f"  > {f}")
 
-    return files_to_process, output_base_dir
-
-
-def process_target(target, batch_output_dir, type, model, channels, hypnogram, hypnodensity, plot):
-    """
-    Process a single target (file or directory) within a batch run.
-
-    Args:
-        target (str|Path): Path to EDF/BDF file (PSG) or to directory/file (forehead).
-        batch_output_dir (Path): Base batch run output directory.
-        type (str): 'forehead' or 'psg'.
-        model (str|None): Model name to use.
-        channels (list[str]|None): Channels selection.
-        hypnogram (bool|None): Whether to save hypnogram; defaults handled in scorer call.
-        hypnodensity (bool): Whether to save hypnodensity (legacy 'probabilities' flag).
-        plot (bool): Whether to save dashboard plot.
-
-    Returns:
-        bool: True on success, False on failure.
-    """
-    target_path = Path(target)
-    rec_name = target_path.name if target_path.is_dir() else target_path.parent.name
-    base_name = target_path.name if target_path.is_dir() else target_path.stem
-    recording_output_dir = batch_output_dir / rec_name
-    recording_output_dir.mkdir(exist_ok=True)
-
-    try:
-        start_time = time.time()
-
-        scorer_kwargs = {
-            'type': type,
-            'input': target_path,
-            'output': str(recording_output_dir),
-            'model': model,
-            'channels': channels,
-            'hypnogram': True if hypnogram is None else bool(hypnogram),
-            'hypnodensity': bool(hypnodensity),
-            'plot': bool(plot),
-        }
-
-        scorer = NIDRA.scorer(**scorer_kwargs)
-        scorer.score()
+    return files_to_process, output_base
 
 
-        execution_time = time.time() - start_time
-        logger.info(f">> SUCCESS: Finished scoring {target_path} in {execution_time:.2f} seconds.")
-        logger.info(f"  Results saved to: {recording_output_dir}")
-        return True
-    except Exception as e:
-        logger.error(f">> FAILED to score {target_path}: {e}", exc_info=True)
-        return False
-    
-def batch_scorer(input, output=None, type=None, model=None, channels=None, hypnogram=None, hypnodensity=False, plot=False):
-    """
-    Run batch scoring over a study directory, a list of targets, or a .txt file.
+def batch_scorer(input, output=None, type=None, model=None, 
+                 channels=None, hypnogram=None, hypnodensity=False, plot=False):
 
-    Args:
-        input (str | Path | list): Path to recordings (directory, .txt file) or a list of paths.
-        output (str|Path|None): Base directory for results. Defaults to the input's directory.
-        type (str): 'forehead' or 'psg'.
-        model (str|None): Name of the model to use.
-        channels (list[str]|None): Channel names selection (PSG) or two channel names (forehead one-file mode).
-        hypnogram (bool|None): Save hypnogram CSVs. Defaults to True.
-        hypnodensity (bool): Save classifier probabilities (hypnodensity) CSVs.
-        plot (bool): Save dashboard plot.
+    if type not in ("forehead", "psg"):
+        raise ValueError("type must be 'forehead' or 'psg'.")
 
-    Returns:
-        An object exposing .score(). Call .score() to execute and receive (processed_count, total_files_found).
-    """
-    if type not in ('forehead', 'psg'):
-        raise ValueError("type must be specified: 'forehead' or 'psg'.")
+    files_to_process, output_base_dir = find_files(input)
 
-    files_to_process, output_base_dir = find_files(input, type)
-
-    # Resolve output directory
     if output:
         output_dir = Path(output)
     elif output_base_dir:
         output_dir = output_base_dir
     else:
-        # Fallback if find_files couldn't determine a base (e.g., empty list)
         output_dir = Path.cwd()
-        logger.warning(f"Could not determine a base directory for outputs. Defaulting to current working directory: {output_dir}")
-
+        logger.warning(
+            f"Could not determine a base directory for outputs. "
+            f"Defaulting to current working directory: {output_dir}"
+        )
 
     def score():
         if not files_to_process:
-            # The warning is already logged by find_files
             return 0, 0
 
-        batch_start_time = time.time()
+        batch_start = time.time()
         batch_output_dir = output_dir / f"autoscorer_output_run_{time.strftime('%Y%m%d_%H%M%S')}"
-        batch_output_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            batch_output_dir.mkdir(parents=True, exist_ok=True)
+        except:
+            logger.error(f"Unable to make output folder at {batch_output_dir}, please specify a location where you have user rights.")
 
-        processed_count = 0
+        success_count = 0
         total = len(files_to_process)
 
         for i, target in enumerate(files_to_process):
+            target_path = Path(target)
+
             logger.info("\n" + "-" * 80)
-            logger.info(f"[{i + 1}/{total}] Processing: {target}")
-            logger.info("-" * 80)
+            logger.info(f"[{i + 1}/{total}] Processing: {target_path}")
+            
+            rec_name = target_path.name if target_path.is_dir() else target_path.parent.name
+            out_dir = batch_output_dir / rec_name
+            out_dir.mkdir(exist_ok=True)
 
-            success = process_target(
-                target=target,
-                batch_output_dir=batch_output_dir,
-                type=type,
-                model=model,
-                channels=channels,
-                hypnogram=hypnogram,
-                hypnodensity=hypnodensity,
-                plot=plot,
-            )
-            if success:
-                processed_count += 1
+            try:
+                start = time.time()
 
-        total_execution_time = time.time() - batch_start_time
-        logger.info("\n" + "-" * 80)
+                scorer = NIDRA.scorer(
+                    type=type,
+                    input=target_path,
+                    output=str(out_dir),
+                    model=model,
+                    channels=channels,
+                    hypnogram=True if hypnogram is None else bool(hypnogram),
+                    hypnodensity=bool(hypnodensity),
+                    plot=bool(plot),
+                )
+
+                scorer.score()
+
+                dt = time.time() - start
+                logger.info(f">> SUCCESS: Finished scoring {target_path} in {dt:.2f} seconds.")
+                logger.info(f"   Results saved to: {out_dir}")
+                logger.info("-" * 80)
+                success_count += 1
+
+            except Exception as e:
+                logger.error(f">> FAILED to score {target_path}: {e}", exc_info=True)
+
+        total_dt = time.time() - batch_start
+        logger.info("\n" + "="*80)
         logger.info("PROCESSING COMPLETE")
-        logger.info(f"Total execution time: {total_execution_time:.2f} seconds.")
+        logger.info(f"{success_count} of {total} recording(s) processed successfully.")
+        logger.info(f"Total execution time: {total_dt:.2f} seconds.")
         logger.info(f"All results saved in: {batch_output_dir}")
-        logger.info("-" * 80)
+        logger.info("="*80)
 
-        return processed_count, total
+        return success_count, total
 
     return SimpleNamespace(score=score)
+
 
 def calculate_font_size(screen_height, percentage, min_size, max_size):
     """Calculates font size as a percentage of screen height with min/max caps."""
     font_size = int(screen_height * (percentage / 100))
     return max(min_size, min(font_size, max_size))
 
-def compute_sleep_stats(hypnogram, epoch_duration_secs=30):
-    """
-    Computes sleep statistics from a hypnogram.
-
-    Args:
-        hypnogram (list): A list of integers representing sleep stages for each epoch.
-                          (0=Wake, 1=N1, 2=N2, 3=N3, 5=REM)
-        epoch_duration_secs (int): The duration of each epoch in seconds (default is 30).
-
-    Returns:
-        dict: A dictionary containing key sleep statistics.
-    """
-    if not hypnogram:
-        return {}
-
+def compute_sleep_stats(sleep_stages, epoch_duration_secs=30):
     stats = {}
-    total_epochs = len(hypnogram)
+    total_epochs = len(sleep_stages)
 
-    # --- Time-based Metrics ---
     stats['Time in Bed (minutes)'] = (total_epochs * epoch_duration_secs) / 60
 
-    # Calculate time spent in each stage
-    time_in_wake_mins = hypnogram.count(0) * epoch_duration_secs / 60
-    time_in_n1_mins = hypnogram.count(1) * epoch_duration_secs / 60
-    time_in_n2_mins = hypnogram.count(2) * epoch_duration_secs / 60
-    time_in_n3_mins = hypnogram.count(3) * epoch_duration_secs / 60
-    time_in_rem_mins = hypnogram.count(5) * epoch_duration_secs / 60
+    time_in_wake_mins = sleep_stages.count(0) * epoch_duration_secs / 60
+    time_in_n1_mins = sleep_stages.count(1) * epoch_duration_secs / 60
+    time_in_n2_mins = sleep_stages.count(2) * epoch_duration_secs / 60
+    time_in_n3_mins = sleep_stages.count(3) * epoch_duration_secs / 60
+    time_in_rem_mins = sleep_stages.count(5) * epoch_duration_secs / 60
 
     stats['Time in Wake (minutes)'] = time_in_wake_mins
     stats['Time in N1 (minutes)'] = time_in_n1_mins
@@ -285,24 +174,18 @@ def compute_sleep_stats(hypnogram, epoch_duration_secs=30):
     stats['Time in N3 (minutes)'] = time_in_n3_mins
     stats['Time in REM (minutes)'] = time_in_rem_mins
 
-    # --- Total Sleep Time (TST) ---
-    # TST is the total time spent in all sleep stages (N1, N2, N3, REM)
     total_sleep_time_mins = (time_in_n1_mins + time_in_n2_mins + 
                              time_in_n3_mins + time_in_rem_mins)
     stats['Total Sleep Time (minutes)'] = total_sleep_time_mins
 
-    # --- Sleep Efficiency ---
-    # Percentage of time in bed that you are actually asleep
     if stats['Time in Bed (minutes)'] > 0:
         stats['Sleep Efficiency (%)'] = (total_sleep_time_mins / stats['Time in Bed (minutes)']) * 100
     else:
         stats['Sleep Efficiency (%)'] = 0
 
-    # --- Sleep Latency ---
-    # Time it takes to fall asleep (first epoch of any sleep stage)
     sleep_onset_epoch = -1
-    for i, stage in enumerate(hypnogram):
-        if stage in [1, 2, 3, 4, 5]: # Any stage other than Wake
+    for i, stage in enumerate(sleep_stages):
+        if stage in [1, 2, 3, 4, 5]: 
             sleep_onset_epoch = i
             break
     
@@ -311,15 +194,12 @@ def compute_sleep_stats(hypnogram, epoch_duration_secs=30):
     else:
         stats['Sleep Latency (minutes)'] = 0 # Never fell asleep
 
-    # --- Wake After Sleep Onset (WASO) ---
-    # Total time awake after falling asleep for the first time
     if sleep_onset_epoch != -1:
-        waso_epochs = hypnogram[sleep_onset_epoch:].count(0)
+        waso_epochs = sleep_stages[sleep_onset_epoch:].count(0)
         stats['WASO (minutes)'] = (waso_epochs * epoch_duration_secs) / 60
     else:
         stats['WASO (minutes)'] = 0
 
-    # --- Stage Percentages (of TST) ---
     if total_sleep_time_mins > 0:
         stats['N1 Sleep (%)'] = (time_in_n1_mins / total_sleep_time_mins) * 100
         stats['N2 Sleep (%)'] = (time_in_n2_mins / total_sleep_time_mins) * 100
@@ -331,7 +211,6 @@ def compute_sleep_stats(hypnogram, epoch_duration_secs=30):
         stats['N3 Sleep (Deep Sleep) (%)'] = 0
         stats['REM Sleep (%)'] = 0
 
-    # Round all float values to 2 decimal places
     for key, value in stats.items():
         if isinstance(value, float):
             stats[key] = round(value, 2)
@@ -546,9 +425,6 @@ def setup_logging():
 
 
 def get_model_path(model_name=None):
-    """
-    returns model file path if name specified or model folder path if name not specified
-    """
     app_dir, is_bundle = get_app_dir()
     base_path = Path(app_dir) if is_bundle else Path(user_data_dir())
     models_dir = base_path / "NIDRA" / "models"
@@ -557,11 +433,6 @@ def get_model_path(model_name=None):
 
 
 def get_app_dir():
-    """
-    Returns (base_path, is_bundle)
-      - base_path: Path object for the application's root directory
-      - is_bundle: 1 if running as a PyInstaller bundle, 0 otherwise
-    """
     # PyInstaller bundle (one-dir)
     if getattr(sys, 'frozen', False):
         exe_dir = Path(sys.executable).resolve().parent
@@ -569,12 +440,10 @@ def get_app_dir():
         if internal_dir.exists():
             return internal_dir, 1
         return exe_dir, 1
-
     # Running from source
     this_file = Path(__file__).resolve()
     if this_file.is_file():
         return this_file.parent, 0
-
     # Installed as pip package
     spec = importlib.util.find_spec("NIDRA")
     if spec and spec.origin:
@@ -582,16 +451,10 @@ def get_app_dir():
 
     return None, 0
 
-
-
-
-
-
 def download_models(logger):
     """
     Checks for models in the user's data directory and downloads them if missing.
     """
-
     # make local models folder
     repo_id = "pzerr/NIDRA_models"
     models = ["u-sleep-nsrr-2024.onnx", "u-sleep-nsrr-2024_eeg.onnx", "ez6.onnx", "ez6moe.onnx"]
@@ -689,3 +552,60 @@ def download_example_data(logger):
 
     logger.info("--- Example data download complete ---")
     return str(example_data_dir)
+
+
+
+def download_assets(kind, logger):
+    """
+    Downloads either 'models' or 'example_data' into their appropriate
+    directory. Skips files that already exist.
+    """
+    repo_id = "pzerr/NIDRA_models"
+    if kind == "models":
+        files = [
+            "u-sleep-nsrr-2024.onnx",
+            "u-sleep-nsrr-2024_eeg.onnx",
+            "ez6.onnx",
+            "ez6moe.onnx",
+        ]
+        base_dir = get_model_path()
+        size_info = "(152 MB)"
+    elif kind == "example_data":
+        files = ["EEG_L.edf", "EEG_R.edf"]
+        model_dir = Path(os.path.dirname(get_model_path("dummy.onnx")))
+        base_dir = model_dir.parent / "example_zmax_data"
+        size_info = "(24 MB)"
+
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    # Check existing
+    missing = [f for f in files if not (base_dir / f).exists()]
+    if not missing:
+        logger.info(f"{kind.replace('_', ' ')} found in: {base_dir}")
+        return str(base_dir)
+
+    # Download missing items
+    logger.info(f"Downloading {kind.replace('_', ' ')} to {base_dir}, please wait... {size_info}")
+    for name in missing:
+        try:
+            logger.info(f"Downloading {name}...")
+            hf_hub_download(repo_id=repo_id, filename=name, local_dir=str(base_dir))
+            logger.info(f"Successfully downloaded {name}.")
+        except Exception as e:
+            logger.error(f"Error downloading {name}: {e}", exc_info=True)
+
+            # unified failure message for ALL asset types
+            repo_url = "https://huggingface.co/pzerr/NIDRA_models"
+            logger.error(
+                "\n--- DOWNLOAD FAILED ---\n"
+                f"Automatic download of one or more required files for '{kind}' has failed.\n"
+                "To continue, please manually download ALL required files from:\n"
+                f"  {repo_url}\n"
+                "Then place them in this directory:\n"
+                f"  {base_dir}\n"
+            )
+            return None
+
+    logger.info(f"--- {kind.replace('_', ' ').title()} download complete ---")
+    return str(base_dir)
+
