@@ -180,9 +180,7 @@ def select_directory():
                 result['error'] = "Could not open the file dialog. Please ensure you have a graphical environment configured."
             finally:
                 if 'root' in locals() and root:
-                    # In some environments, destroying the root can hang if the dialog wasn't the last GUI event.
-                    # It will be cleaned up when the thread exits anyway.
-                    pass
+                    root.destroy()
 
         dialog_thread = threading.Thread(target=open_dialog)
         dialog_thread.start()
@@ -243,7 +241,7 @@ def select_input_file():
                 result['error'] = "Could not open the file dialog."
             finally:
                 if 'root' in locals() and root:
-                    pass
+                    root.destroy()
 
         dialog_thread = threading.Thread(target=open_dialog)
         dialog_thread.start()
