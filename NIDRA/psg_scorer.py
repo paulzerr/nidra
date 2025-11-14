@@ -128,6 +128,7 @@ class PSGScorer:
                 self.logger.warning("None of the requested channels were found. Falling back to all channels in the EDF.")
 
         channels_to_load, self.channel_groups, self.has_eog = self._get_load_and_group_channels(base_channels)
+        self.logger.info(f"Channels selected for scoring: {channels_to_load}")
         print(f"Found {len(self.channel_groups)} channel groups.")
 
         self.raw.pick(channels_to_load)

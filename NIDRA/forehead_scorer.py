@@ -125,6 +125,7 @@ class ForeheadScorer:
             info = mne.create_info(['eegl', 'eegr'], sfreq=self.target_fs,
                                    ch_types=['eeg', 'eeg'], verbose=False)
             self.raw = mne.io.RawArray(np.vstack([dataL, dataR]), info, verbose=False)
+            self.logger.info(f"Using channel '{rawL.ch_names[0]}' from {self.input.name} and '{rawR.ch_names[0]}' from {rawR_path.name}")
             print(f"Loading data from: '{self.input}'")
             return
 
@@ -142,6 +143,8 @@ class ForeheadScorer:
                 if len(chosen) < 2:
                     raise ValueError("Could not find at least two channels in the EDF file.")
                 self.channels = chosen
+            
+            self.logger.info(f"Channels selected for scoring: {self.channels}")
 
             # if not exactly two channel names are provided, return error
             if len(self.channels) != 2:

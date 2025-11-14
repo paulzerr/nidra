@@ -16,7 +16,7 @@ from NIDRA import utils
 LOG_FILE, logger = utils.setup_logging()
 
 TEXTS = {
-    "WINDOW_TITLE": "NIDRA", "INPUT_TITLE": "Sleep recordings", "MODEL_TITLE": "Model",
+    "WINDOW_TITLE": "NIDRA", "INPUT_TITLE": "Input sleep recordings", "MODEL_TITLE": "Model",
     "OPTIONS_TITLE": "Options", "OPTIONS_PROBS": "Generate hypnodensity", "OPTIONS_PLOT": "Generate graph",
     "OPTIONS_STATS": "Generate sleep statistics",
     "DATA_SOURCE_TITLE": "Data Source",
@@ -85,8 +85,6 @@ def index():
     logger.info(f"User Agent: {request.headers.get('User-Agent', 'N/A')}")
     logger.info("--------------------------------------------------------------------------\n")
 
-
-
     logger.info("\n" + "="*80)
     logger.info("Welcome to NIDRA, the easy-to-use sleep autoscorer.\nSelect your sleep recordings to begin.\nTo shutdown NIDRA, simply close this window or tab.")
     logger.info("="*80 + "\n")
@@ -104,75 +102,81 @@ def serve_docs(filename):
     """Serves files from the docs directory."""
     return send_from_directory(app.docs_path, filename)
 
-def _choose_folder_mac(prompt="Select a folder"):
-    """Opens a folder selection dialog on macOS using AppleScript."""
+def _open_native_dialog_mac(mode, prompt, file_types=None):
+    """
+    Opens a native file or folder selection dialog on macOS using AppleScript.
+    This approach is thread-safe and avoids issues with tkinter in macOS bundles.
+    """
     if not dialog_lock.acquire(blocking=False):
+        logger.warning("Dialog blocked because another is already open.")
         return {'status': 'error', 'message': 'Another file dialog is already open.'}
-    try:
-        script = f'POSIX path of (choose folder with prompt "{prompt}")'
-        out = subprocess.check_output(["osascript", "-e", script], text=True)
-        return out.strip()
-    except subprocess.CalledProcessError:  # User cancelled
-        return None
-    except Exception as e:
-        logger.error(f"AppleScript folder selection failed: {e}", exc_info=True)
-        return None
-    finally:
-        if dialog_lock.locked():
-            dialog_lock.release()
 
-def _choose_file_mac(prompt="Select a file", file_types=None):
-    """Opens a file selection dialog on macOS using AppleScript."""
-    if not dialog_lock.acquire(blocking=False):
-        return {'status': 'error', 'message': 'Another file dialog is already open.'}
     try:
-        if file_types:
-            type_str = "of type {" + ", ".join(f'"{t}"' for t in file_types) + "}"
-            script = f'POSIX path of (choose file with prompt "{prompt}" {type_str})'
+        if mode == 'folder':
+            script = f'POSIX path of (choose folder with prompt "{prompt}")'
+        elif mode == 'file':
+            if file_types:
+                type_str = "of type {" + ", ".join(f'"{t}"' for t in file_types) + "}"
+                script = f'POSIX path of (choose file with prompt "{prompt}" {type_str})'
+            else:
+                script = f'POSIX path of (choose file with prompt "{prompt}")'
         else:
-            script = f'POSIX path of (choose file with prompt "{prompt}")'
+            raise ValueError(f"Invalid dialog mode: {mode}")
 
         out = subprocess.check_output(["osascript", "-e", script], text=True)
-        return out.strip()
+        path = out.strip()
+        if path:
+            return {'status': 'success', 'path': path}
+        else:
+            return {'status': 'cancelled'}
     except subprocess.CalledProcessError:  # User cancelled
-        return None
+        return {'status': 'cancelled'}
     except Exception as e:
-        logger.error(f"AppleScript file selection failed: {e}", exc_info=True)
-        return None
+        logger.error(f"AppleScript dialog failed (mode: {mode}): {e}", exc_info=True)
+        return {'status': 'error', 'message': 'Could not open the dialog.'}
     finally:
         if dialog_lock.locked():
             dialog_lock.release()
 
-@app.route('/select-directory')
-def select_directory():
-    """
-    Opens a native directory selection dialog on the server.
-    This function runs the dialog in a separate thread to avoid blocking the Flask server.
-    On macOS, it uses a thread-safe AppleScript dialog.
-    """
+def _open_native_dialog(mode, title, file_types=None):
     if platform.system() == "Darwin":
-        path_or_error = _choose_folder_mac(prompt="Select a Folder")
-        if isinstance(path_or_error, dict):  # Error case
-            return jsonify(path_or_error), 409
-        if path_or_error:
-            return jsonify({'status': 'success', 'path': path_or_error})
-        else:
-            return jsonify({'status': 'cancelled'})
+        mac_file_types = None
+        if file_types:
+            # Convert tkinter-style file types to a simple list of extensions for AppleScript
+            mac_file_types = []
+            for _, patterns in file_types:
+                mac_file_types.extend(p.split('.')[-1] for p in patterns.split())
+        
+        result = _open_native_dialog_mac(
+            mode=mode,
+            prompt=title,
+            file_types=mac_file_types
+        )
+        if result.get('status') == 'error':
+            return jsonify(result), 409
+        return jsonify(result)
 
+    # For other systems (Windows, Linux), use tkinter in a separate thread.
     if not dialog_lock.acquire(blocking=False):
         logger.warning("File dialog blocked because another is already open.")
         return jsonify({'status': 'error', 'message': 'Another file dialog is already open.'}), 409
 
     try:
         result = {}
-        def open_dialog():
+        def open_dialog_thread():
             import tkinter as tk
             from tkinter import filedialog
             try:
                 root = tk.Tk()
                 root.withdraw()  # Hide the main window
                 root.attributes('-topmost', True)  # Bring the dialog to the front
-                path = filedialog.askdirectory(title="Select a Folder")
+
+                path = None
+                if mode == 'folder':
+                    path = filedialog.askdirectory(title=title)
+                elif mode == 'file':
+                    path = filedialog.askopenfilename(title=title, filetypes=file_types)
+
                 if path:
                     result['path'] = path
             except Exception as e:
@@ -182,7 +186,7 @@ def select_directory():
                 if 'root' in locals() and root:
                     root.destroy()
 
-        dialog_thread = threading.Thread(target=open_dialog)
+        dialog_thread = threading.Thread(target=open_dialog_thread)
         dialog_thread.start()
         dialog_thread.join()
 
@@ -196,66 +200,26 @@ def select_directory():
         if dialog_lock.locked():
             dialog_lock.release()
 
+@app.route('/select-directory')
+def select_directory():
+    """Opens a native directory selection dialog."""
+    return _open_native_dialog(mode='folder', title="Select a Folder")
+
+
 @app.route('/select-input-file')
 def select_input_file():
     """
-    Opens a native file selection dialog on the server for input files.
+    Opens a native file selection dialog for input files.
     Supports .edf, .bdf, and .txt files.
     """
     file_types_supported = [
         ("Supported Files", "*.edf *.bdf *.txt"),
     ]
-    if platform.system() == "Darwin":
-        path_or_error = _choose_file_mac(
-            prompt="Select an input file (EDF, BDF, or TXT)",
-            file_types=['edf', 'bdf', 'txt']
-        )
-        if isinstance(path_or_error, dict):  # Error case
-            return jsonify(path_or_error), 409
-        if path_or_error:
-            return jsonify({'status': 'success', 'path': path_or_error})
-        else:
-            return jsonify({'status': 'cancelled'})
-
-    if not dialog_lock.acquire(blocking=False):
-        logger.warning("File dialog blocked because another is already open.")
-        return jsonify({'status': 'error', 'message': 'Another file dialog is already open.'}), 409
-
-    try:
-        result = {}
-        def open_dialog():
-            import tkinter as tk
-            from tkinter import filedialog
-            try:
-                root = tk.Tk()
-                root.withdraw()
-                root.attributes('-topmost', True)
-                path = filedialog.askopenfilename(
-                    title="Select an input file",
-                    filetypes=file_types_supported
-                )
-                if path:
-                    result['path'] = path
-            except Exception as e:
-                logger.error(f"An error occurred in the tkinter dialog thread: {e}", exc_info=True)
-                result['error'] = "Could not open the file dialog."
-            finally:
-                if 'root' in locals() and root:
-                    root.destroy()
-
-        dialog_thread = threading.Thread(target=open_dialog)
-        dialog_thread.start()
-        dialog_thread.join()
-
-        if 'error' in result:
-            return jsonify({'status': 'error', 'message': result['error']}), 500
-        if 'path' in result:
-            return jsonify({'status': 'success', 'path': result['path']})
-        else:
-            return jsonify({'status': 'cancelled'})
-    finally:
-        if dialog_lock.locked():
-            dialog_lock.release()
+    return _open_native_dialog(
+        mode='file',
+        title="Select an input file",
+        file_types=file_types_supported
+    )
 
 @app.route('/start-scoring', methods=['POST'])
 def start_scoring():
@@ -332,58 +296,6 @@ def cancel_scoring():
         return jsonify({'status': 'error', 'message': 'No scoring process is running.'}), 409
 
 
-# def _run_scoring(input, output, data_source, model, plot, hypnodensity, channels=None):
-#     """
-#     Performs scoring on a single recording (file or directory).
-#     Uses utils.find_files to resolve exactly one target and delegates to the scorer.
-#     """
-#     if channels:
-#         logger.info(f"Using custom channel selection: {channels}")
-#     try:
-#         start_time = time.time()
-#         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
-
-#         # Resolve exactly one target (file or directory)
-#         targets, _ = utils.find_files(input)
-#         if not targets:
-#             raise FileNotFoundError(f"Could not find any suitable recordings in '{input}'. Please check the input path and data source settings.")
-#         if len(targets) > 1:
-#             raise ValueError(
-#                 f"Multiple recordings were detected for '{input}'. "
-#                 "Please select a single recording folder/file, or choose 'Score all recordings (in subfolders)'."
-#             )
-#         target = targets[0]
-#         logger.info("\n" + "-" * 80)
-#         logger.info(f"Processing: {target}")
-#         logger.info("-" * 80)
-
-#         scorer_kwargs = {
-#             'input': target,
-#             'output': output,
-#             'model': model,
-#             'channels': channels,
-#             'hypnogram': True,
-#             'hypnodensity': bool(hypnodensity),
-#             'plot': bool(plot),
-#         }
-
-#         scorer = scorer_factory(type=scorer_type, **scorer_kwargs)
-#         scorer.score()
-
-#         logger.info("Autoscoring process completed.")
-
-#         execution_time = time.time() - start_time
-#         name = Path(target).name
-#         logger.info(f">> SUCCESS: Finished processing {name} in {execution_time:.2f} seconds.")
-#         logger.info(f"  Results saved to: {output}")
-#         return True
-#     except Exception as e:
-#         nm = Path(input).name if hasattr(input, '__str__') else 'input'
-#         logger.error(f">> FAILED to process {nm}: {e}", exc_info=True)
-#         return False
-
-
-
 @app.route('/open-recent-results', methods=['POST'])
 def open_recent_results():
     """Finds the most recent output folder from the log and opens it."""
@@ -424,8 +336,6 @@ def open_recent_results():
 def show_example():
     """Downloads example data and returns the path."""
     try:
-        logger.info("\n--- Preparing scoring of example data ---")
-
         # If running as a PyInstaller bundle, use local examples
         app_dir, is_bundle = utils.get_app_dir()
         if is_bundle:
@@ -453,8 +363,8 @@ def show_example():
 @app.route('/get-channels', methods=['POST'])
 def get_channels():
     """
-    Reads channel names from EDF files and determines the required channel selection mode
-    based on the data source and file structure (e.g., for ZMax recordings).
+    Reads channel names from the first available EDF file and determines the
+    required channel selection mode.
     """
     data = request.json
     input_path_str = data.get('input_dir')
@@ -466,164 +376,82 @@ def get_channels():
         return jsonify({'status': 'error', 'message': 'Data source not provided.'}), 400
 
     try:
-        input_path = Path(input_path_str)
-        search_dir = None
-        search_file = None
+        # Use utils.find_files to get a list of all EDFs.
+        # It handles .txt files, directories, and single files recursively.
+        files_to_process, _ = utils.find_files(input_path_str)
 
-        if input_path.is_file() and input_path.suffix.lower() == '.txt':
-            logger.info(f"Reading first path from text file: {input_path}")
-            with open(input_path, 'r') as f:
-                first_line = f.readline().strip()
-            if not first_line:
-                return jsonify({'status': 'error', 'message': 'The selected .txt file is empty.'}), 400
-            first_target = Path(first_line)
-            if first_target.is_dir():
-                search_dir = first_target
-            elif first_target.is_file():
-                search_file = first_target
-            else:
-                return jsonify({'status': 'error', 'message': f'Path from .txt not found: {first_target}'}), 404
-        else:
-            # Allow either a directory or a direct EDF file path
-            if input_path.is_dir():
-                search_dir = input_path
-            elif input_path.is_file():
-                search_file = input_path
-            else:
-                return jsonify({'status': 'error', 'message': f'Invalid input path: {input_path}'}), 404
+        if not files_to_process:
+            return jsonify({'status': 'error', 'message': f'No sleep recordings (.edf, .bdf) found for input: {input_path_str}'}), 404
 
-        if (search_dir is None and search_file is None):
-            return jsonify({'status': 'error', 'message': 'No valid directory or file resolved from input.'}), 404
-
+        first_file = files_to_process[0]
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
-        selection_mode = 'psg'  # Default for PSG
+        selection_mode = 'psg'  # Default
+        channels = []
+        dialog_text = ""
+        mode_hint = ""
+        warning_hint = ""
 
         if scorer_type == 'forehead':
-            # If the input resolves to a specific EDF file (from .txt or direct file path), decide mode from file.
-            if search_file is not None:
-                import re
-                file_path = search_file
-                file_str = str(file_path)
-                # Detect two-file mode if filename indicates L/R and counterpart exists
-                if re.search(r'(?i)([_ ])?L\.edf$', file_str):
-                    r_file = Path(re.sub(r'(?i)([_ ])?L\.edf$', r'\1R.edf', file_str))
-                    if r_file.exists():
-                        selection_mode = 'zmax_two_files'
-                        # Two-file mode: no channel selection needed
-                        channels = []
-                        return jsonify({'status': 'success', 'channels': channels, 'selection_mode': selection_mode})
-                if re.search(r'(?i)([_ ])?R\.edf$', file_str):
-                    l_file = Path(re.sub(r'(?i)([_ ])?R\.edf$', r'\1L.edf', file_str))
-                    if l_file.exists():
-                        selection_mode = 'zmax_two_files'
-                        channels = []
-                        return jsonify({'status': 'success', 'channels': channels, 'selection_mode': selection_mode})
-                # Otherwise, treat as single-file ZMax (multi-channel)
-                raw = mne.io.read_raw_edf(file_path, preload=False, verbose=False)
-                channels = raw.ch_names
+            import re
+            file_str = str(first_file)
+            # Check for L/R pair to determine if it's two-file ZMax
+            if re.search(r'(?i)[_ ]?L\.edf$', file_str):
+                r_file_str = re.sub(r'(?i)([_ ]?)L\.edf$', r'\1R.edf', file_str)
+                if Path(r_file_str).exists():
+                    selection_mode = 'zmax_two_files'
+                else:  # It's an L file but no R file, treat as one file
+                    selection_mode = 'zmax_one_file'
+            else:  # Not an L file, so must be single file mode
                 selection_mode = 'zmax_one_file'
-                return jsonify({'status': 'success', 'channels': channels, 'selection_mode': selection_mode})
+        
+        # Set hints based on the determined mode
+        if selection_mode == 'zmax_one_file':
+            mode_hint = "For single-file ZMax, please select exactly two channels."
+        elif selection_mode == 'zmax_two_files':
+            mode_hint = "Two-file ZMax recording (L/R) detected. No channel selection is required as one channel per file is assumed."
 
-            # Inspect only a single recording directory.
-            # First try the selected directory (non-recursive). If it doesn't contain a single recording,
-            # look for the first immediate subdirectory that does.
-            def _dedup(paths):
-                seen = set()
-                out = []
-                for p in paths:
-                    key = str(p).lower()
-                    if key not in seen:
-                        seen.add(key)
-                        out.append(p)
-                return out
+        # Set warning hint if multiple files are being processed and selection is relevant
+        if len(files_to_process) > 1:
+            warning_hint = "Channels are based on the first recording found. All other recordings in this batch are assumed to have the same channels."
+        
+        # Combine hints in the correct order with a blank line between them, if both exist
+        dialog_parts = [p for p in [mode_hint, warning_hint] if p]
+        dialog_text = "<br><br>".join(dialog_parts)
 
-            def _detect_zmax_in_dir(d: Path):
-                l_files = sorted(d.glob('*[lL].edf'))
-                r_files = sorted(d.glob('*[rR].edf'))
-                all_edfs = sorted(d.glob('*.edf')) + sorted(d.glob('*.EDF'))
-
-                # Deduplicate to avoid duplicates on case-insensitive filesystems
-                all_edfs_loc = _dedup(all_edfs)
-                l_files_loc = _dedup(l_files)
-                r_files_loc = _dedup(r_files)
-
-                # Detect single-file ZMax first: exactly one EDF in this folder (name may contain L/R)
-                if len(all_edfs_loc) == 1:
-                    raw = mne.io.read_raw_edf(all_edfs_loc[0], preload=False, verbose=False)
-                    return 'zmax_one_file', raw.ch_names
-
-                # Detect two-file ZMax: exactly one L and one R file
-                if len(l_files_loc) == 1 and len(r_files_loc) == 1:
-                    # Two-file mode: no channel selection in UI; one channel per EDF is assumed
-                    return 'zmax_two_files', []
-
-                return None, None
-
-            selection_mode = None
-            channels = None
-
-            # Try selected directory first (non-recursive)
-            selection_mode, channels = _detect_zmax_in_dir(search_dir)
-
-            # If not determinable, try first immediate subdirectory with a determinable pattern
-            if selection_mode is None:
-                for sub in sorted(search_dir.iterdir()):
-                    if sub.is_dir():
-                        selection_mode, channels = _detect_zmax_in_dir(sub)
-                        if selection_mode is not None:
-                            break
-
-            # If still not determinable, recursively search deeper subfolders for the first determinable recording
-            if selection_mode is None:
-                for sub in sorted(search_dir.rglob('*')):
-                    if sub.is_dir():
-                        selection_mode, channels = _detect_zmax_in_dir(sub)
-                        if selection_mode is not None:
-                            break
-
-            if selection_mode is None:
-                # Build counts only for the selected directory (not recursive) for a clear error
-                l_top = list(search_dir.glob('*[lL].edf'))
-                r_top = list(search_dir.glob('*[rR].edf'))
-                all_top = list(search_dir.glob('*.edf')) + list(search_dir.glob('*.EDF'))
-                non_lr_top = [f for f in all_top if f not in l_top and f not in r_top]
-                message = (f'Could not determine ZMax recording type in {search_dir}. '
-                           f'Found {len(l_top)} L-files, {len(r_top)} R-files, and {len(non_lr_top)} other EDF files in this folder. '
-                           'If your recordings are in subfolders, please select one recording folder, '
-                           'or choose "Score all recordings (in subfolders)"; channel selection uses a single recording.')
-                return jsonify({'status': 'error', 'message': message}), 404
-
-        else:  # For PSG, read the first available EDF from this folder or the first immediate subfolder
-            if search_file is not None:
-                raw = mne.io.read_raw_edf(search_file, preload=False, verbose=False)
+        # For PSG or single-file ZMax, we need to read the channels from the first file.
+        if selection_mode in ['psg', 'zmax_one_file']:
+            try:
+                raw = mne.io.read_raw_edf(first_file, preload=False, verbose=False)
                 channels = raw.ch_names
-                return jsonify({'status': 'success', 'channels': channels, 'selection_mode': selection_mode})
-            edf_files = sorted(search_dir.glob('*.edf')) + sorted(search_dir.glob('*.EDF'))
-            if not edf_files:
-                # look into first immediate subdirectory that contains an EDF
-                for sub in sorted(search_dir.iterdir()):
-                    if sub.is_dir():
-                        edf_files = sorted(sub.glob('*.edf')) + sorted(sub.glob('*.EDF'))
-                        if edf_files:
-                            break
-            if not edf_files:
-                return jsonify({'status': 'error', 'message': f'No EDF files found in {search_dir} or its immediate subfolders.'}), 404
-            raw = mne.io.read_raw_edf(edf_files[0], preload=False, verbose=False)
-            channels = raw.ch_names
+            except Exception as e:
+                logger.error(f"Could not read channels from {first_file}: {e}", exc_info=True)
+                return jsonify({'status': 'error', 'message': f'Error reading file: {first_file.name}\n{e}'}), 500
 
-        return jsonify({'status': 'success', 'channels': channels, 'selection_mode': selection_mode})
+        return jsonify({
+            'status': 'success',
+            'channels': channels,
+            'selection_mode': selection_mode,
+            'dialog_text': dialog_text
+        })
 
     except Exception as e:
-        logger.error(f"Error reading channels from EDF file: {e}", exc_info=True)
+        logger.error(f"Error determining channels: {e}", exc_info=True)
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-
-
+@app.route('/log-channel-selection', methods=['POST'])
+def log_channel_selection():
+    """Logs the user-selected channels."""
+    data = request.json
+    channels = data.get('channels')
+    if channels:
+        logger.info(f"Manually selected channels: {', '.join(channels)}")
+    return jsonify({'status': 'success'})
 
 @app.route('/status')
 def status():
     return jsonify({'is_running': is_scoring_running, 'is_cancelling': is_cancelling})
+
 
 @app.route('/log')
 def log_stream():
@@ -634,6 +462,7 @@ def log_stream():
             return f.read()
     except Exception as e:
         return f"Error reading log file: {e}"
+
 
 # heartbeat to ensure NIDRA is shutdown when tab is closed (ping disappears).
 def probe_frontend_loop():

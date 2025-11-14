@@ -103,7 +103,7 @@ function initializeApp() {
                 const result = await response.json();
     
                 if (response.ok) {
-                    openChannelSelectionModal(result.channels, result.selection_mode);
+                    openChannelSelectionModal(result.channels, result.selection_mode, result.dialog_text);
                 } else {
                     alert(`Error: ${result.message}`);
                 }
@@ -443,7 +443,7 @@ function parseChannelType(name) {
     return { name: nameStripped, base, type: chType };
 }
 
-function openChannelSelectionModal(channels, selectionMode) {
+function openChannelSelectionModal(channels, selectionMode, dialogText) {
     // --- Create Modal Structure ---
     const modalBackdrop = document.createElement('div');
     modalBackdrop.className = 'modal-backdrop';
@@ -456,18 +456,23 @@ function openChannelSelectionModal(channels, selectionMode) {
     modalContent.appendChild(h2);
 
     const p = document.createElement('p');
-    switch (selectionMode) {
-        case 'zmax_one_file':
-            p.textContent = 'Please select exactly two channels for a single-file ZMax recording.';
-            break;
-        case 'zmax_two_files':
-            p.textContent = 'No channel selection in two-file mode, one channel per EDF is assumed.';
-            break;
-        case 'psg':
-        default:
-            p.textContent = 'Select the channels to be used for scoring.';
-            break;
+    p.innerHTML = dialogText; // Use innerHTML to render line breaks from backend
+
+    if (!p.innerHTML) { // Fallback if backend provides no text
+        switch (selectionMode) {
+            case 'zmax_one_file':
+                p.innerHTML = 'Please select exactly two channels for a single-file ZMax recording.';
+                break;
+            case 'zmax_two_files':
+                p.innerHTML = 'No channel selection in two-file mode, one channel per EDF is assumed.';
+                break;
+            case 'psg':
+            default:
+                p.innerHTML = 'Select the channels to be used for scoring.';
+                break;
+        }
     }
+    p.style.marginBottom = "1em";
     modalContent.appendChild(p);
 
     const form = document.createElement('form');
@@ -565,6 +570,14 @@ function openChannelSelectionModal(channels, selectionMode) {
         } else {
             window.selectedChannels = selectedCheckboxes.map(cb => cb.value);
             console.log('Selected channels:', window.selectedChannels);
+            // Log the selection on the backend
+            if (window.selectedChannels && window.selectedChannels.length > 0) {
+                fetch('/log-channel-selection', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ channels: window.selectedChannels })
+                });
+            }
         }
         closeModal();
     });
