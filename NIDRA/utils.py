@@ -5,12 +5,10 @@ import time
 import tempfile
 from pathlib import Path
 from datetime import datetime
-from huggingface_hub import hf_hub_download, hf_hub_url
+from huggingface_hub import hf_hub_download
 from appdirs import user_data_dir
-import requests
 import importlib.util
 from types import SimpleNamespace
-import NIDRA
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +59,6 @@ def find_files(input):
         output_base = input
 
     return files_to_process, output_base
-
 
 def batch_scorer(input, output=None, type=None, model=None,
                  channels=None, hypnogram=None, hypnodensity=False, plot=False, cancel_event=None):
@@ -122,8 +119,14 @@ def batch_scorer(input, output=None, type=None, model=None,
             try:
                 start = time.time()
 
-                scorer = NIDRA.scorer(
-                    type=type,
+                if type == 'forehead':
+                    from NIDRA.forehead_scorer import ForeheadScorer as Scorer
+                elif type == 'psg':
+                    from NIDRA.psg_scorer import PSGScorer as Scorer
+                else:
+                    raise ValueError(f"Unknown scorer type: {type}")
+
+                scorer = Scorer(
                     input=target_path,
                     output=str(out_dir),
                     model=model,
