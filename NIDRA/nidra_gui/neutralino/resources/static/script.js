@@ -115,46 +115,69 @@ function initializeApp() {
 
     // Handle Run Button click
     runBtn.addEventListener('click', async () => {
-        const payload = {
-            input_dir: document.getElementById('input-dir').value,
-            output: document.getElementById('output-dir').value,
-            data_source: dataSourceSelect.value,
-            model: modelNameSelect.value,
-            plot: document.getElementById('gen-plot').checked,
-            hypnodensity: document.getElementById('gen-probs').checked,
-            gen_stats: document.getElementById('gen-stats').checked,
-            score_subdirs: window.scoringMode === 'subdirs',
-            score_from_file: window.scoringMode === 'from_file',
-            channels: window.selectedChannels || null
-        };
+        const isRunning = runBtn.dataset.isRunning === 'true';
 
-        if (!payload.input_dir || !payload.output) {
-            alert('Please provide both an Input and an Output directory path.');
-            return;
-        }
+        if (isRunning) {
+            // --- CANCEL SCORING ---
+            try {
+                const response = await fetch('/cancel-scoring', { method: 'POST' });
+                const result = await response.json();
+                if (response.ok) {
+                    console.log('Cancellation requested:', result.message);
+                    // Update UI immediately to show cancellation is in progress
+                    runBtn.textContent = 'Cancelling...';
+                    runBtn.disabled = true;
+                } else {
+                    alert(`Error: ${result.message}`);
+                }
+            } catch (error) {
+                console.error('Failed to send cancellation request:', error);
+                alert('An error occurred while trying to cancel the scoring process.');
+            }
 
-        setRunningState(true);
+        } else {
+            // --- START SCORING ---
+            const payload = {
+                input_dir: document.getElementById('input-dir').value,
+                output: document.getElementById('output-dir').value,
+                data_source: dataSourceSelect.value,
+                model: modelNameSelect.value,
+                plot: document.getElementById('gen-plot').checked,
+                hypnodensity: document.getElementById('gen-probs').checked,
+                gen_stats: document.getElementById('gen-stats').checked,
+                score_subdirs: window.scoringMode === 'subdirs',
+                score_from_file: window.scoringMode === 'from_file',
+                channels: window.selectedChannels || null
+            };
 
-        try {
-            const response = await fetch('/start-scoring', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            if (!payload.input_dir || !payload.output) {
+                alert('Please provide both an Input and an Output directory path.');
+                return;
+            }
 
-            const result = await response.json();
+            setRunningState(true);
 
-            if (response.ok) {
-                console.log('Scoring started:', result.message);
-                startPolling();
-            } else {
-                alert(`Error: ${result.message}`);
+            try {
+                const response = await fetch('/start-scoring', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    console.log('Scoring started:', result.message);
+                    startPolling();
+                } else {
+                    alert(`Error: ${result.message}`);
+                    setRunningState(false);
+                }
+            } catch (error) {
+                console.error('Failed to start scoring process:', error);
+                alert('An error occurred while trying to start the scoring process.');
                 setRunningState(false);
             }
-        } catch (error) {
-            console.error('Failed to start scoring process:', error);
-            alert('An error occurred while trying to start the scoring process.');
-            setRunningState(false);
         }
     });
 
@@ -271,9 +294,19 @@ function initializeApp() {
 
     // --- UI and Polling Functions ---
 
-    function setRunningState(isRunning) {
-        runBtn.disabled = isRunning;
-        runBtn.textContent = isRunning ? 'Running...' : 'Begin Autoscoring';
+    function setRunningState(isRunning, isCancelling = false) {
+        runBtn.dataset.isRunning = isRunning;
+    
+        if (isCancelling) {
+            runBtn.disabled = true;
+            runBtn.textContent = 'Cancelling...';
+        } else if (isRunning) {
+            runBtn.disabled = false; // Enable button for cancellation
+            runBtn.textContent = 'Cancel';
+        } else {
+            runBtn.disabled = false;
+            runBtn.textContent = 'Run Autoscoring';
+        }
     }
 
     function startPolling() {
@@ -307,10 +340,11 @@ function initializeApp() {
             const response = await fetch('/status');
             const data = await response.json();
 
-            
+            setRunningState(data.is_running, data.is_cancelling);
+
             if (!data.is_running) {
-                setRunningState(false);
                 stopPolling();
+                // Fetch logs one last time to get the final output
                 setTimeout(fetchLogs, 500);
             }
         } catch (error) {

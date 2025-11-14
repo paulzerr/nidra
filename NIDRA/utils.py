@@ -70,8 +70,8 @@ def find_files(input_path):
     return files_to_process, output_base
 
 
-def batch_scorer(input, output=None, type=None, model=None, 
-                 channels=None, hypnogram=None, hypnodensity=False, plot=False):
+def batch_scorer(input, output=None, type=None, model=None,
+                 channels=None, hypnogram=None, hypnodensity=False, plot=False, cancel_event=None):
 
     if type not in ("forehead", "psg"):
         raise ValueError("type must be 'forehead' or 'psg'.")
@@ -105,6 +105,10 @@ def batch_scorer(input, output=None, type=None, model=None,
 
         for i, target in enumerate(files_to_process):
             target_path = Path(target)
+
+            if cancel_event and cancel_event.is_set():
+                logger.warning("Scoring cancelled by user.")
+                break
 
             logger.info("\n" + "-" * 80)
             logger.info(f"[{i + 1}/{total}] Processing: {target_path}")

@@ -24,6 +24,7 @@ TEXTS = {
     "OUTPUT_TITLE": "Output location", "RUN_BUTTON": "Run autoscoring",
     "SELECT_INPUT_FILE_BUTTON": "Select input file", "SELECT_INPUT_FOLDER_BUTTON": "Select input folder",
     "BROWSE_BUTTON": "Select output folder",
+    "CANCEL_BUTTON": "Cancel autoscoring",
     "INPUT_PLACEHOLDER": "Select a recording, a folder containing recordings, or a .txt file containing paths...",
     "OUTPUT_PLACEHOLDER": "Select where to save results...",
     "HELP_TITLE": "Help & Info (opens in browser)",
@@ -58,13 +59,16 @@ log.setLevel(logging.ERROR)
 
 # --- Global State ---
 is_scoring_running = False
+is_cancelling = False # to give user feedback that cancellation is in progress
 worker_thread = None
+cancel_event = threading.Event()
 _startup_check_done = False
 frontend_url = None
 last_frontend_contact = None
 probe_thread = None
 frontend_grace_period = 60  # seconds
 
+dialog_lock = threading.Lock()
 
 # --- Flask Routes ---
 @app.route('/')
@@ -102,6 +106,8 @@ def serve_docs(filename):
 
 def _choose_folder_mac(prompt="Select a folder"):
     """Opens a folder selection dialog on macOS using AppleScript."""
+    if not dialog_lock.acquire(blocking=False):
+        return {'status': 'error', 'message': 'Another file dialog is already open.'}
     try:
         script = f'POSIX path of (choose folder with prompt "{prompt}")'
         out = subprocess.check_output(["osascript", "-e", script], text=True)
@@ -111,9 +117,14 @@ def _choose_folder_mac(prompt="Select a folder"):
     except Exception as e:
         logger.error(f"AppleScript folder selection failed: {e}", exc_info=True)
         return None
+    finally:
+        if dialog_lock.locked():
+            dialog_lock.release()
 
 def _choose_file_mac(prompt="Select a file", file_types=None):
     """Opens a file selection dialog on macOS using AppleScript."""
+    if not dialog_lock.acquire(blocking=False):
+        return {'status': 'error', 'message': 'Another file dialog is already open.'}
     try:
         if file_types:
             type_str = "of type {" + ", ".join(f'"{t}"' for t in file_types) + "}"
@@ -128,6 +139,9 @@ def _choose_file_mac(prompt="Select a file", file_types=None):
     except Exception as e:
         logger.error(f"AppleScript file selection failed: {e}", exc_info=True)
         return None
+    finally:
+        if dialog_lock.locked():
+            dialog_lock.release()
 
 @app.route('/select-directory')
 def select_directory():
@@ -137,40 +151,52 @@ def select_directory():
     On macOS, it uses a thread-safe AppleScript dialog.
     """
     if platform.system() == "Darwin":
-        path = _choose_folder_mac(prompt="Select a Folder")
-        if path:
-            return jsonify({'status': 'success', 'path': path})
+        path_or_error = _choose_folder_mac(prompt="Select a Folder")
+        if isinstance(path_or_error, dict):  # Error case
+            return jsonify(path_or_error), 409
+        if path_or_error:
+            return jsonify({'status': 'success', 'path': path_or_error})
         else:
             return jsonify({'status': 'cancelled'})
 
-    result = {}
-    def open_dialog():
-        import tkinter as tk
-        from tkinter import filedialog
-        try:
-            root = tk.Tk()
-            root.withdraw()  # Hide the main window
-            root.attributes('-topmost', True)  # Bring the dialog to the front
-            path = filedialog.askdirectory(title="Select a Folder")
-            if path:
-                result['path'] = path
-        except Exception as e:
-            logger.error(f"An error occurred in the tkinter dialog thread: {e}", exc_info=True)
-            result['error'] = "Could not open the file dialog. Please ensure you have a graphical environment configured."
-        finally:
-            if 'root' in locals() and root:
-                root.destroy()
+    if not dialog_lock.acquire(blocking=False):
+        logger.warning("File dialog blocked because another is already open.")
+        return jsonify({'status': 'error', 'message': 'Another file dialog is already open.'}), 409
 
-    dialog_thread = threading.Thread(target=open_dialog)
-    dialog_thread.start()
-    dialog_thread.join()
+    try:
+        result = {}
+        def open_dialog():
+            import tkinter as tk
+            from tkinter import filedialog
+            try:
+                root = tk.Tk()
+                root.withdraw()  # Hide the main window
+                root.attributes('-topmost', True)  # Bring the dialog to the front
+                path = filedialog.askdirectory(title="Select a Folder")
+                if path:
+                    result['path'] = path
+            except Exception as e:
+                logger.error(f"An error occurred in the tkinter dialog thread: {e}", exc_info=True)
+                result['error'] = "Could not open the file dialog. Please ensure you have a graphical environment configured."
+            finally:
+                if 'root' in locals() and root:
+                    # In some environments, destroying the root can hang if the dialog wasn't the last GUI event.
+                    # It will be cleaned up when the thread exits anyway.
+                    pass
 
-    if 'error' in result:
-        return jsonify({'status': 'error', 'message': result['error']}), 500
-    if 'path' in result:
-        return jsonify({'status': 'success', 'path': result['path']})
-    else:
-        return jsonify({'status': 'cancelled'})
+        dialog_thread = threading.Thread(target=open_dialog)
+        dialog_thread.start()
+        dialog_thread.join()
+
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 500
+        if 'path' in result:
+            return jsonify({'status': 'success', 'path': result['path']})
+        else:
+            return jsonify({'status': 'cancelled'})
+    finally:
+        if dialog_lock.locked():
+            dialog_lock.release()
 
 @app.route('/select-input-file')
 def select_input_file():
@@ -182,51 +208,61 @@ def select_input_file():
         ("Supported Files", "*.edf *.bdf *.txt"),
     ]
     if platform.system() == "Darwin":
-        path = _choose_file_mac(
+        path_or_error = _choose_file_mac(
             prompt="Select an input file (EDF, BDF, or TXT)",
             file_types=['edf', 'bdf', 'txt']
         )
-        if path:
-            return jsonify({'status': 'success', 'path': path})
+        if isinstance(path_or_error, dict):  # Error case
+            return jsonify(path_or_error), 409
+        if path_or_error:
+            return jsonify({'status': 'success', 'path': path_or_error})
         else:
             return jsonify({'status': 'cancelled'})
 
-    result = {}
-    def open_dialog():
-        import tkinter as tk
-        from tkinter import filedialog
-        try:
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes('-topmost', True)
-            path = filedialog.askopenfilename(
-                title="Select an input file",
-                filetypes=file_types_supported
-            )
-            if path:
-                result['path'] = path
-        except Exception as e:
-            logger.error(f"An error occurred in the tkinter dialog thread: {e}", exc_info=True)
-            result['error'] = "Could not open the file dialog."
-        finally:
-            if 'root' in locals() and root:
-                root.destroy()
+    if not dialog_lock.acquire(blocking=False):
+        logger.warning("File dialog blocked because another is already open.")
+        return jsonify({'status': 'error', 'message': 'Another file dialog is already open.'}), 409
 
-    dialog_thread = threading.Thread(target=open_dialog)
-    dialog_thread.start()
-    dialog_thread.join()
+    try:
+        result = {}
+        def open_dialog():
+            import tkinter as tk
+            from tkinter import filedialog
+            try:
+                root = tk.Tk()
+                root.withdraw()
+                root.attributes('-topmost', True)
+                path = filedialog.askopenfilename(
+                    title="Select an input file",
+                    filetypes=file_types_supported
+                )
+                if path:
+                    result['path'] = path
+            except Exception as e:
+                logger.error(f"An error occurred in the tkinter dialog thread: {e}", exc_info=True)
+                result['error'] = "Could not open the file dialog."
+            finally:
+                if 'root' in locals() and root:
+                    pass
 
-    if 'error' in result:
-        return jsonify({'status': 'error', 'message': result['error']}), 500
-    if 'path' in result:
-        return jsonify({'status': 'success', 'path': result['path']})
-    else:
-        return jsonify({'status': 'cancelled'})
+        dialog_thread = threading.Thread(target=open_dialog)
+        dialog_thread.start()
+        dialog_thread.join()
+
+        if 'error' in result:
+            return jsonify({'status': 'error', 'message': result['error']}), 500
+        if 'path' in result:
+            return jsonify({'status': 'success', 'path': result['path']})
+        else:
+            return jsonify({'status': 'cancelled'})
+    finally:
+        if dialog_lock.locked():
+            dialog_lock.release()
 
 @app.route('/start-scoring', methods=['POST'])
 def start_scoring():
     """Starts the scoring process in a background thread."""
-    global is_scoring_running, worker_thread
+    global is_scoring_running, worker_thread, cancel_event, is_cancelling
 
     if is_scoring_running:
         return jsonify({'status': 'error', 'message': 'Scoring is already in progress.'}), 409
@@ -237,6 +273,8 @@ def start_scoring():
         return jsonify({'status': 'error', 'message': 'Missing required parameters.'}), 400
 
     is_scoring_running = True
+    is_cancelling = False
+    cancel_event.clear()
     logger.info("\n" + "="*80 + "\nStarting new scoring process on python backend...\n" + "="*80)
 
     # call scorer
@@ -250,6 +288,7 @@ def start_scoring():
             data['model'],
             data.get('plot', False),
             data.get('hypnodensity', False),
+            cancel_event,
             data.get('channels')
         )
     )
@@ -257,9 +296,9 @@ def start_scoring():
     return jsonify({'status': 'success', 'message': 'Scoring process initiated.'})
 
 
-def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model, plot, hypnodensity, channels=None):
+def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model, plot, hypnodensity, cancel_event, channels=None):
 
-    global is_scoring_running
+    global is_scoring_running, is_cancelling
     try:
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
         batch = utils.batch_scorer(
@@ -269,7 +308,8 @@ def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model,
             model=model,
             channels=channels,
             hypnodensity=hypnodensity,
-            plot=plot
+            plot=plot,
+            cancel_event=cancel_event
         )
         batch.score()
 
@@ -277,7 +317,21 @@ def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model,
         logger.error(f"A critical error occurred in the scoring thread: {e}", exc_info=True)
     finally:
         is_scoring_running = False
+        is_cancelling = False
 
+
+
+@app.route('/cancel-scoring', methods=['POST'])
+def cancel_scoring():
+    """Signals the scoring process to cancel."""
+    global is_scoring_running, cancel_event, is_cancelling
+    if is_scoring_running:
+        is_cancelling = True
+        cancel_event.set()
+        logger.info("Cancellation request received. Scoring will stop after the current file.")
+        return jsonify({'status': 'success', 'message': 'Cancellation requested.'})
+    else:
+        return jsonify({'status': 'error', 'message': 'No scoring process is running.'}), 409
 
 
 # def _run_scoring(input, output, data_source, model, plot, hypnodensity, channels=None):
@@ -571,7 +625,7 @@ def get_channels():
 
 @app.route('/status')
 def status():
-    return jsonify({'is_running': is_scoring_running})
+    return jsonify({'is_running': is_scoring_running, 'is_cancelling': is_cancelling})
 
 @app.route('/log')
 def log_stream():
