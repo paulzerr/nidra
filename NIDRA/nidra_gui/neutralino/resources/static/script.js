@@ -2,7 +2,7 @@ function initializeApp() {
     const stoppedPageHTML = `
     <div style="font-family: sans-serif; text-align: center; padding: 2em; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);">
         <h1>NIDRA has stopped due to timeout.</h1>
-        <p>You can now close this window. To continue using NIDRA, restart the application.</p>
+        <p>You can now close this window. <br>To continue using NIDRA, restart the application.</p>
     </div>`;
 
     // ============================================
@@ -277,15 +277,11 @@ function initializeApp() {
     }
 
     function startPolling() {
-        if (logInterval) clearInterval(logInterval);
         if (statusInterval) clearInterval(statusInterval);
-
-        logInterval = setInterval(fetchLogs, 1000); // Poll logs every second
         statusInterval = setInterval(checkStatus, 2000); // Check status every 2 seconds
     }
 
     function stopPolling() {
-        clearInterval(logInterval);
         clearInterval(statusInterval);
     }
 
@@ -324,12 +320,10 @@ function initializeApp() {
         }
     }
 
-    const startupLogInterval = setInterval(async () => {
-        const logText = await fetchLogs();
-        if (logText.includes('Welcome to NIDRA')) {
-            clearInterval(startupLogInterval);
-        }
-    }, 1000);
+    // Always poll logs while the UI is open
+    if (logInterval) clearInterval(logInterval);
+    logInterval = setInterval(fetchLogs, 1000);
+    fetchLogs();
 
     checkStatus();
 

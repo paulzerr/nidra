@@ -451,107 +451,107 @@ def get_app_dir():
 
     return None, 0
 
-def download_models(logger):
-    """
-    Checks for models in the user's data directory and downloads them if missing.
-    """
-    # make local models folder
-    repo_id = "pzerr/NIDRA_models"
-    models = ["u-sleep-nsrr-2024.onnx", "u-sleep-nsrr-2024_eeg.onnx", "ez6.onnx", "ez6moe.onnx"]
-    models_dir = get_model_path() 
-    models_dir.mkdir(parents=True, exist_ok=True) 
+# def download_models(logger):
+#     """
+#     Checks for models in the user's data directory and downloads them if missing.
+#     """
+#     # make local models folder
+#     repo_id = "pzerr/NIDRA_models"
+#     models = ["u-sleep-nsrr-2024.onnx", "u-sleep-nsrr-2024_eeg.onnx", "ez6.onnx", "ez6moe.onnx"]
+#     models_dir = get_model_path() 
+#     models_dir.mkdir(parents=True, exist_ok=True) 
 
-    # check which model files already exist
-    models_to_download = [m for m in models if not get_model_path(m).exists()]
+#     # check which model files already exist
+#     models_to_download = [m for m in models if not get_model_path(m).exists()]
 
-    if not models_to_download:
-        logger.info(f"Models found at: {models_dir}")
-        return False
+#     if not models_to_download:
+#         logger.info(f"Models found at: {models_dir}")
+#         return False
 
-    # app_dir, is_bundle = get_app_dir() # no longer needed
-    #     if is_bundle:
-    #         return False
+#     # app_dir, is_bundle = get_app_dir() # no longer needed
+#     #     if is_bundle:
+#     #         return False
 
-    # download models
-    logger.info("--- Downloading model files ---")
-    total_size = 0
-    for model_name in models_to_download:
-        try:
-            url = hf_hub_url(repo_id, model_name)
-            response = requests.head(url, timeout=30)
-            response.raise_for_status()
-            file_size = int(response.headers.get('content-length', 0))
-            total_size += file_size
-        except Exception:
-            continue
+#     # download models
+#     logger.info("--- Downloading model files ---")
+#     total_size = 0
+#     for model_name in models_to_download:
+#         try:
+#             url = hf_hub_url(repo_id, model_name)
+#             response = requests.head(url, timeout=30)
+#             response.raise_for_status()
+#             file_size = int(response.headers.get('content-length', 0))
+#             total_size += file_size
+#         except Exception:
+#             continue
     
-    total_size_mb = total_size / (1024 * 1024)
-    if total_size_mb < 0.1:
-        total_size_mb = 152.0 # Fallback size
-    size_info = f"({total_size_mb:.2f} MB)" if total_size_mb > 0 else ""
-    logger.info(f"Downloading sleep scoring models to {models_dir}, please wait... {size_info}")
+#     total_size_mb = total_size / (1024 * 1024)
+#     if total_size_mb < 0.1:
+#         total_size_mb = 152.0 # Fallback size
+#     size_info = f"({total_size_mb:.2f} MB)" if total_size_mb > 0 else ""
+#     logger.info(f"Downloading sleep scoring models to {models_dir}, please wait... {size_info}")
 
-    for model_name in models_to_download:
-        try:
-            logger.info(f"Downloading {model_name}...")
-            hf_hub_download(repo_id=repo_id, filename=model_name, local_dir=models_dir)
-            logger.info(f"Successfully downloaded {model_name}.")
-        except Exception as e:
-            logger.error(f"Error downloading {model_name}: {e}", exc_info=True)
-            repo_url = "https://huggingface.co/pzerr/NIDRA_models"
-            error_message = (
-                "\n--- MODEL DOWNLOAD FAILED ---\n"
-                f"Automatic download of the required model '{model_name}' failed.\n"
-                "Please try one of the following solutions:\n"
-                "1. Use the standalone version of NIDRA, which includes all models.\n"
-                f"2. Manually download the model from: {repo_url}\n"
-                f"   And place it in the following directory: {models_dir}\n"
-            )
-            logger.error(error_message)
+#     for model_name in models_to_download:
+#         try:
+#             logger.info(f"Downloading {model_name}...")
+#             hf_hub_download(repo_id=repo_id, filename=model_name, local_dir=models_dir)
+#             logger.info(f"Successfully downloaded {model_name}.")
+#         except Exception as e:
+#             logger.error(f"Error downloading {model_name}: {e}", exc_info=True)
+#             repo_url = "https://huggingface.co/pzerr/NIDRA_models"
+#             error_message = (
+#                 "\n--- MODEL DOWNLOAD FAILED ---\n"
+#                 f"Automatic download of the required model '{model_name}' failed.\n"
+#                 "Please try one of the following solutions:\n"
+#                 "1. Use the standalone version of NIDRA, which includes all models.\n"
+#                 f"2. Manually download the model from: {repo_url}\n"
+#                 f"   And place it in the following directory: {models_dir}\n"
+#             )
+#             logger.error(error_message)
     
-    logger.info("--- Model download complete ---")
-    return True
+#     logger.info("--- Model download complete ---")
+#     return True
 
-def download_example_data(logger):
-    """
-    Checks for example data in the user's data directory and downloads it if missing.
-    Logs progress to the provided logger instance.
-    Returns the path to the example data directory.
-    """
-    repo_id = "pzerr/NIDRA_models"
-    example_files = ["EEG_L.edf", "EEG_R.edf"]
+# def download_example_data(logger):
+#     """
+#     Checks for example data in the user's data directory and downloads it if missing.
+#     Logs progress to the provided logger instance.
+#     Returns the path to the example data directory.
+#     """
+#     repo_id = "pzerr/NIDRA_models"
+#     example_files = ["EEG_L.edf", "EEG_R.edf"]
 
-    # Place example data next to the models directory
-    models_dir = Path(os.path.dirname(get_model_path("dummy.onnx")))
-    example_data_dir = models_dir.parent / "example_zmax_data"
-    os.makedirs(example_data_dir, exist_ok=True)
+#     # Place example data next to the models directory
+#     models_dir = Path(os.path.dirname(get_model_path("dummy.onnx")))
+#     example_data_dir = models_dir.parent / "example_zmax_data"
+#     os.makedirs(example_data_dir, exist_ok=True)
 
-    files_to_download = [f for f in example_files if not (example_data_dir / f).exists()]
+#     files_to_download = [f for f in example_files if not (example_data_dir / f).exists()]
 
-    if not files_to_download:
-        return str(example_data_dir)
+#     if not files_to_download:
+#         return str(example_data_dir)
 
-    logger.info("\n\n" + f"Downloading example data to {example_data_dir}, please wait...")
+#     logger.info("\n\n" + f"Downloading example data to {example_data_dir}, please wait...")
 
-    for filename in files_to_download:
-        try:
-            logger.info(f"Downloading {filename}...")
-            hf_hub_download(repo_id=repo_id, filename=filename, local_dir=str(example_data_dir))
-            logger.info(f"Successfully downloaded {filename}.")
-        except Exception as e:
-            logger.error(f"Error downloading {filename}: {e}", exc_info=True)
-            repo_url = "https://huggingface.co/pzerr/NIDRA_models"
-            download_dir = example_data_dir / filename
-            error_message = (
-                "\n--- EXAMPLE DATA DOWNLOAD FAILED ---\n"
-                f"Please try to manually download the files from: {repo_url}\n"
-                f"And place them in this directory: {example_data_dir}\n"
-            )
-            logger.error(error_message)
-            return None
+#     for filename in files_to_download:
+#         try:
+#             logger.info(f"Downloading {filename}...")
+#             hf_hub_download(repo_id=repo_id, filename=filename, local_dir=str(example_data_dir))
+#             logger.info(f"Successfully downloaded {filename}.")
+#         except Exception as e:
+#             logger.error(f"Error downloading {filename}: {e}", exc_info=True)
+#             repo_url = "https://huggingface.co/pzerr/NIDRA_models"
+#             download_dir = example_data_dir / filename
+#             error_message = (
+#                 "\n--- EXAMPLE DATA DOWNLOAD FAILED ---\n"
+#                 f"Please try to manually download the files from: {repo_url}\n"
+#                 f"And place them in this directory: {example_data_dir}\n"
+#             )
+#             logger.error(error_message)
+#             return None
 
-    logger.info("--- Example data download complete ---")
-    return str(example_data_dir)
+#     logger.info("--- Example data download complete ---")
+#     return str(example_data_dir)
 
 
 
@@ -581,16 +581,15 @@ def download_assets(kind, logger):
     # Check existing
     missing = [f for f in files if not (base_dir / f).exists()]
     if not missing:
-        logger.info(f"{kind.replace('_', ' ')} found in: {base_dir}")
+        logger.info(f"All {kind.replace('_', ' ')} found in: {base_dir}")
         return str(base_dir)
 
     # Download missing items
     logger.info(f"Downloading {kind.replace('_', ' ')} to {base_dir}, please wait... {size_info}")
     for name in missing:
         try:
-            logger.info(f"Downloading {name}...")
             hf_hub_download(repo_id=repo_id, filename=name, local_dir=str(base_dir))
-            logger.info(f"Successfully downloaded {name}.")
+            logger.info(f"Downloaded {name}.")
         except Exception as e:
             logger.error(f"Error downloading {name}: {e}", exc_info=True)
 

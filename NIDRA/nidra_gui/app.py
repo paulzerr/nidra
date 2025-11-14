@@ -63,7 +63,7 @@ _startup_check_done = False
 frontend_url = None
 last_frontend_contact = None
 probe_thread = None
-frontend_grace_period = 2  # seconds (should be 60)
+frontend_grace_period = 60  # seconds
 
 
 # --- Flask Routes ---
@@ -81,9 +81,18 @@ def index():
     logger.info(f"User Agent: {request.headers.get('User-Agent', 'N/A')}")
     logger.info("--------------------------------------------------------------------------\n")
 
-    utils.download_assets("models",logger)
-    logger.info(TEXTS.get("CONSOLE_INIT_MESSAGE", "Welcome to NIDRA."))
 
+
+    logger.info("\n" + "="*80)
+    logger.info("Welcome to NIDRA, the easy-to-use sleep autoscorer.\nSelect your sleep recordings to begin.\nTo shutdown NIDRA, simply close this window or tab.")
+    logger.info("="*80 + "\n")
+    if not _startup_check_done:
+        _startup_check_done = True
+        threading.Thread(
+            target=utils.download_assets,
+            args=("models", logger),
+            daemon=True
+        ).start()
     return render_template('index.html', texts=TEXTS)
 
 @app.route('/docs/<path:filename>')
@@ -253,7 +262,6 @@ def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model,
     global is_scoring_running
     try:
         scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
-        #if score_subdirs:
         batch = utils.batch_scorer(
             input=input_dir,
             output=output,
@@ -264,12 +272,6 @@ def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model,
             plot=plot
         )
         batch.score()
-        # else:
-        #     # Single-recording scoring: resolve exactly one target and score it
-        #     logger.info(f"Processing single recording at '{input_dir}'...")
-        #     total_count = 1
-        #     if _run_scoring(input_dir, output, data_source, model, plot, hypnodensity, channels):
-        #         success_count = 1
 
     except Exception as e:
         logger.error(f"A critical error occurred in the scoring thread: {e}", exc_info=True)
