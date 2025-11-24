@@ -37,7 +37,6 @@ final_hiddenimports = [
     'pandas',
     'werkzeug',
     'matplotlib',
-    'backports',
 ] + collect_submodules('scipy') + collect_submodules('pandas') + collect_submodules('werkzeug') + mne_hiddenimports
 
 # 3. Print the final lists that will be passed to Analysis
