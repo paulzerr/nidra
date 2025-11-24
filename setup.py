@@ -12,6 +12,7 @@ install_requires = [
     "Flask",
     "huggingface_hub",
     "hf_xet",
+    #"pydantic-core==2.33.0",
     "pydantic-core==2.33.0",
     "appdirs",
     "requests",

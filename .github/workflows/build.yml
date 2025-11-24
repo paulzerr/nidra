@@ -101,12 +101,10 @@ jobs:
           Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024.onnx -OutFile NIDRA/models/u-sleep-nsrr-2024.onnx
           Invoke-WebRequest -Uri https://huggingface.co/pzerr/NIDRA_models/resolve/main/u-sleep-nsrr-2024_eeg.onnx -OutFile NIDRA/models/u-sleep-nsrr-2024_eeg.onnx
 
-      # ADD THIS NEW STEP AFTER THE INSTALL BLOCK
-      - name: Enforce Setuptools Pin (Fix PyInstaller)
+      - name: Enforce Setuptools version
         run: |
           .\venv\Scripts\activate
           python -m pip install "setuptools<70.0.0"
-
 
       - name: Download Example Data from Hugging Face
         if: steps.cache-hf-data.outputs.cache-hit != 'true'
