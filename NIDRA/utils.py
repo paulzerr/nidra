@@ -139,7 +139,7 @@ def batch_scorer(input, output=None, type=None, model=None,
                 scorer.score()
 
                 dt = time.time() - start
-                logger.info(f">> SUCCESS: Finished scoring {target_path} in {dt:.2f} seconds.")
+                logger.info(f">> SUCCESS: Finished scoring {target_path.name} in {dt:.2f} seconds.")
                 logger.info(f"   Results saved to: {out_dir}")
                 logger.info("-" * 80)
                 success_count += 1
@@ -430,15 +430,11 @@ def setup_logging():
     # Return the configured root logger instance
     return log_file, logging.getLogger()
 
-
-
 def get_model_path(model_name=None):
     app_dir, is_bundle = get_app_dir()
     base_path = Path(app_dir) if is_bundle else Path(user_data_dir())
     models_dir = base_path / "NIDRA" / "models"
     return models_dir / model_name if model_name else models_dir
-
-
 
 def get_app_dir():
     # PyInstaller bundle (one-dir)

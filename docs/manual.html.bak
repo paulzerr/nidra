@@ -31,7 +31,7 @@
                     <img src="logo.png" alt="NIDRA Logo" class="logo">
                 </div>
                 <div>
-                    <h1>NIDRA v0.2.0 - super simple sleep scoring</h1>
+                    <h1>NIDRA v0.1.1 - super simple sleep scoring</h1>
                     <a href="https://github.com/paulzerr/nidra" class="intro-link">https://github.com/paulzerr/nidra</a>
                     <p>An easy way to use powerful machine learning models to autoscore sleep recordings with excellent accuracy. No programming required, but Python endpoints are available. NIDRA can accurately score recordings from 2-channel EEG wearables such as ZMax (using ez6 and ez6moe models), as well as full PSG recordings (using U-Sleep 2.0 via sleepyland).</p>
 
@@ -105,17 +105,18 @@ pip install .</code></pre>
         <section id="preparing-data">
             <h2>Preparing your data</h2>
             <ul>
-                <li>NIDRA automatically detects your input format. When specifying a single .edf file, NIDRA will score that file. When specifying a folder, NIDRA will score all recordings in that folder and all of its subfolders. You can also input a text file that contains a list of file paths.</li>
-                <li>When scoring PSG data, and if you use standard channel labels (e.g., 'EEG Fpz-Cz', 'EOG left', 'Fp1', 'O2-M1'), NIDRA uses these to identify channel types. If no clear channel names are provided, all channels are used and assumed to be EEG.</li>
-                <li>When scoring ZMax or other EEG wearable data, your recordings may contain both channels in the same file, or you can have one channel per file. In the latter case, the file pairs need to be in the same folder and named *L.edf and *R.edf.</li>
-                
-</ul>
-<br>
-<p><strong>Structure for Forehead EEG (e.g., ZMax):</strong></p>
-<ul>
-  
+                <li>In general, NIDRA expects to find each recording (.edf) in its own subfolder. However, you can also input a text file that contains the file locations.</li>
+                <li>If you use standard channel labels (e.g., 'EEG Fpz-Cz', 'EOG left', 'Fp1', 'O2-M1') in your PSG recordings, NIDRA uses these to identify channel types. If no clear channel names are provided, all channels are used and assumed to be EEG.</li>
+            </ul>
 
-            <li><p>For ZMax EEG data in the original format, the left and right channel files must be in the same directory. These are typically named <code>EEG_L.edf</code> and <code>EEG_R.edf</code>. However, you can also supply ZMax recordings (or data from any forehead EEG device) with both EEG channels in the same .edf file. NIDRA will automatically detect this.</p></li>
+            <h3 id="scoring-options">Input file options</h3>
+            <ul>
+                <li><strong>Score single recording:</strong> Score a single recording. Specify the .edf file, or the folder containing the edf file(s). For ZMax file pairs, you can specify either the left or right channel edf.</li>
+                <li><strong>Score all recordings (in subfolders):</strong> Score multiple recordings. NIDRA will look for subfolders within your selected input folder and process each one as a separate recording.</li>
+                <li><strong>Score all recordings (paths in .txt file):</strong> Specify a <code>.txt</code> file as input, which contains one absolute path to a single edf file per line to tell NIDRA which recordings to score. If you choose this option, file organization is irrelevant.</li>
+            </ul>
+<p><strong>Structure for Forehead EEG (e.g., ZMax):</strong></p>
+            <p>For ZMax EEG data, the left and right channel files must be in the same directory. These are typically named <code>EEG_L.edf</code> and <code>EEG_R.edf</code>. However, you can also supply ZMax recordings (or data from any forehead EEG device) with both EEG channels in the same .edf file. NIDRA will automatically detect this.</p>
             <pre>
 forehead_study/
 ├── subject_01/
@@ -125,12 +126,21 @@ forehead_study/
 |   ├── night01_L.edf
 |   └── night01_R.edf
 </pre>
-</ul>
-<br>
+            <p><strong>Structure for PSG:</strong></p>
+            <p>Similarly, for PSG data, each EDF file should be in its own directory.</p>
+            <pre>
+psg_study/
+├── subject_02/
+|   └── night_recording_1.edf
+├── subject_03/
+|   └── night_recording_2.edf
+└── subject_04/
+    └── another_night.edf
+</pre>
 
 <p><strong>Selecting channels</strong></p>
-<ul><p><li>You can optionally specify which channels to use for scoring. NIDRA will automatically detect EEG and EOG channels based on their names, and ignore other channels as they are not used by any of the models. </p></li>
-</ul>
+            <p>You can optionally specify which channels to use for scoring. NIDRA will automatically detect EEG and EOG channels based on their names, and ignore other channels as they are not used by any of the models. </p>
+
 
 
         </section>

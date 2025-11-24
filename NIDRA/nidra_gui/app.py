@@ -237,49 +237,37 @@ def start_scoring():
     is_scoring_running = True
     is_cancelling = False
     cancel_event.clear()
-    logger.info("\n" + "="*80 + "\nStarting new scoring process on python backend...\n" + "="*80)
+    logger.info("\n" + "=" * 80 + "\nStarting new scoring process on python backend...\n" + "=" * 80)
 
-    # call scorer
+    def _run_scoring(config, cancel_event_obj):
+        """The actual scoring logic that runs in a separate thread."""
+        global is_scoring_running, is_cancelling
+        try:
+            scorer_type = 'psg' if config['data_source'] == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
+            batch = utils.batch_scorer(
+                input=config['input_dir'],
+                output=config['output'],
+                type=scorer_type,
+                model=config['model'],
+                channels=config.get('channels'),
+                hypnodensity=config.get('hypnodensity', False),
+                plot=config.get('plot', False),
+                cancel_event=cancel_event_obj
+            )
+            batch.score()
+
+        except Exception as e:
+            logger.error(f"A critical error occurred in the scoring thread: {e}", exc_info=True)
+        finally:
+            is_scoring_running = False
+            is_cancelling = False
+
     worker_thread = threading.Thread(
-        target=scoring_thread_wrapper,
-        args=(
-            data['input_dir'],
-            data['output'],
-            data.get('score_subdirs', False) or data.get('score_from_file', False),
-            data['data_source'],
-            data['model'],
-            data.get('plot', False),
-            data.get('hypnodensity', False),
-            cancel_event,
-            data.get('channels')
-        )
+        target=_run_scoring,
+        args=(data, cancel_event)
     )
     worker_thread.start()
     return jsonify({'status': 'success', 'message': 'Scoring process initiated.'})
-
-
-def scoring_thread_wrapper(input_dir, output, score_subdirs, data_source, model, plot, hypnodensity, cancel_event, channels=None):
-
-    global is_scoring_running, is_cancelling
-    try:
-        scorer_type = 'psg' if data_source == TEXTS["DATA_SOURCE_PSG"] else 'forehead'
-        batch = utils.batch_scorer(
-            input=input_dir,
-            output=output,
-            type=scorer_type,
-            model=model,
-            channels=channels,
-            hypnodensity=hypnodensity,
-            plot=plot,
-            cancel_event=cancel_event
-        )
-        batch.score()
-
-    except Exception as e:
-        logger.error(f"A critical error occurred in the scoring thread: {e}", exc_info=True)
-    finally:
-        is_scoring_running = False
-        is_cancelling = False
 
 
 
@@ -515,6 +503,4 @@ def register_frontend():
         probe_thread.start()
 
     return jsonify({'status': 'success'})
-
-
 

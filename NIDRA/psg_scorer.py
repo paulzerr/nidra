@@ -36,7 +36,7 @@ class PSGScorer:
                 raise ValueError("No valid input provided")
             self.base_filename = f"{self.input.parent.name}_{self.input.stem}"
 
-        self.model           = model
+        self.model           = model if model is not None else "u-sleep-nsrr-2024"
         self.channels        = channels
         self.sfreq           = sfreq
         self.epoch_sec       = 30 # we ignore this input for now and enforce 30s epochs
@@ -95,7 +95,7 @@ class PSGScorer:
     def _load_model(self):
         if self.has_eog:
             model_filename = self.model + ".onnx"
-            print(f"EOG channels found, loading model {model_filename}...")
+            print(f"EOG channel(s) found, loading model {model_filename}...")
         else:
             model_filename = self.model + "_eeg.onnx"
             print(f"No EOG channels found, loading EEG-only model: {model_filename}")
@@ -160,7 +160,74 @@ class PSGScorer:
         psg_data_scaled = psg_data_scaled[:n_epochs_final * n_samples_in_epoch_final]
         
         self.preprocessed_psg = psg_data_scaled.reshape(n_epochs_final, n_samples_in_epoch_final, -1).astype(np.float32)
-        
+    
+    # alternative predict function that uses overlapping windows.
+    # this might have higher accuracy, but does not align well with the original sleepyland/usleep implementation
+    # def _predict(self):
+    #     print(f"Prediction started.")
+    #     window_size = int(self.session.get_inputs()[0].shape[1])      # L (epochs per window; fixed to 35)
+    #     n_epochs_total = int(self.preprocessed_psg.shape[0])          # N (total epochs)
+    #     samples_per_epoch = int(self.preprocessed_psg.shape[1])       # S
+    #     n_classes = int(self.session.get_outputs()[0].shape[-1])      # C_out
+    #     batch_size = 64
+    #     margin = window_size // 2
+    #     group_probabilities = []
+
+    #     for i, channel_group in enumerate(self.channel_groups):
+            
+    #         self.logger.info(f"Predicting on group {i+1}/{len(self.channel_groups)}: {channel_group.channel_names}")
+
+    #         # [N, S, C_in]
+    #         psg_subset = self.preprocessed_psg[:, :, tuple(channel_group.channel_indices)].astype(np.float32)
+    #         n_channels = psg_subset.shape[-1]
+
+    #         prob_sum = np.zeros((n_epochs_total, n_classes), dtype=np.float32)
+    #         coverage = np.zeros(n_epochs_total, dtype=np.int32)
+
+    #         if n_epochs_total <= window_size:
+    #             # Short recording: single padded window
+    #             diff = window_size - n_epochs_total
+    #             pad = np.zeros((diff, samples_per_epoch, n_channels), dtype=np.float32) if diff > 0 else None
+    #             window = psg_subset if diff == 0 else np.concatenate([psg_subset, pad], axis=0)
+    #             batch = np.expand_dims(window, 0)  # [1, L, S, C]
+    #             pred = self.session.run([self.output_name], {self.input_name: batch})[0][0]  # [L, C]
+    #             pred = pred[:n_epochs_total]  # trim padding
+    #             prob_sum += pred
+    #             coverage += 1
+    #         else:
+    #             # Build starts with stride=margin AND force a final start at N-L
+    #             last_start = n_epochs_total - window_size
+    #             starts = list(range(0, last_start + 1, margin))
+    #             if starts[-1] != last_start:
+    #                 starts.append(last_start)
+    #             n_windows = len(starts)
+
+    #             # Build windows as a dense stack
+    #             # Shape: [n_windows, L, S, C]
+    #             windows = np.stack([psg_subset[s:s + window_size] for s in starts], axis=0)
+
+    #             # Batched inference
+    #             for start_idx in range(0, n_windows, batch_size):
+    #                 end_idx = min(start_idx + batch_size, n_windows)
+    #                 batch = windows[start_idx:end_idx]  # [B, L, S, C]
+    #                 pred_batch = self.session.run([self.output_name], {self.input_name: batch})[0]  # [B, L, C]
+
+    #                 # Accumulate predictions into epoch space with coverage counts
+    #                 for j in range(end_idx - start_idx):
+    #                     s = starts[start_idx + j]
+    #                     e = s + window_size
+    #                     prob_sum[s:e] += pred_batch[j]
+    #                     coverage[s:e] += 1
+
+    #         # Normalize by coverage (triangular divisor)
+    #         group_probs = prob_sum / np.maximum(coverage[:, None], 1e-7)
+    #         group_probabilities.append(group_probs)
+
+    #     # Ensemble average across channel groups
+    #     self.probabilities = np.mean(np.stack(group_probabilities, axis=0), axis=0)  # [N, C]
+    #     self.sleep_stages = self.probabilities.argmax(-1)
+    #     print(f"Prediction successful.")
+    #     return self.sleep_stages, self.probabilities
 
     def _predict(self):
         print(f"Prediction started.")
@@ -180,46 +247,38 @@ class PSGScorer:
             psg_subset = self.preprocessed_psg[:, :, tuple(channel_group.channel_indices)].astype(np.float32)
             n_channels = psg_subset.shape[-1]
 
-            prob_sum = np.zeros((n_epochs_total, n_classes), dtype=np.float32)
-            coverage = np.zeros(n_epochs_total, dtype=np.int32)
-
+            # --- Non-overlapping windows (Old Method) ---
             if n_epochs_total <= window_size:
-                # Short recording: single padded window
                 diff = window_size - n_epochs_total
                 pad = np.zeros((diff, samples_per_epoch, n_channels), dtype=np.float32) if diff > 0 else None
                 window = psg_subset if diff == 0 else np.concatenate([psg_subset, pad], axis=0)
                 batch = np.expand_dims(window, 0)  # [1, L, S, C]
                 pred = self.session.run([self.output_name], {self.input_name: batch})[0][0]  # [L, C]
-                pred = pred[:n_epochs_total]  # trim padding
-                prob_sum += pred
-                coverage += 1
+                group_probs = pred[:n_epochs_total]
             else:
-                # Build starts with stride=margin AND force a final start at N-L
-                last_start = n_epochs_total - window_size
-                starts = list(range(0, last_start + 1, margin))
-                if starts[-1] != last_start:
-                    starts.append(last_start)
-                n_windows = len(starts)
+                preds = []
+                # Calculate starts for non-overlapping windows
+                starts = range(0, n_epochs_total, window_size)
+                
+                for s in starts:
+                    e = s + window_size
+                    if e <= n_epochs_total:
+                        # Full window
+                        window = psg_subset[s:e]
+                        batch = np.expand_dims(window, 0)
+                        pred_batch = self.session.run([self.output_name], {self.input_name: batch})[0][0]
+                        preds.append(pred_batch)
+                    else:
+                        # Partial final window - grab last window_size epochs
+                        last_window = psg_subset[-window_size:]
+                        batch = np.expand_dims(last_window, 0)
+                        pred_batch = self.session.run([self.output_name], {self.input_name: batch})[0][0]
+                        # Only take the part that corresponds to the remaining epochs
+                        remaining = n_epochs_total - s
+                        preds.append(pred_batch[-remaining:])
+                
+                group_probs = np.concatenate(preds, axis=0)
 
-                # Build windows as a dense stack 
-                # Shape: [n_windows, L, S, C]
-                windows = np.stack([psg_subset[s:s + window_size] for s in starts], axis=0)
-
-                # Batched inference
-                for start_idx in range(0, n_windows, batch_size):
-                    end_idx = min(start_idx + batch_size, n_windows)
-                    batch = windows[start_idx:end_idx]  # [B, L, S, C]
-                    pred_batch = self.session.run([self.output_name], {self.input_name: batch})[0]  # [B, L, C]
-
-                    # Accumulate predictions into epoch space with coverage counts
-                    for j in range(end_idx - start_idx):
-                        s = starts[start_idx + j]
-                        e = s + window_size
-                        prob_sum[s:e] += pred_batch[j]
-                        coverage[s:e] += 1
-
-            # Normalize by coverage (triangular divisor)
-            group_probs = prob_sum / np.maximum(coverage[:, None], 1e-7)
             group_probabilities.append(group_probs)
 
         # Ensemble average across channel groups
@@ -401,7 +460,7 @@ class PSGScorer:
         iqr = q75 - q25
         iqr[iqr == 0] = 1.0
         return (x - median) / iqr
-    
+
     def _softmax(self, x: np.ndarray, axis: int = -1) -> np.ndarray:
         """NumPy implementation of softmax"""
         exp_x = np.exp(x - np.max(x, axis=axis, keepdims=True))
