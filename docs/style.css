@@ -34,8 +34,9 @@ pre code { background: transparent; padding: 0; font-size: 100%; }
   .content { margin-left: 0; padding: 2rem 1.5rem; }
 }
 
-table.minimal { border-collapse: collapse; }
-table.minimal th, table.minimal td { padding: 0.25rem 0.5rem; }
+table.minimal { border-collapse: collapse; width: 100%; }
+table.minimal th, table.minimal td { padding: 0.75rem 0.5rem; }
 table.minimal thead th { text-align: left; border-bottom: 2px solid #DEE2E6; padding-bottom: 1rem; }
-table.minimal td + td, table.minimal th + th { border-left: 2px solid #DEE2E6; }
+table.minimal tbody tr:nth-child(odd) { background-color: #f8f9fa; }
+table.minimal tbody tr:nth-child(even) { background-color: #ffffff; }
 .intro-link { display: inline-block; margin: 0.25rem 0 0.75rem; }
