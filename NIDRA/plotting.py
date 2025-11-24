@@ -100,7 +100,7 @@ def _remap_hypnogram_for_plotting(hyp):
     return hyp_plot
 
 
-def plot_hypnodensity(hyp, ypred, raw, nclasses=6, figoutdir='./', filename='dashboard.png', titl="ezscore-f", type='forehead'):
+def plot_hypnodensity(hyp, ypred, raw, nclasses=6, figoutdir='./', filename='figure.png', type='forehead'):
     """
     Plots a hypnodensity graph, which is a combination of a hypnogram and the softmax probabilities of the sleep stage predictions.
 
@@ -115,7 +115,7 @@ def plot_hypnodensity(hyp, ypred, raw, nclasses=6, figoutdir='./', filename='das
     figoutdir : str
         The directory where the figure will be saved.
     filename : str
-        The filename for the saved plot (default: 'dashboard.png').
+        The filename for the saved plot (default: 'figure.png').
     type : str
         The type of scorer ('forehead' or 'psg'), which determines the plot layout.
     """

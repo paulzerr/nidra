@@ -314,7 +314,7 @@ class PSGScorer:
 
     def _make_plot(self):
         if self.plot:
-            plot_filename = f"{self.base_filename}_graph.png"
+            plot_filename = f"{self.base_filename}_figure.png"
             plot_hypnodensity(
                 hyp=self.sleep_stages,
                 ypred=self.probabilities,
@@ -324,7 +324,7 @@ class PSGScorer:
                 filename=plot_filename,
                 type='psg'
             )
-            print(f"Graph saved to {self.output / plot_filename}")
+            print(f"Figure saved to {self.output / plot_filename}")
 
 
     def _parse_channel(self, name: str) -> Dict[str, Any]:

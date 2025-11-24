@@ -195,7 +195,7 @@ import NIDRA
 
 scorer = NIDRA.scorer(
     type = 'psg',
-    input = '/path/to/edf/or/folder/'
+    input = '/path/to/recording.edf'
 )
 
 scorer.score()
@@ -223,21 +223,22 @@ hypnogram, probabilities = scorer.score()
 </pre>
 
 
-            <h3>Example 3: Scoring multiple PSG recordings</h3>
-            <p>For batch processing, NIDRA provides a convenient <code>batch_scorer</code>. This function automatically discovers all valid recordings in the subdirectories of your input path, mirroring the behavior of the GUI. This is the recommended way to process a full study. Please see the <a href="#preparing-data">Preparing Your Data</a> section for details on how to structure your study directory.</p>
+            <h3>Example 3: Scoring multiple recordings</h3>
+            <p>You can score multiple recordings in one go by simply specifying a folder path, which contains recordings or subfolders with recordings. NIDRA will scan subfolders recursively and score all edf files present. </p>
+            <p>You can also specify the path of a .txt file that contains one path to a recording (or folder containing one or more recordings) per line.</p>
 
             <pre>
 import NIDRA
 
-batch = NIDRA.batch_scorer(
-    type='psg',
-    input_dir='/path/to/folder/with/subfolders/', # or: .txt file with edf paths
-    output='/path/to/output/folder/',
-    probabilities=True,
-    plot=True
+scorer = NIDRA.scorer(
+    type = 'psg',
+    input = '/path/to/folder/'
 )
 
-batch.score()
+scorer.score()
+
+
+
 </pre>
             <h3>Example 4: Scoring in-memory data (e.g. real-time application)</h3>
             <p>You can also score data that you already have in memory as an array. This is useful for real-time applications or custom data loading pipelines. When scoring PSG data from an array, you must provide the sampling frequency (<code>sfreq</code>). Providing channel names is recommended but optional; if not provided, they will be auto-generated. All channels are then assumed to contain EEG data. By default, no output files are generated, but this can be enabled if desired.</p>
@@ -285,7 +286,7 @@ Scorer.score(plot: bool = False) -> tuple[numpy.ndarray, numpy.ndarray]</code></
 <h4>Output files (when enabled)</h4>
 <ul>
   <li><code>..._hypnogram.csv</code> — sleep stage code per epoch</li>
-  <li><code>..._probabilities.csv</code> — per-epoch class probabilities</li>
+  <li><code>..._hypnodensity.csv</code> — per-epoch class probabilities</li>
   <li><code>..._dashboard.png</code> — plot (if <code>plot=True</code> and file writing enabled)</li>
 </ul>
 

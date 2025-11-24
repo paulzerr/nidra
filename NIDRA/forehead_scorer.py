@@ -265,5 +265,5 @@ class ForeheadScorer:
                 filename=plot_filename,
                 type='forehead'
             )
-            print(f"Graph saved to {self.output / plot_filename}")
+            print(f"Figure saved to {self.output / plot_filename}")
 
