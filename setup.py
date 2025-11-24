@@ -13,15 +13,14 @@ install_requires = [
     "huggingface_hub",
     "hf_xet",
     #"pydantic-core==2.33.0",
-    "pydantic-core==2.33.0",
+    "pydantic==2.33.0",
     "appdirs",
     "requests",
     "pywebview",
     "psutil",
 ]
 
-# Add platform-specific dependencies for numpy and onnxruntime
-# This logic mirrors the one in pyproject.toml for compatibility with older pip/setuptools
+# platform-specific dependencies for numpy and onnxruntime
 if sys.platform == 'darwin':
     # platform.release() returns the kernel version, e.g., '23.1.0' for macOS 14.1
     # macOS < 14 corresponds to Darwin kernel version < 23
