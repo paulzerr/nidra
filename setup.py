@@ -19,7 +19,7 @@ install_requires = [
     "pywebview",
     "psutil",
 ]
-
+ 
 # platform-specific dependencies for numpy and onnxruntime
 if sys.platform == 'darwin':
     # platform.release() returns the kernel version, e.g., '23.1.0' for macOS 14.1

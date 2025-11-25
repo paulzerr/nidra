@@ -206,7 +206,7 @@ class ForeheadScorer:
         self.processed_data, self.num_full_seqs = seqdat, num_full_seqs
 
     def _predict(self):
-        print(f"Prediction started.")
+        print(f"Prediction started...")
         seq_length = 100
         last_seq = self.processed_data[-1]
         last_seq_valid_epochs = int(np.sum(~np.isnan(last_seq.sum(axis=(1, 2)))))

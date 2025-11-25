@@ -21,7 +21,7 @@ print("\n--- MNE Datas ---")
 print(mne_datas)
 print("\n--- Matplotlib Datas ---")
 print(matplotlib_datas)
-
+ 
 # 2. Construct final lists for Analysis
 final_datas = [
     ('NIDRA/nidra_gui/neutralino', 'neutralino'),

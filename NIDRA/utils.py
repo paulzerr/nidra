@@ -159,7 +159,6 @@ def batch_scorer(input, output=None, type=None, model=None,
 
     return SimpleNamespace(score=score)
 
-
 def calculate_font_size(screen_height, percentage, min_size, max_size):
     """Calculates font size as a percentage of screen height with min/max caps."""
     font_size = int(screen_height * (percentage / 100))

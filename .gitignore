@@ -1,9 +1,10 @@
 *.log
 *.tmp
 *.pyc
+*.bak
 .*/
 !.github
-
+old/
 __pycache__/
 models/
 examples/

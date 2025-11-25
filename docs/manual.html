@@ -36,7 +36,7 @@
                     <a href="https://github.com/paulzerr/nidra" class="intro-link">https://github.com/paulzerr/nidra</a>
                     <p>An easy way to use powerful machine learning models to autoscore sleep recordings with excellent accuracy. No programming required, but Python endpoints are available. NIDRA can accurately score recordings from 2-channel EEG wearables such as ZMax (using ez6 and ez6moe models), as well as full PSG recordings (using U-Sleep 2.0 via sleepyland).</p>
 
-                    <p><h2><strong>Download <a href="https://github.com/paulzerr/nidra/releases/latest/download/NIDRA.exe"> >> NIDRA for Windows 10/11 <<</a> </strong></h1></p>
+                    <p><h2><strong>Download <a href="https://github.com/paulzerr/nidra/releases/latest/download/NIDRA_installer.exe"> >> NIDRA for Windows 10/11 <<</a> </strong></h1></p>
                 <p></p>
                 <br>
                 </div>
@@ -78,6 +78,8 @@ pip install .</code></pre>
             <p>The GUI provides an intuitive, point-and-click option to score sleep recordings. The easiest way to launch the GUI is by downloading and starting the self-extracting archive (see above). Or, if you installed NIDRA as a Python package, you can launch it by opening your terminal or cmd and running the command: <code>nidra</code></p>
             <img src="gui.png" alt="Screenshot of the NIDRA GUI" style="width: 98%; display: block; margin: 20px 0;">
             <p><b>Fig.1</b> - Screenshot of the GUI. </p>
+            <img src="dashboard.png" alt="Screenshot of the NIDRA dashboard" style="width: 98%; display: block; margin: 20px 0;">
+            <p><b>Fig.2</b> - Example output figure. </p>
 
             <h2>GUI Walkthrough</h2>
             <h3>Step 1: Start the NIDRA GUI</h3>
@@ -323,7 +325,7 @@ Scorer.score(plot: bool = False) -> tuple[numpy.ndarray, numpy.ndarray]</code></
     <tr>
       <td><code>output</code></td>
       <td><code>str</code></td>
-      <td>—</td>
+      <td><code>input/autoscorer_output</code></td>
       <td>—</td>
       <td>Directory for outputs. Defaults to <code>autoscorer_output</code> in input folder. Required if using in-memory data and saving files.</td>
     </tr>    
@@ -522,3 +524,4 @@ Rossi, A. D., et al. (2025). SLEEPYLAND: trust begins with fair evaluation of au
     </main>
 </body>
 </html>
+
