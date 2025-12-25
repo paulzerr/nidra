@@ -16,11 +16,19 @@ def find_files(input):
 
     input = Path(input)
     exts = {".edf", ".bdf"}
+    skip_exact = {"BATT", "LIGHT", "DY", "BODY TEMP", "NOISE", "DX", "DZ"}
+    skip_prefixes = ("OXY",)
     files = []
+
+    def should_skip_file(f: Path):
+        name = f.stem.upper()
+        if name in skip_exact:
+            return True
+        return any(name.startswith(prefix) for prefix in skip_prefixes)
 
     def collect_from_dir(d: Path):
         for f in d.rglob("*"):
-            if f.is_file() and f.suffix.lower() in exts:
+            if f.is_file() and f.suffix.lower() in exts and not should_skip_file(f):
                 files.append(f)
 
     def collect_from_txt(txt: Path):
@@ -35,7 +43,7 @@ def find_files(input):
         if p.is_file():
             if p.suffix.lower() == ".txt":
                 collect_from_txt(p)
-            elif p.suffix.lower() in exts:
+            elif p.suffix.lower() in exts and not should_skip_file(p):
                 files.append(p)
         elif p.is_dir():
             collect_from_dir(p)
@@ -91,11 +99,10 @@ def batch_scorer(input, output=None, type=None, model=None,
             return 0, 0
 
         batch_start = time.time()
-        batch_output_dir = output_dir / f"autoscorer_output_run_{time.strftime('%Y%m%d_%H%M%S')}"
         try:
-            batch_output_dir.mkdir(parents=True, exist_ok=True)
+            output_dir.mkdir(parents=True, exist_ok=True)
         except:
-            logger.error(f"Unable to make output folder at {batch_output_dir}, please specify a location where you have user rights.")
+            logger.error(f"Unable to make output folder at {output_dir}, please specify a location where you have user rights.")
 
         success_count = 0
         total = len(files_to_process)
@@ -112,8 +119,7 @@ def batch_scorer(input, output=None, type=None, model=None,
 
             #logger.info(f"Scoring on channels: {channels}")
             
-            rec_name = target_path.name if target_path.is_dir() else target_path.parent.name
-            out_dir = batch_output_dir / rec_name
+            out_dir = output_dir
             out_dir.mkdir(exist_ok=True)
 
             try:
@@ -152,7 +158,7 @@ def batch_scorer(input, output=None, type=None, model=None,
         logger.info("PROCESSING COMPLETE")
         logger.info(f"{success_count} of {total} recording(s) processed successfully.")
         logger.info(f"Total execution time: {total_dt:.2f} seconds.")
-        logger.info(f"All results saved in: {batch_output_dir}")
+        logger.info(f"All results saved in: {output_dir}")
         logger.info("="*80)
 
         return success_count, total
@@ -506,4 +512,3 @@ def download_assets(kind, logger):
 
     logger.info(f"--- {kind.replace('_', ' ').title()} download complete ---")
     return str(base_dir)
-
