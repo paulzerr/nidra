@@ -2,11 +2,8 @@ name: NIDRA Build
 
 on:
   push:
-    branches: [ master, development ]
     tags:
       - 'v*'
-  pull_request:
-    branches: [ master ]
 
 jobs:
   build:
