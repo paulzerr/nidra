@@ -68,13 +68,21 @@ def find_files(input):
 
     return files_to_process, output_base
 
-def batch_scorer(input, output=None, type=None, model=None,
-                 channels=None, hypnogram=None, hypnodensity=False, plot=False, cancel_event=None):
+def batch_scorer(input, output=None, type=None, model=None, channels=None, hypnogram=None, 
+                 hypnodensity=False, plot=False, cancel_event=None, sfreq=None):
 
     if type not in ("forehead", "psg"):
         raise ValueError("type must be 'forehead' or 'psg'.")
 
-    files_to_process, output_base_dir = find_files(input)
+    # Allow in-memory array input
+    is_array_input = hasattr(input, "__array__")
+    if is_array_input:
+        if sfreq is None:
+            raise ValueError("'sfreq' must be provided when array input is used.")
+        files_to_process = [Path("array_input")]
+        output_base_dir = None
+    else:
+        files_to_process, output_base_dir = find_files(input)
 
     if files_to_process:
         logger.info(f"The following {len(files_to_process)} recordings will be scored:")
@@ -132,15 +140,27 @@ def batch_scorer(input, output=None, type=None, model=None,
                 else:
                     raise ValueError(f"Unknown scorer type: {type}")
 
-                scorer = Scorer(
-                    input=target_path,
-                    output=str(out_dir),
-                    model=model,
-                    channels=channels,
-                    hypnogram=True if hypnogram is None else bool(hypnogram),
-                    hypnodensity=bool(hypnodensity),
-                    plot=bool(plot),
-                )
+                if is_array_input:
+                    scorer = Scorer(
+                        input=input,
+                        output=str(output) if output else None,
+                        model=model,
+                        channels=channels,
+                        sfreq=sfreq,
+                        hypnogram=False if hypnogram is None else bool(hypnogram),
+                        hypnodensity=bool(hypnodensity),
+                        plot=bool(plot),
+                    )
+                else:
+                    scorer = Scorer(
+                        input=target_path,
+                        output=str(out_dir),
+                        model=model,
+                        channels=channels,
+                        hypnogram=True if hypnogram is None else bool(hypnogram),
+                        hypnodensity=bool(hypnodensity),
+                        plot=bool(plot),
+                    )
 
                 scorer.score()
 

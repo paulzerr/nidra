@@ -82,7 +82,7 @@ class PSGScorer:
             if self.channels is None: 
                 self.channels = [f"Ch{i+1:02d}" for i in range(n_channels)]
             # make raw mne object from the numpy array
-            info = mne.create_info(channels=self.channels, sfreq=self.sfreq, ch_types='eeg', verbose=False)
+            info = mne.create_info(ch_names=self.channels, sfreq=self.sfreq, ch_types='eeg', verbose=False)
             self.raw = mne.io.RawArray(self.input, info, verbose=False)
             print(f"Array data loaded.")
         else:

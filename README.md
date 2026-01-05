@@ -2,7 +2,7 @@
   <tr>
     <td width="200" valign="top"><img src="docs/logo.png" alt="NIDRA Logo" width="200"/></td>
     <td valign="top">
-      <h2>NIDRA v0.2.0 - super simple sleep scoring</h2>
+      <h2>NIDRA v0.2.2 - super simple sleep scoring</h2>
       An easy way to use powerful machine learning models to autoscore sleep recordings with excellent accuracy. No programming required, but Python endpoints are available. NIDRA can accurately score recordings from 2-channel EEG wearables such as ZMax (using ezscore-f models), as well as full PSG recordings (using U-Sleep 2.0 via sleepyland).
       <br>
       <h3>Please see the <a href="https://nidra.netlify.app/">NIDRA Manual</a> for a detailed user guide, installation, and examples.</h3>
