@@ -79,7 +79,7 @@ def batch_scorer(input, output=None, type=None, model=None, channels=None, hypno
     if is_array_input:
         if sfreq is None:
             raise ValueError("'sfreq' must be provided when array input is used.")
-        files_to_process = [Path("array_input")]
+        files_to_process = [Path("array_input")] # workaround
         output_base_dir = None
     else:
         files_to_process, output_base_dir = find_files(input)
@@ -91,29 +91,26 @@ def batch_scorer(input, output=None, type=None, model=None, channels=None, hypno
     else:
         logger.warning(f"Could not find any sleep recordings in the specified location.")
 
-    if output:
-        output_dir = Path(output)
-    elif output_base_dir:
-        output_dir = output_base_dir
+    if hypnogram or hypnodensity or plot:
+        if output:
+            output_dir = Path(output)
+        elif output_base_dir:
+            output_dir = output_base_dir
+        else:
+            output_dir = Path.cwd()
+            logger.warning(
+                f"Could not determine a base directory for outputs. "
+                f"Defaulting to current working directory: {output_dir}"
+            )
     else:
-        output_dir = Path.cwd()
-        logger.warning(
-            f"Could not determine a base directory for outputs. "
-            f"Defaulting to current working directory: {output_dir}"
-        )
+        output_dir = None
 
     def score():
-        if not files_to_process:
-            return 0, 0
-
         batch_start = time.time()
-        try:
-            output_dir.mkdir(parents=True, exist_ok=True)
-        except:
-            logger.error(f"Unable to make output folder at {output_dir}, please specify a location where you have user rights.")
-
+        hypno = None
+        probs = None
         success_count = 0
-        total = len(files_to_process)
+        total         = len(files_to_process)
 
         for i, target in enumerate(files_to_process):
             target_path = Path(target)
@@ -127,8 +124,11 @@ def batch_scorer(input, output=None, type=None, model=None, channels=None, hypno
 
             #logger.info(f"Scoring on channels: {channels}")
             
-            out_dir = output_dir
-            out_dir.mkdir(exist_ok=True)
+            try:
+                if hypnogram or hypnodensity or plot:
+                    output_dir.mkdir(parents=True, exist_ok=True)
+            except:
+                logger.error(f"Unable to make output folder at {output_dir}, please specify a location where you have user rights.")
 
             try:
                 start = time.time()
@@ -154,7 +154,7 @@ def batch_scorer(input, output=None, type=None, model=None, channels=None, hypno
                 else:
                     scorer = Scorer(
                         input=target_path,
-                        output=str(out_dir),
+                        output=str(output_dir),
                         model=model,
                         channels=channels,
                         hypnogram=True if hypnogram is None else bool(hypnogram),
@@ -162,11 +162,11 @@ def batch_scorer(input, output=None, type=None, model=None, channels=None, hypno
                         plot=bool(plot),
                     )
 
-                scorer.score()
+                hypno, probs = scorer.score()
 
                 dt = time.time() - start
                 logger.info(f">> SUCCESS: Finished scoring {target_path.name} in {dt:.2f} seconds.")
-                logger.info(f"   Results saved to: {out_dir}")
+                logger.info(f"   Results saved to: {output_dir}")
                 logger.info("-" * 80)
                 success_count += 1
 
@@ -181,7 +181,7 @@ def batch_scorer(input, output=None, type=None, model=None, channels=None, hypno
         logger.info(f"All results saved in: {output_dir}")
         logger.info("="*80)
 
-        return success_count, total
+        return hypno, probs
 
     return SimpleNamespace(score=score)
 
